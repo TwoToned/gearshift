@@ -1,0 +1,225 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
+import { createModel, updateModel } from "@/server/models";
+import { getCategories } from "@/server/categories";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { QuickCreateCategory } from "./quick-create-category";
+import { SpecificationsEditor } from "./specifications-editor";
+
+interface ModelFormProps {
+  initialData?: ModelFormValues & { id: string };
+}
+
+export function ModelForm({ initialData }: ModelFormProps) {
+  const router = useRouter();
+  const isEditing = !!initialData;
+  const [showCreateCategory, setShowCreateCategory] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => getCategories(),
+  });
+
+  const form = useForm<ModelFormValues>({
+    resolver: zodResolver(modelSchema),
+    defaultValues: initialData || {
+      name: "",
+      manufacturer: "",
+      modelNumber: "",
+      categoryId: "",
+      description: "",
+      assetType: "SERIALIZED",
+      requiresTestAndTag: false,
+      isActive: true,
+      images: [],
+      manuals: [],
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: ModelFormValues) =>
+      isEditing ? updateModel(initialData.id, data) : createModel(data),
+    onSuccess: (result) => {
+      toast.success(isEditing ? "Model updated" : "Model created");
+      router.push(`/assets/models/${result.id}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-6">
+      {/* Basic Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Basic Information</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="name">Name *</Label>
+            <Input id="name" {...form.register("name")} placeholder="e.g. Shure SM58" />
+            {form.formState.errors.name && (
+              <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="manufacturer">Manufacturer</Label>
+            <Input id="manufacturer" {...form.register("manufacturer")} placeholder="e.g. Shure" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="modelNumber">Model Number</Label>
+            <Input id="modelNumber" {...form.register("modelNumber")} placeholder="e.g. SM58-LC" />
+          </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <ComboboxPicker
+              value={form.watch("categoryId") || ""}
+              onChange={(v) => form.setValue("categoryId", v)}
+              options={categories.map((cat) => ({
+                value: cat.id,
+                label: cat.parent ? `${cat.parent.name} → ${cat.name}` : cat.name,
+              }))}
+              placeholder="No category"
+              searchPlaceholder="Search categories..."
+              onCreateNew={() => setShowCreateCategory(true)}
+              createNewLabel="New category"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assetType">Asset Type</Label>
+            <select
+              id="assetType"
+              {...form.register("assetType")}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="SERIALIZED">Serialized (tracked individually)</option>
+              <option value="BULK">Bulk (tracked by quantity)</option>
+            </select>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea id="description" {...form.register("description")} placeholder="Optional description" rows={3} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pricing */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pricing</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="defaultRentalPrice">Rental Price ($/day)</Label>
+            <Input id="defaultRentalPrice" type="number" step="0.01" {...form.register("defaultRentalPrice")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="defaultPurchasePrice">Purchase Price ($)</Label>
+            <Input id="defaultPurchasePrice" type="number" step="0.01" {...form.register("defaultPurchasePrice")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="replacementCost">Replacement Cost ($)</Label>
+            <Input id="replacementCost" type="number" step="0.01" {...form.register("replacementCost")} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Technical */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Technical Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="weight">Weight (kg)</Label>
+            <Input id="weight" type="number" step="0.01" {...form.register("weight")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="powerDraw">Power Draw (watts)</Label>
+            <Input id="powerDraw" type="number" {...form.register("powerDraw")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="maintenanceIntervalDays">Maintenance Interval (days)</Label>
+            <Input id="maintenanceIntervalDays" type="number" {...form.register("maintenanceIntervalDays")} placeholder="e.g. 365" />
+          </div>
+          <div className="sm:col-span-2 space-y-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="requiresTestAndTag"
+                checked={form.watch("requiresTestAndTag")}
+                onCheckedChange={(v) => form.setValue("requiresTestAndTag", !!v)}
+              />
+              <Label htmlFor="requiresTestAndTag">Requires Test & Tag</Label>
+            </div>
+            {form.watch("requiresTestAndTag") && (
+              <div className="space-y-2 max-w-xs">
+                <Label htmlFor="testAndTagIntervalDays">Test & Tag Interval (days)</Label>
+                <Input id="testAndTagIntervalDays" type="number" {...form.register("testAndTagIntervalDays")} placeholder="e.g. 90" />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Specifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Specifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SpecificationsEditor
+            value={(form.watch("specifications") as Record<string, string>) || {}}
+            onChange={(specs) => form.setValue("specifications", specs)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Status */}
+      <Card>
+        <CardContent className="flex items-center justify-between pt-6">
+          <div>
+            <Label htmlFor="isActive">Active</Label>
+            <p className="text-xs text-muted-foreground">Inactive models are hidden from asset creation</p>
+          </div>
+          <Switch
+            id="isActive"
+            checked={form.watch("isActive")}
+            onCheckedChange={(v) => form.setValue("isActive", v)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Submit */}
+      <div className="flex gap-3">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isEditing ? "Update Model" : "Create Model"}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.back()}>
+          Cancel
+        </Button>
+      </div>
+
+      <QuickCreateCategory
+        open={showCreateCategory}
+        onOpenChange={setShowCreateCategory}
+        onCreated={(id) => form.setValue("categoryId", id)}
+      />
+    </form>
+  );
+}

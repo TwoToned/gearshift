@@ -1,0 +1,38 @@
+import { z } from "zod";
+
+export const maintenanceSchema = z.object({
+  assetId: z.string().min(1, "Asset is required"),
+  type: z
+    .enum([
+      "REPAIR",
+      "PREVENTATIVE",
+      "TEST_AND_TAG",
+      "INSPECTION",
+      "CLEANING",
+      "FIRMWARE_UPDATE",
+    ])
+    .default("REPAIR"),
+  status: z
+    .enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+    .default("SCHEDULED"),
+  title: z.string().min(1, "Title is required").max(200),
+  description: z.string().max(5000).optional(),
+  assignedToId: z.string().optional(),
+  scheduledDate: z
+    .union([z.literal(""), z.coerce.date()])
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  completedDate: z
+    .union([z.literal(""), z.coerce.date()])
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  cost: z.coerce.number().min(0).optional(),
+  partsUsed: z.string().max(2000).optional(),
+  result: z.enum(["PASS", "FAIL", "CONDITIONAL"]).optional(),
+  nextDueDate: z
+    .union([z.literal(""), z.coerce.date()])
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+});
+
+export type MaintenanceFormValues = z.input<typeof maintenanceSchema>;

@@ -1,0 +1,308 @@
+"use client";
+
+import { use } from "react";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Archive, Plus, Package } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import { getModel, archiveModel } from "@/server/models";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+const statusColors: Record<string, string> = {
+  AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
+  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  RESERVED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  LOST: "bg-red-500/10 text-red-500 border-red-500/20",
+  ACTIVE: "bg-green-500/10 text-green-500 border-green-500/20",
+  LOW_STOCK: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  OUT_OF_STOCK: "bg-red-500/10 text-red-500 border-red-500/20",
+};
+
+export default function ModelDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const { data: model, isLoading } = useQuery({
+    queryKey: ["model", id],
+    queryFn: () => getModel(id),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => archiveModel(id),
+    onSuccess: () => {
+      toast.success("Model archived");
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+      router.push("/assets/models");
+    },
+  });
+
+  if (isLoading) {
+    return <div className="text-muted-foreground">Loading...</div>;
+  }
+
+  if (!model) {
+    return <div className="text-muted-foreground">Model not found.</div>;
+  }
+
+  const specs = (model.specifications as Record<string, string>) || {};
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{model.name}</h1>
+            <Badge variant={model.assetType === "SERIALIZED" ? "default" : "outline"}>
+              {model.assetType === "SERIALIZED" ? "Serialized" : "Bulk"}
+            </Badge>
+            {!model.isActive && <Badge variant="destructive">Archived</Badge>}
+          </div>
+          <p className="text-muted-foreground">
+            {[model.manufacturer, model.modelNumber].filter(Boolean).join(" — ") || "No manufacturer info"}
+            {model.category && <> &middot; {model.category.name}</>}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=${model.assetType === "SERIALIZED" ? "serialized" : "bulk"}`} />}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Asset
+          </Button>
+          <Button variant="outline" render={<Link href={`/assets/models/${id}/edit`} />}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          {model.isActive && (
+            <Button
+              variant="outline"
+              className="text-destructive"
+              onClick={() => { if (confirm("Archive this model?")) archiveMutation.mutate(); }}
+            >
+              <Archive className="mr-2 h-4 w-4" />
+              Archive
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Tabs defaultValue="details">
+        <TabsList>
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="assets">
+            Assets ({model.assets.length + model.bulkAssets.length})
+          </TabsTrigger>
+          <TabsTrigger value="specs">Specifications</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="details" className="space-y-4 mt-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pricing</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Rental (per day)</span>
+                  <span className="font-medium">
+                    {model.defaultRentalPrice ? `$${Number(model.defaultRentalPrice).toFixed(2)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Purchase price</span>
+                  <span className="font-medium">
+                    {model.defaultPurchasePrice ? `$${Number(model.defaultPurchasePrice).toFixed(2)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Replacement cost</span>
+                  <span className="font-medium">
+                    {model.replacementCost ? `$${Number(model.replacementCost).toFixed(2)}` : "—"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Technical</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Weight</span>
+                  <span className="font-medium">{model.weight ? `${Number(model.weight)} kg` : "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Power draw</span>
+                  <span className="font-medium">{model.powerDraw ? `${model.powerDraw}W` : "—"}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Maintenance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Test & tag interval</span>
+                  <span className="font-medium">
+                    {model.testAndTagIntervalDays ? `${model.testAndTagIntervalDays} days` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Maintenance interval</span>
+                  <span className="font-medium">
+                    {model.maintenanceIntervalDays ? `${model.maintenanceIntervalDays} days` : "—"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          {model.description && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{model.description}</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="assets" className="mt-4">
+          {model.assetType === "SERIALIZED" ? (
+            model.assets.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-8">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No assets created from this model yet.</p>
+                  <Button size="sm" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=serialized`} />}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Asset
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset Tag</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Serial #</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {model.assets.map((asset) => (
+                      <TableRow key={asset.id}>
+                        <TableCell>
+                          <Link href={`/assets/registry/${asset.id}`} className="font-mono text-sm font-medium hover:underline">
+                            {asset.assetTag}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{asset.customName || "—"}</TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">{asset.serialNumber || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusColors[asset.status] || ""}>
+                            {asset.status.replace("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{asset.location?.name || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          ) : (
+            model.bulkAssets.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-8">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No bulk stock entries for this model yet.</p>
+                  <Button size="sm" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=bulk`} />}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Bulk Asset
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset Tag</TableHead>
+                      <TableHead className="text-right">Available</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {model.bulkAssets.map((ba) => (
+                      <TableRow key={ba.id}>
+                        <TableCell>
+                          <Link href={`/assets/registry/${ba.id}?type=bulk`} className="font-mono text-sm font-medium hover:underline">
+                            {ba.assetTag}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{ba.availableQuantity}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{ba.totalQuantity}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusColors[ba.status] || ""}>
+                            {ba.status.replace("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{ba.location?.name || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          )}
+        </TabsContent>
+
+        <TabsContent value="specs" className="mt-4">
+          {Object.keys(specs).length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                No specifications defined. Edit this model to add them.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  {Object.entries(specs).map(([key, val]) => (
+                    <div key={key} className="flex justify-between border-b pb-2 last:border-0">
+                      <span className="text-sm text-muted-foreground">{key}</span>
+                      <span className="text-sm font-medium">{val}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

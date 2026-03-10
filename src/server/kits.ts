@@ -1,0 +1,453 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { getOrgContext } from "@/lib/org-context";
+import {
+  kitSchema,
+  kitSerializedItemSchema,
+  kitBulkItemSchema,
+  type KitFormValues,
+  type KitSerializedItemFormValues,
+  type KitBulkItemFormValues,
+} from "@/lib/validations/kit";
+import type { Prisma } from "@/generated/prisma/client";
+import { serialize } from "@/lib/serialize";
+import { reserveAssetTags } from "@/server/settings";
+
+// ---------------------------------------------------------------------------
+// getKits – paginated list with optional filters
+// ---------------------------------------------------------------------------
+export async function getKits(params?: {
+  search?: string;
+  status?: string;
+  categoryId?: string;
+  locationId?: string;
+  isActive?: boolean;
+  page?: number;
+  pageSize?: number;
+}) {
+  const { organizationId } = await getOrgContext();
+  const {
+    search,
+    status,
+    categoryId,
+    locationId,
+    isActive = true,
+    page = 1,
+    pageSize = 25,
+  } = params || {};
+
+  const where: Prisma.KitWhereInput = {
+    organizationId,
+    isActive,
+    ...(status && { status: status as Prisma.EnumKitStatusFilter }),
+    ...(categoryId && { categoryId }),
+    ...(locationId && { locationId }),
+    ...(search && {
+      OR: [
+        { assetTag: { contains: search, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ],
+    }),
+  };
+
+  const [kits, total] = await Promise.all([
+    prisma.kit.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        location: { select: { name: true } },
+        _count: { select: { serializedItems: true, bulkItems: true } },
+      },
+      orderBy: { assetTag: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.kit.count({ where }),
+  ]);
+
+  return serialize({
+    kits,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// getKit – single kit with all relations
+// ---------------------------------------------------------------------------
+export async function getKit(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  return serialize(
+    await prisma.kit.findUnique({
+      where: { id, organizationId },
+      include: {
+        serializedItems: {
+          include: { asset: { include: { model: true } } },
+        },
+        bulkItems: {
+          include: { bulkAsset: { include: { model: true } } },
+        },
+        category: true,
+        location: true,
+        lineItems: {
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          include: { project: true },
+        },
+        scanLogs: {
+          take: 20,
+          orderBy: { scannedAt: "desc" },
+          include: { scannedBy: true, project: true },
+        },
+        maintenanceRecords: {
+          take: 20,
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// createKit
+// ---------------------------------------------------------------------------
+export async function createKit(data: KitFormValues) {
+  const { organizationId } = await getOrgContext();
+  const parsed = kitSchema.parse(data);
+
+  try {
+    const result = await prisma.kit.create({
+      data: {
+        organizationId,
+        name: parsed.name,
+        assetTag: parsed.assetTag,
+        description: parsed.description,
+        categoryId: parsed.categoryId || null,
+        status: parsed.status,
+        condition: parsed.condition,
+        locationId: parsed.locationId || null,
+        weight: parsed.weight,
+        caseType: parsed.caseType,
+        caseDimensions: parsed.caseDimensions,
+        notes: parsed.notes,
+        purchaseDate: parsed.purchaseDate,
+        purchasePrice: parsed.purchasePrice,
+        image: parsed.image,
+        images: parsed.images,
+        barcode: parsed.assetTag,
+        qrCode: parsed.assetTag,
+        isActive: parsed.isActive,
+      },
+    });
+    await reserveAssetTags(1);
+    return serialize(result);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("Unique constraint")) {
+      throw new Error(`Asset tag "${parsed.assetTag}" already exists`);
+    }
+    throw e;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// updateKit
+// ---------------------------------------------------------------------------
+export async function updateKit(id: string, data: KitFormValues) {
+  const { organizationId } = await getOrgContext();
+  const parsed = kitSchema.parse(data);
+
+  return serialize(
+    await prisma.kit.update({
+      where: { id, organizationId },
+      data: {
+        name: parsed.name,
+        assetTag: parsed.assetTag,
+        description: parsed.description,
+        categoryId: parsed.categoryId || null,
+        status: parsed.status,
+        condition: parsed.condition,
+        locationId: parsed.locationId || null,
+        weight: parsed.weight,
+        caseType: parsed.caseType,
+        caseDimensions: parsed.caseDimensions,
+        notes: parsed.notes,
+        purchaseDate: parsed.purchaseDate,
+        purchasePrice: parsed.purchasePrice,
+        image: parsed.image,
+        images: parsed.images,
+        isActive: parsed.isActive,
+      },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// archiveKit – soft delete: remove all contents, then deactivate
+// ---------------------------------------------------------------------------
+export async function archiveKit(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  const kit = await prisma.kit.findUnique({
+    where: { id, organizationId },
+    include: {
+      serializedItems: { include: { asset: true } },
+      bulkItems: true,
+    },
+  });
+
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Only AVAILABLE kits can be archived");
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      // Clear kitId on all serialized assets
+      for (const item of kit.serializedItems) {
+        await tx.asset.update({
+          where: { id: item.assetId },
+          data: { kitId: null, status: "AVAILABLE" },
+        });
+      }
+      // Delete all serialized items
+      await tx.kitSerializedItem.deleteMany({ where: { kitId: id } });
+
+      // Return bulk quantities
+      for (const item of kit.bulkItems) {
+        await tx.bulkAsset.update({
+          where: { id: item.bulkAssetId },
+          data: { availableQuantity: { increment: item.quantity } },
+        });
+      }
+      // Delete all bulk items
+      await tx.kitBulkItem.deleteMany({ where: { kitId: id } });
+
+      // Soft-delete the kit
+      return tx.kit.update({
+        where: { id, organizationId },
+        data: { isActive: false, status: "RETIRED" },
+      });
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// addSerializedItemToKit
+// ---------------------------------------------------------------------------
+export async function addSerializedItemToKit(
+  kitId: string,
+  data: KitSerializedItemFormValues,
+) {
+  const { organizationId, userId } = await getOrgContext();
+  const parsed = kitSerializedItemSchema.parse(data);
+
+  const kit = await prisma.kit.findUnique({
+    where: { id: kitId, organizationId },
+  });
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Items can only be added to AVAILABLE kits");
+  }
+
+  const asset = await prisma.asset.findUnique({
+    where: { id: parsed.assetId, organizationId },
+  });
+  if (!asset) throw new Error("Asset not found");
+  if (asset.status !== "AVAILABLE") {
+    throw new Error("Asset is not AVAILABLE");
+  }
+  if (asset.kitId) {
+    throw new Error("Asset is already assigned to another kit");
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      const item = await tx.kitSerializedItem.create({
+        data: {
+          organizationId,
+          kitId,
+          assetId: parsed.assetId,
+          position: parsed.position,
+          notes: parsed.notes,
+          addedById: userId,
+        },
+        include: { asset: { include: { model: true } } },
+      });
+
+      await tx.asset.update({
+        where: { id: parsed.assetId },
+        data: { kitId, locationId: kit.locationId },
+      });
+
+      return item;
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// removeSerializedItemFromKit
+// ---------------------------------------------------------------------------
+export async function removeSerializedItemFromKit(
+  kitId: string,
+  assetId: string,
+) {
+  const { organizationId } = await getOrgContext();
+
+  const kit = await prisma.kit.findUnique({
+    where: { id: kitId, organizationId },
+  });
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Items can only be removed from AVAILABLE kits");
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      await tx.kitSerializedItem.delete({
+        where: { organizationId_assetId: { organizationId, assetId } },
+      });
+
+      await tx.asset.update({
+        where: { id: assetId },
+        data: { kitId: null, status: "AVAILABLE" },
+      });
+
+      return { success: true };
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// addBulkItemToKit
+// ---------------------------------------------------------------------------
+export async function addBulkItemToKit(
+  kitId: string,
+  data: KitBulkItemFormValues,
+) {
+  const { organizationId, userId } = await getOrgContext();
+  const parsed = kitBulkItemSchema.parse(data);
+
+  const kit = await prisma.kit.findUnique({
+    where: { id: kitId, organizationId },
+  });
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Items can only be added to AVAILABLE kits");
+  }
+
+  const bulkAsset = await prisma.bulkAsset.findUnique({
+    where: { id: parsed.bulkAssetId, organizationId },
+  });
+  if (!bulkAsset) throw new Error("Bulk asset not found");
+  if (bulkAsset.availableQuantity < parsed.quantity) {
+    throw new Error(
+      `Insufficient quantity: only ${bulkAsset.availableQuantity} available`,
+    );
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      const item = await tx.kitBulkItem.create({
+        data: {
+          organizationId,
+          kitId,
+          bulkAssetId: parsed.bulkAssetId,
+          quantity: parsed.quantity,
+          position: parsed.position,
+          notes: parsed.notes,
+          addedById: userId,
+        },
+        include: { bulkAsset: { include: { model: true } } },
+      });
+
+      await tx.bulkAsset.update({
+        where: { id: parsed.bulkAssetId },
+        data: { availableQuantity: { decrement: parsed.quantity } },
+      });
+
+      return item;
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// removeBulkItemFromKit
+// ---------------------------------------------------------------------------
+export async function removeBulkItemFromKit(
+  kitId: string,
+  bulkItemId: string,
+) {
+  const { organizationId } = await getOrgContext();
+
+  const kit = await prisma.kit.findUnique({
+    where: { id: kitId, organizationId },
+  });
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Items can only be removed from AVAILABLE kits");
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      const bulkItem = await tx.kitBulkItem.findUnique({
+        where: { id: bulkItemId },
+      });
+      if (!bulkItem) throw new Error("Bulk item not found");
+
+      await tx.kitBulkItem.delete({ where: { id: bulkItemId } });
+
+      await tx.bulkAsset.update({
+        where: { id: bulkItem.bulkAssetId },
+        data: { availableQuantity: { increment: bulkItem.quantity } },
+      });
+
+      return { success: true };
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// getAvailableAssetsForKit – serialized assets not in any kit
+// ---------------------------------------------------------------------------
+export async function getAvailableAssetsForKit(modelId?: string) {
+  const { organizationId } = await getOrgContext();
+
+  return serialize(
+    await prisma.asset.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        status: "AVAILABLE",
+        kitId: null,
+        ...(modelId && { modelId }),
+      },
+      include: { model: true },
+      orderBy: { assetTag: "asc" },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// getAvailableBulkAssetsForKit – bulk assets with available quantity
+// ---------------------------------------------------------------------------
+export async function getAvailableBulkAssetsForKit() {
+  const { organizationId } = await getOrgContext();
+
+  return serialize(
+    await prisma.bulkAsset.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        status: "ACTIVE",
+        availableQuantity: { gt: 0 },
+      },
+      include: { model: true },
+      orderBy: { assetTag: "asc" },
+    }),
+  );
+}

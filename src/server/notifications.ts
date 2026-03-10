@@ -1,0 +1,130 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { getOrgContext } from "@/lib/org-context";
+import { serialize } from "@/lib/serialize";
+
+export interface AppNotification {
+  id: string;
+  type: "overdue_maintenance" | "overdue_return" | "upcoming_project" | "low_stock";
+  title: string;
+  description: string;
+  href: string;
+  severity: "warning" | "error" | "info";
+  timestamp: string;
+}
+
+export async function getNotifications(): Promise<AppNotification[]> {
+  const { organizationId } = await getOrgContext();
+  const now = new Date();
+  const soon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days
+  const notifications: AppNotification[] = [];
+
+  // 1. Overdue maintenance
+  const overdueMaintenance = await prisma.maintenanceRecord.findMany({
+    where: {
+      organizationId,
+      status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+      scheduledDate: { lt: now },
+    },
+    include: { asset: { include: { model: true } } },
+    take: 10,
+  });
+
+  for (const m of overdueMaintenance) {
+    const desc = m.asset
+      ? `${m.asset.assetTag} — ${m.asset.model.name} is overdue`
+      : `${m.title} is overdue`;
+    notifications.push({
+      id: `maint-${m.id}`,
+      type: "overdue_maintenance",
+      title: m.title,
+      description: desc,
+      href: `/maintenance/${m.id}`,
+      severity: "error",
+      timestamp: m.scheduledDate?.toISOString() || m.createdAt.toISOString(),
+    });
+  }
+
+  // 2. Overdue returns (projects past rental end date with checked-out items)
+  const overdueProjects = await prisma.project.findMany({
+    where: {
+      organizationId,
+      status: { in: ["CHECKED_OUT", "ON_SITE"] },
+      rentalEndDate: { lt: now },
+    },
+    include: {
+      _count: { select: { lineItems: { where: { status: "CHECKED_OUT" } } } },
+    },
+    take: 10,
+  });
+
+  for (const p of overdueProjects) {
+    if (p._count.lineItems > 0) {
+      notifications.push({
+        id: `return-${p.id}`,
+        type: "overdue_return",
+        title: `Overdue return: ${p.projectNumber}`,
+        description: `${p.name} — ${p._count.lineItems} items still checked out`,
+        href: `/projects/${p.id}`,
+        severity: "error",
+        timestamp: p.rentalEndDate?.toISOString() || p.updatedAt.toISOString(),
+      });
+    }
+  }
+
+  // 3. Upcoming projects starting within 3 days
+  const upcomingProjects = await prisma.project.findMany({
+    where: {
+      organizationId,
+      status: { in: ["CONFIRMED", "PREPPING"] },
+      rentalStartDate: { gte: now, lte: soon },
+    },
+    take: 10,
+  });
+
+  for (const p of upcomingProjects) {
+    notifications.push({
+      id: `upcoming-${p.id}`,
+      type: "upcoming_project",
+      title: `Starting soon: ${p.projectNumber}`,
+      description: p.name,
+      href: `/projects/${p.id}`,
+      severity: "info",
+      timestamp: p.rentalStartDate?.toISOString() || p.createdAt.toISOString(),
+    });
+  }
+
+  // 4. Low stock bulk assets
+  const lowStock = await prisma.bulkAsset.findMany({
+    where: {
+      organizationId,
+      isActive: true,
+      status: "LOW_STOCK",
+    },
+    include: { model: true },
+    take: 10,
+  });
+
+  for (const b of lowStock) {
+    notifications.push({
+      id: `stock-${b.id}`,
+      type: "low_stock",
+      title: `Low stock: ${b.model.name}`,
+      description: `${b.assetTag} — ${b.availableQuantity} of ${b.totalQuantity} available`,
+      href: `/assets/registry/${b.id}`,
+      severity: "warning",
+      timestamp: b.updatedAt.toISOString(),
+    });
+  }
+
+  // Sort by severity (errors first) then timestamp
+  const severityOrder = { error: 0, warning: 1, info: 2 };
+  notifications.sort((a, b) => {
+    const s = severityOrder[a.severity] - severityOrder[b.severity];
+    if (s !== 0) return s;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
+  return serialize(notifications) as AppNotification[];
+}

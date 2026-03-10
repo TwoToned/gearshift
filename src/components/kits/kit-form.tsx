@@ -1,0 +1,260 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { kitSchema, type KitFormValues } from "@/lib/validations/kit";
+import { createKit, updateKit } from "@/server/kits";
+import { peekNextAssetTags } from "@/server/settings";
+import { getCategories } from "@/server/categories";
+import { getLocations } from "@/server/locations";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { QuickCreateLocation } from "@/components/assets/quick-create-location";
+
+interface KitFormProps {
+  initialData?: KitFormValues & { id: string };
+}
+
+export function KitForm({ initialData }: KitFormProps) {
+  const router = useRouter();
+  const isEditing = !!initialData;
+  const [showCreateLocation, setShowCreateLocation] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => getCategories(),
+  });
+
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: () => getLocations(),
+  });
+
+  const form = useForm<KitFormValues>({
+    resolver: zodResolver(kitSchema),
+    defaultValues: initialData || {
+      name: "",
+      assetTag: "",
+      description: "",
+      categoryId: "",
+      status: "AVAILABLE",
+      condition: "NEW",
+      locationId: "",
+      weight: undefined,
+      caseType: "",
+      caseDimensions: "",
+      notes: "",
+      purchaseDate: undefined,
+      purchasePrice: undefined,
+      image: "",
+      images: [],
+      isActive: true,
+    },
+  });
+
+  // Auto-populate asset tag for new kits
+  useEffect(() => {
+    if (!isEditing && !form.getValues("assetTag")) {
+      peekNextAssetTags(1).then(([tag]) => {
+        form.setValue("assetTag", tag);
+      }).catch(() => {
+        // ignore — user can still type manually
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mutation = useMutation({
+    mutationFn: (data: KitFormValues) =>
+      isEditing ? updateKit(initialData.id, data) : createKit(data),
+    onSuccess: (result) => {
+      toast.success(isEditing ? "Kit updated" : "Kit created");
+      router.push(`/kits/${result.id}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Kit Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name *</Label>
+            <Input id="name" {...form.register("name")} placeholder="e.g. Audio Kit A" />
+            {form.formState.errors.name && (
+              <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assetTag">Asset Tag *</Label>
+            <Input id="assetTag" {...form.register("assetTag")} placeholder="e.g. KIT-AUD-001" />
+            {form.formState.errors.assetTag && (
+              <p className="text-xs text-destructive">{form.formState.errors.assetTag.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <ComboboxPicker
+              value={form.watch("categoryId") || ""}
+              onChange={(v) => form.setValue("categoryId", v)}
+              options={categories.map((cat) => ({
+                value: cat.id,
+                label: cat.parent ? `${cat.parent.name} → ${cat.name}` : cat.name,
+              }))}
+              placeholder="No category"
+              searchPlaceholder="Search categories..."
+              allowClear
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <ComboboxPicker
+              value={form.watch("locationId") || ""}
+              onChange={(v) => form.setValue("locationId", v)}
+              options={locations.map((loc) => ({
+                value: loc.id,
+                label: loc.parent ? `${loc.parent.name} → ${loc.name}` : loc.name,
+                description: loc.type,
+              }))}
+              placeholder="No location"
+              searchPlaceholder="Search locations..."
+              onCreateNew={() => setShowCreateLocation(true)}
+              createNewLabel="New location"
+              allowClear
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <select
+              id="status"
+              {...form.register("status")}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="AVAILABLE">Available</option>
+              <option value="CHECKED_OUT">Checked Out</option>
+              <option value="IN_MAINTENANCE">In Maintenance</option>
+              <option value="RETIRED">Retired</option>
+              <option value="INCOMPLETE">Incomplete</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="condition">Condition</Label>
+            <select
+              id="condition"
+              {...form.register("condition")}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="NEW">New</option>
+              <option value="GOOD">Good</option>
+              <option value="FAIR">Fair</option>
+              <option value="POOR">Poor</option>
+              <option value="DAMAGED">Damaged</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Case Information</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="caseType">Case Type</Label>
+            <Input id="caseType" {...form.register("caseType")} placeholder="e.g. Pelican 1650" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="caseDimensions">Case Dimensions</Label>
+            <Input
+              id="caseDimensions"
+              {...form.register("caseDimensions")}
+              placeholder="600x400x300mm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="weight">Weight (kg)</Label>
+            <Input
+              id="weight"
+              type="number"
+              step="0.1"
+              {...form.register("weight")}
+              placeholder="0.0"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Purchase Information</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="purchaseDate">Purchase Date</Label>
+            <Input id="purchaseDate" type="date" {...form.register("purchaseDate")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
+            <Input
+              id="purchasePrice"
+              type="number"
+              step="0.01"
+              {...form.register("purchasePrice")}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              {...form.register("description")}
+              placeholder="What this kit is used for"
+              rows={2}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              {...form.register("notes")}
+              placeholder="Any additional notes"
+              rows={3}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-3">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isEditing ? "Update Kit" : "Create Kit"}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.back()}>
+          Cancel
+        </Button>
+      </div>
+
+      <QuickCreateLocation
+        open={showCreateLocation}
+        onOpenChange={setShowCreateLocation}
+        onCreated={(id) => form.setValue("locationId", id)}
+      />
+    </form>
+  );
+}
