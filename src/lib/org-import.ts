@@ -301,7 +301,7 @@ export async function importOrganization(
         position: r.position ?? null,
         sortOrder: r.sortOrder ?? 0,
         addedAt: safeDate(r.addedAt ?? r.createdAt),
-        addedById: remapUser(r.addedById) ?? r.addedById,
+        addedById: remapUser(r.addedById) ?? null,
         notes: r.notes ?? null,
       } as any,
     });
@@ -320,7 +320,7 @@ export async function importOrganization(
         position: r.position ?? null,
         sortOrder: r.sortOrder ?? 0,
         addedAt: safeDate(r.addedAt ?? r.createdAt),
-        addedById: remapUser(r.addedById) ?? r.addedById,
+        addedById: remapUser(r.addedById) ?? null,
         notes: r.notes ?? null,
       } as any,
     });
@@ -512,7 +512,7 @@ export async function importOrganization(
         storageKey: newStorageKey,
         url: newUrl,
         thumbnailUrl: null, // Thumbnails aren't exported; clear to avoid 403 on old org URLs
-        uploadedById: remapUser(r.uploadedById) ?? r.uploadedById,
+        uploadedById: remapUser(r.uploadedById) ?? null,
         createdAt: safeDate(r.createdAt),
         updatedAt: safeDate(r.updatedAt),
       } as any,
