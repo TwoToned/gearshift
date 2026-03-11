@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut, User, ChevronsUpDown, Shield, Settings } from "lucide-react";
+import { LogOut, User, ChevronsUpDown, Shield } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -71,10 +71,6 @@ export function UserNav() {
           <DropdownMenuItem onClick={() => router.push("/account")}>
             <User className="mr-2 h-4 w-4" />
             Account Settings
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push("/settings")}>
-            <Settings className="mr-2 h-4 w-4" />
-            Org Settings
           </DropdownMenuItem>
           {isSiteAdmin && (
             <DropdownMenuItem onClick={() => router.push("/admin")}>

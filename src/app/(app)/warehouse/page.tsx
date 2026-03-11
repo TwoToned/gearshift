@@ -33,7 +33,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const WAREHOUSE_STATUSES = [
   "CONFIRMED",
@@ -177,6 +178,7 @@ export default function WarehousePage() {
   }
 
   return (
+    <RequirePermission resource="warehouse" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -260,7 +262,7 @@ export default function WarehousePage() {
                     <WarehouseIcon className="mr-2 h-4 w-4" />
                     Open
                   </Button>
-                  <NotViewer>
+                  <CanDo resource="warehouse" action="check_out">
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
                         Actions
@@ -293,7 +295,7 @@ export default function WarehousePage() {
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </NotViewer>
+                  </CanDo>
                 </div>
               </CardContent>
             </Card>
@@ -337,5 +339,6 @@ export default function WarehousePage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RequirePermission>
   );
 }

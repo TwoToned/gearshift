@@ -32,7 +32,8 @@ import { MediaUploader, type MediaItem } from "@/components/media/media-uploader
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { resolveAssetPhotoUrl, isAssetPhotoCustom } from "@/lib/media-utils";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -65,9 +66,11 @@ function formatDate(date: Date | string | null | undefined) {
 
 export default function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
+    <RequirePermission resource="asset" action="read">
     <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
       <AssetDetailContent params={params} />
     </Suspense>
+    </RequirePermission>
   );
 }
 
@@ -137,7 +140,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               {ba.model.category && <> &middot; {ba.model.category.name}</>}
             </p>
           </div>
-          <NotViewer>
+          <CanDo resource="asset" action="update">
             <div className="flex gap-2">
               <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit?type=bulk`} />}>
                 <Pencil className="mr-2 h-4 w-4" />
@@ -163,7 +166,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 Delete
               </Button>
             </div>
-          </NotViewer>
+          </CanDo>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -243,7 +246,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </p>
           </div>
         </div>
-        <NotViewer>
+        <CanDo resource="asset" action="update">
           <div className="flex gap-2">
             <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
               <Pencil className="mr-2 h-4 w-4" />
@@ -269,7 +272,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               Delete
             </Button>
           </div>
-        </NotViewer>
+        </CanDo>
       </div>
 
       <Tabs defaultValue="details">

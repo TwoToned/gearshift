@@ -32,7 +32,8 @@ import { MediaUploader, type MediaItem } from "@/components/media/media-uploader
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveKitPhotoUrl } from "@/lib/media-utils";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import {
   Dialog,
   DialogContent,
@@ -189,6 +190,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
   const kitPhotoUrl = resolveKitPhotoUrl(kit, false);
 
   return (
+    <RequirePermission resource="kit" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -202,7 +204,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{kit.assetTag}</h1>
-            <NotViewer fallback={
+            <CanDo resource="kit" action="update" fallback={
               <Badge variant="outline" className={statusColors[kit.status] || ""}>
                 {kit.status.replace("_", " ")}
               </Badge>
@@ -219,7 +221,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                 <option value="RETIRED">Retired</option>
                 <option value="INCOMPLETE">Incomplete</option>
               </select>
-            </NotViewer>
+            </CanDo>
             <Badge variant="outline" className={conditionColors[kit.condition] || ""}>
               {kit.condition}
             </Badge>
@@ -233,12 +235,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           </p>
           </div>
         </div>
-        <NotViewer>
+        <CanDo resource="kit" action="update">
           <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Button>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Kit Info Card */}
@@ -300,12 +302,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Serialized Items</h3>
-              <NotViewer>
+              <CanDo resource="kit" action="update">
                 <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
                   <Plus className="mr-1 h-3 w-3" />
                   Add Item
                 </Button>
-              </NotViewer>
+              </CanDo>
             </div>
             {kit.serializedItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -344,7 +346,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <NotViewer>
+                          <CanDo resource="kit" action="update">
                             <Button
                               variant="ghost"
                               size="icon-sm"
@@ -357,7 +359,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </NotViewer>
+                          </CanDo>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -371,12 +373,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Bulk Items</h3>
-              <NotViewer>
+              <CanDo resource="kit" action="update">
                 <Button size="sm" variant="outline" onClick={() => setShowAddBulkItem(true)}>
                   <Plus className="mr-1 h-3 w-3" />
                   Add Bulk Item
                 </Button>
-              </NotViewer>
+              </CanDo>
             </div>
             {kit.bulkItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -404,7 +406,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           {item.position || "—"}
                         </TableCell>
                         <TableCell>
-                          <NotViewer>
+                          <CanDo resource="kit" action="update">
                             <Button
                               variant="ghost"
                               size="icon-sm"
@@ -417,7 +419,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </NotViewer>
+                          </CanDo>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -663,6 +665,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
         </DialogContent>
       </Dialog>
     </div>
+    </RequirePermission>
   );
 }
 

@@ -29,7 +29,8 @@ import {
 import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveModelPhotoUrl } from "@/lib/media-utils";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -77,6 +78,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
   const primaryPhotoUrl = resolveModelPhotoUrl(model, false);
 
   return (
+    <RequirePermission resource="model" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -101,7 +103,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
           </p>
           </div>
         </div>
-        <NotViewer>
+        <CanDo resource="model" action="update">
           <div className="flex gap-2">
             <Button variant="outline" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=${model.assetType === "SERIALIZED" ? "serialized" : "bulk"}`} />}>
               <Plus className="mr-2 h-4 w-4" />
@@ -122,7 +124,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
               </Button>
             )}
           </div>
-        </NotViewer>
+        </CanDo>
       </div>
 
       <Tabs defaultValue="details">
@@ -388,5 +390,6 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
         </TabsContent>
       </Tabs>
     </div>
+    </RequirePermission>
   );
 }

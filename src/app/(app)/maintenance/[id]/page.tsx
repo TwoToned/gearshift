@@ -4,7 +4,8 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getMaintenanceRecord } from "@/server/maintenance";
 import { MaintenanceForm } from "@/components/maintenance/maintenance-form";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import type { MaintenanceFormValues } from "@/lib/validations/maintenance";
 
 export default function MaintenanceDetailPage({
@@ -46,7 +47,8 @@ export default function MaintenanceDetailPage({
   };
 
   return (
-    <NotViewer fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
+    <RequirePermission resource="maintenance" action="read">
+    <CanDo resource="maintenance" action="update" fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Edit Maintenance Record</h1>
@@ -54,6 +56,7 @@ export default function MaintenanceDetailPage({
         </div>
         <MaintenanceForm initialData={initialData} />
       </div>
-    </NotViewer>
+    </CanDo>
+    </RequirePermission>
   );
 }

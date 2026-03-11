@@ -58,6 +58,7 @@ export default function AccountPage() {
   // 2FA
   const [show2FASetup, setShow2FASetup] = useState(false);
   const [totpURI, setTotpURI] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
 
   // Leave org dialog
@@ -151,7 +152,14 @@ export default function AccountPage() {
         password: currentPassword,
       });
       if (res.error) throw new Error(res.error.message || "Failed to enable 2FA");
-      setTotpURI(res.data?.totpURI || "");
+      const uri = res.data?.totpURI || "";
+      setTotpURI(uri);
+      // Generate QR code data URL
+      if (uri) {
+        const QRCode = (await import("qrcode")).default;
+        const dataUrl = await QRCode.toDataURL(uri, { width: 200, margin: 2 });
+        setQrDataUrl(dataUrl);
+      }
       return res.data;
     },
     onSuccess: () => {
@@ -174,6 +182,7 @@ export default function AccountPage() {
       setVerifyCode("");
       setCurrentPassword("");
       setTotpURI("");
+      setQrDataUrl("");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -494,16 +503,20 @@ export default function AccountPage() {
           </DialogHeader>
           <div className="space-y-4">
             {totpURI && (
-              <div className="flex justify-center p-4 bg-white rounded-md">
-                {/* Show the TOTP URI for manual entry */}
-                <div className="text-center space-y-2">
-                  <p className="text-xs text-black break-all font-mono">
+              <div className="space-y-3">
+                {qrDataUrl && (
+                  <div className="flex justify-center p-4 bg-white rounded-md">
+                    <img src={qrDataUrl} alt="2FA QR Code" width={200} height={200} />
+                  </div>
+                )}
+                <details className="text-center">
+                  <summary className="text-xs text-muted-foreground cursor-pointer">
+                    Can&apos;t scan? Show manual entry key
+                  </summary>
+                  <p className="mt-2 text-xs break-all font-mono bg-muted p-2 rounded-md">
                     {totpURI}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Copy this URI into your authenticator app if you can&apos;t scan a QR code.
-                  </p>
-                </div>
+                </details>
               </div>
             )}
             <div className="space-y-2">

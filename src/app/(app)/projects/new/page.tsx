@@ -1,11 +1,13 @@
 "use client";
 
 import { ProjectForm } from "@/components/projects/project-form";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 export default function NewProjectPage() {
   return (
-    <NotViewer fallback={<div className="mx-auto max-w-3xl py-8 text-center text-muted-foreground">You do not have permission to create projects.</div>}>
+    <RequirePermission resource="project" action="create">
+    <CanDo resource="project" action="create" fallback={<div className="mx-auto max-w-3xl py-8 text-center text-muted-foreground">You do not have permission to create projects.</div>}>
       <div className="mx-auto max-w-3xl space-y-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">New Project</h1>
@@ -15,6 +17,7 @@ export default function NewProjectPage() {
         </div>
         <ProjectForm />
       </div>
-    </NotViewer>
+    </CanDo>
+    </RequirePermission>
   );
 }

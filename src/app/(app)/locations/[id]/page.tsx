@@ -17,7 +17,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getLocation, deleteLocation, updateLocationNotes } from "@/server/locations";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import { addLocationMedia, removeLocationMedia } from "@/server/location-media";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
   const assetCount = (location._count?.assets || 0) + (location._count?.bulkAssets || 0) + (location._count?.kits || 0);
 
   return (
+    <RequirePermission resource="location" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -107,7 +109,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
             {location.parent && <> &middot; Sub-location of {location.parent.name}</>}
           </p>
         </div>
-        <NotViewer>
+        <CanDo resource="location" action="update">
           <div className="flex gap-2">
             <Button variant="outline" render={<Link href={`/locations/${id}/edit`} />}>
               <Pencil className="mr-2 h-4 w-4" />
@@ -122,7 +124,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
               Delete
             </Button>
           </div>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Info Cards */}
@@ -393,5 +395,6 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
         </TabsContent>
       </Tabs>
     </div>
+    </RequirePermission>
   );
 }

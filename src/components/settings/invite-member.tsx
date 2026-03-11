@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -15,20 +16,31 @@ import {
 import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { addMemberByEmail } from "@/server/settings";
+import { getCustomRoles } from "@/server/custom-roles";
+import type { PermissionMap } from "@/lib/permissions";
 
-const roles = [
+const builtInRoles = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "member", label: "Member" },
   { value: "viewer", label: "Viewer" },
-] as const;
+];
 
-type Role = (typeof roles)[number]["value"];
+interface CustomRoleData {
+  id: string;
+  name: string;
+  permissions: PermissionMap;
+}
 
 export function InviteMember() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("member");
+  const [role, setRole] = useState("member");
+
+  const { data: customRoles } = useQuery({
+    queryKey: ["custom-roles"],
+    queryFn: getCustomRoles,
+  });
 
   const addMutation = useMutation({
     mutationFn: () => addMemberByEmail(email, role),
@@ -39,6 +51,9 @@ export function InviteMember() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const customRolesList = (customRoles || []) as CustomRoleData[];
+  const hasCustomRoles = customRolesList.length > 0;
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -60,16 +75,29 @@ export function InviteMember() {
       </div>
       <div className="space-y-1.5">
         <Label>Role</Label>
-        <Select value={role} onValueChange={(v) => setRole((v ?? "member") as Role)}>
-          <SelectTrigger className="w-full sm:w-[140px]">
+        <Select value={role} onValueChange={(v) => setRole(v ?? "member")}>
+          <SelectTrigger className="w-full sm:w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {roles.map((r) => (
+            {builtInRoles.map((r) => (
               <SelectItem key={r.value} value={r.value}>
                 {r.label}
               </SelectItem>
             ))}
+            {hasCustomRoles && (
+              <>
+                <Separator className="my-1" />
+                <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                  Custom Roles
+                </div>
+                {customRolesList.map((cr) => (
+                  <SelectItem key={`custom:${cr.id}`} value={`custom:${cr.id}`}>
+                    {cr.name}
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
       </div>

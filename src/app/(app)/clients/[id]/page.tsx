@@ -8,7 +8,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getClient, archiveClient, updateClientNotes } from "@/server/clients";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { addClientMedia, removeClientMedia } from "@/server/client-media";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   }
 
   return (
+    <RequirePermission resource="client" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -93,7 +95,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             {client.contactEmail && <> &middot; {client.contactEmail}</>}
           </p>
         </div>
-        <NotViewer>
+        <CanDo resource="client" action="update">
           <div className="flex gap-2">
             <Button variant="outline" render={<Link href={`/clients/${id}/edit`} />}>
               <Pencil className="mr-2 h-4 w-4" />
@@ -110,7 +112,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               </Button>
             )}
           </div>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Info Cards */}
@@ -296,5 +298,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         </TabsContent>
       </Tabs>
     </div>
+    </RequirePermission>
   );
 }

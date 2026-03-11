@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
 
 export function ModelTable() {
   const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
@@ -91,7 +91,7 @@ export function ModelTable() {
           <option value="SERIALIZED">Serialized</option>
           <option value="BULK">Bulk</option>
         </select>
-        <NotViewer>
+        <CanDo resource="model" action="create">
           <Button
             variant="outline"
             onClick={async () => {
@@ -116,7 +116,7 @@ export function ModelTable() {
             <Plus className="mr-2 h-4 w-4" />
             New Model
           </Button>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Table */}

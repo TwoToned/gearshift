@@ -1,6 +1,6 @@
 "use client";
 
-import { useCurrentRole, useCanDo } from "@/lib/use-permissions";
+import { useCurrentRole, useCanDo, useIsViewer } from "@/lib/use-permissions";
 import type { Resource } from "@/lib/permissions";
 
 /**
@@ -23,7 +23,7 @@ export function CanDo({
 }
 
 /**
- * Hide children from viewers (read-only users).
+ * Hide children from read-only users (viewers or custom roles with no write perms).
  * While loading role, hides content (safe default — don't flash buttons then hide).
  */
 export function NotViewer({
@@ -33,9 +33,7 @@ export function NotViewer({
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }) {
-  const { role, isLoading } = useCurrentRole();
-  // While loading: hide action buttons (safe default)
-  if (isLoading || !role) return <>{fallback}</>;
-  if (role === "viewer") return <>{fallback}</>;
+  const readOnly = useIsViewer();
+  if (readOnly) return <>{fallback}</>;
   return <>{children}</>;
 }

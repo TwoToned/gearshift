@@ -21,7 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -71,6 +72,7 @@ export default function KitsPage() {
   const total = data?.total || 0;
 
   return (
+    <RequirePermission resource="kit" action="read">
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
@@ -79,12 +81,12 @@ export default function KitsPage() {
             Manage pre-configured kits and cases.
           </p>
         </div>
-        <NotViewer>
+        <CanDo resource="kit" action="create">
           <Button render={<Link href="/kits/new" />}>
             <Plus className="mr-2 h-4 w-4" />
             New Kit
           </Button>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Filters */}
@@ -226,5 +228,6 @@ export default function KitsPage() {
         </div>
       </div>
     </div>
+    </RequirePermission>
   );
 }

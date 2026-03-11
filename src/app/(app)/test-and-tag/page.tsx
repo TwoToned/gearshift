@@ -6,7 +6,8 @@ import Link from "next/link";
 import { Loader2, Zap, Plus, List, AlertTriangle, Clock, CheckCircle, XCircle, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -64,6 +65,7 @@ export default function TestAndTagPage() {
   }
 
   return (
+    <RequirePermission resource="testTag" action="read">
     <div className="space-y-8 p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -71,7 +73,7 @@ export default function TestAndTagPage() {
           <p className="text-muted-foreground">Manage electrical testing and compliance</p>
         </div>
         <div className="flex items-center gap-2">
-          <NotViewer>
+          <CanDo resource="testTag" action="create">
             <Button render={<Link href="/test-and-tag/quick-test" />}>
               <Zap className="mr-2 h-4 w-4" />
               Quick Test
@@ -80,7 +82,7 @@ export default function TestAndTagPage() {
               <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
-          </NotViewer>
+          </CanDo>
           <Button variant="outline" render={<Link href="/test-and-tag/registry" />}>
             <List className="mr-2 h-4 w-4" />
             Registry
@@ -306,5 +308,6 @@ export default function TestAndTagPage() {
         </div>
       )}
     </div>
+    </RequirePermission>
   );
 }

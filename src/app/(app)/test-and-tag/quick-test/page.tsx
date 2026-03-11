@@ -23,7 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ShieldCheck, ArrowLeft, Check, X, Volume2, Loader2 } from "lucide-react";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -498,7 +499,7 @@ function QuickTestInner() {
   const isSaving = saveRecordMutation.isPending;
 
   return (
-    <NotViewer fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
+    <CanDo resource="testTag" action="create" fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -990,7 +991,7 @@ function QuickTestInner() {
         <span><kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+Shift+F</kbd> Save as Fail</span>
       </div>
     </div>
-    </NotViewer>
+    </CanDo>
   );
 }
 
@@ -1045,6 +1046,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function QuickTestPage() {
   return (
+    <RequirePermission resource="testTag" action="create">
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -1054,5 +1056,6 @@ export default function QuickTestPage() {
     >
       <QuickTestInner />
     </Suspense>
+    </RequirePermission>
   );
 }

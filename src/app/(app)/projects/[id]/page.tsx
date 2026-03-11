@@ -53,7 +53,8 @@ import {
 import { addProjectMedia, removeProjectMedia, getProjectMedia } from "@/server/project-media";
 import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
 import { NotesEditor } from "@/components/ui/notes-editor";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import type { ProjectMediaType } from "@/generated/prisma/client";
 
 const statusColors: Record<string, string> = {
@@ -183,6 +184,7 @@ export default function ProjectDetailPage({
   const currentStatus = project.status;
 
   return (
+    <RequirePermission resource="project" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -250,7 +252,7 @@ export default function ProjectDetailPage({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <NotViewer>
+          <CanDo resource="project" action="update">
             <Button
               variant="outline"
               render={<Link href={`/projects/${id}/edit`} />}
@@ -283,7 +285,7 @@ export default function ProjectDetailPage({
                 Cancel
               </Button>
             )}
-          </NotViewer>
+          </CanDo>
         </div>
       </div>
 
@@ -304,7 +306,7 @@ export default function ProjectDetailPage({
                 <span className="text-sm font-medium text-muted-foreground">
                   Status:
                 </span>
-                <NotViewer fallback={
+                <CanDo resource="project" action="update" fallback={
                   <Badge variant="outline" className={statusColors[currentStatus] || ""}>
                     {statusLabels[currentStatus] || currentStatus}
                   </Badge>
@@ -321,7 +323,7 @@ export default function ProjectDetailPage({
                       </option>
                     ))}
                   </select>
-                </NotViewer>
+                </CanDo>
               </CardContent>
             </Card>
 
@@ -657,5 +659,6 @@ export default function ProjectDetailPage({
         </TabsContent>
       </Tabs>
     </div>
+    </RequirePermission>
   );
 }

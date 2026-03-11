@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Zap, Pencil, ArchiveX, Trash2, Loader2 } from "lucide-react";
 
 import { getTestTagAsset, retireTestTagAsset, deleteTestTagAsset } from "@/server/test-tag-assets";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,6 +116,7 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
+    <RequirePermission resource="testTag" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -126,7 +128,7 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-muted-foreground">{item.description}</p>
         </div>
         <div className="flex items-center gap-2">
-          <NotViewer>
+          <CanDo resource="testTag" action="update">
             <Button
               render={<Link href={`/test-and-tag/quick-test?id=${item.testTagId}`} />}
             >
@@ -165,7 +167,7 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </Button>
             )}
-          </NotViewer>
+          </CanDo>
         </div>
       </div>
 
@@ -303,5 +305,6 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
         </CardContent>
       </Card>
     </div>
+    </RequirePermission>
   );
 }

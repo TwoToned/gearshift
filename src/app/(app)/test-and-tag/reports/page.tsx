@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getTestTagAssets } from "@/server/test-tag-assets";
 import { getReportPreviewCount, type ReportFilters } from "@/server/test-tag-reports";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 type ReportType = "register" | "overdue" | "session" | "item-history" | "due-schedule" | "class-summary" | "tester-activity" | "failed-items" | "bulk-summary" | "compliance-certificate";
 
@@ -191,6 +192,7 @@ export default function TestTagReportsPage() {
   };
 
   return (
+    <RequirePermission resource="reports" action="view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -369,5 +371,6 @@ export default function TestTagReportsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RequirePermission>
   );
 }

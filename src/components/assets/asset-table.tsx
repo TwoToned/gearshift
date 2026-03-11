@@ -11,7 +11,7 @@ import { getBulkAssets } from "@/server/bulk-assets";
 import { getLocations } from "@/server/locations";
 import { exportAssetsCSV, exportBulkAssetsCSV } from "@/server/csv";
 import { CSVImportDialog } from "@/components/assets/csv-import-dialog";
-import { NotViewer } from "@/components/auth/permission-gate";
+import { CanDo } from "@/components/auth/permission-gate";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -202,7 +202,7 @@ export function AssetTable() {
             allowClear
           />
         </div>
-        <NotViewer>
+        <CanDo resource="asset" action="create">
           <Button
             variant="outline"
             onClick={async () => {
@@ -227,19 +227,19 @@ export function AssetTable() {
             <Plus className="mr-2 h-4 w-4" />
             New {view === "serialized" ? "Asset" : "Bulk Asset"}
           </Button>
-        </NotViewer>
+        </CanDo>
       </div>
 
       {/* Bulk Edit Bar */}
       {view === "serialized" && selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <NotViewer>
+          <CanDo resource="asset" action="update">
             <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)}>
               <Pencil className="mr-2 h-3 w-3" />
               Bulk Edit
             </Button>
-          </NotViewer>
+          </CanDo>
           <Button size="sm" variant="ghost" onClick={clearSelection}>
             Clear
           </Button>

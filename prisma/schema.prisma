@@ -104,6 +104,7 @@ model Organization {
 
   members     Member[]
   invitations Invitation[]
+  customRoles CustomRole[]
 
   // App relations
   categories         Category[]
@@ -157,6 +158,24 @@ model Invitation {
   createdAt      DateTime     @default(now())
 
   @@map("invitation")
+}
+
+// ─── Custom Roles ──────────────────────────────────────────────────────────
+
+model CustomRole {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  color          String?      // Badge color class
+  permissions    String       // JSON-serialized PermissionMap
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("custom_role")
 }
 
 // ─── App Data Models ─────────────────────────────────────────────────────────
