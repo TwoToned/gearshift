@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 
+export interface OrgBranding {
+  primaryColor?: string;
+  accentColor?: string;
+  documentColor?: string;
+}
+
 export interface OrgSettings {
   phone?: string;
   email?: string;
@@ -15,6 +21,7 @@ export interface OrgSettings {
   assetTagPrefix?: string;
   assetTagCounter?: number;
   assetTagDigits?: number;
+  branding?: OrgBranding;
 }
 
 export async function getOrganization() {

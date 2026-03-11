@@ -1,5 +1,5 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import { styles, formatDate } from "./styles";
+import { createStyles, formatDate, type PdfBranding } from "./styles";
 
 interface LineItem {
   id: string;
@@ -24,7 +24,7 @@ interface LineItem {
 }
 
 interface PullSlipPDFProps {
-  org: { name: string };
+  org: { name: string; branding?: PdfBranding };
   project: {
     projectNumber: string;
     name: string;
@@ -37,6 +37,7 @@ interface PullSlipPDFProps {
 }
 
 export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
+  const s = createStyles(org.branding);
   // Filter out kit children (they'll be rendered under their parent)
   const equipmentItems = project.lineItems.filter(
     (i) => i.status !== "CANCELLED" && !i.isKitChild
@@ -59,16 +60,16 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.companyName}>{org.name}</Text>
-            <Text style={styles.companyDetails}>Pull Slip</Text>
+            <Text style={s.companyName}>{org.name}</Text>
+            <Text style={s.companyDetails}>Pull Slip</Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>PULL SLIP</Text>
-            <Text style={styles.docMeta}>
+            <Text style={s.docTitle}>PULL SLIP</Text>
+            <Text style={s.docMeta}>
               {project.projectNumber}
               {"\n"}{project.name}
               {project.client ? `\n${project.client.name}` : ""}
@@ -77,48 +78,48 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
         </View>
 
         {/* Info row */}
-        <View style={[styles.row, { marginBottom: 12 }]}>
+        <View style={[s.row, { marginBottom: 12 }]}>
           {project.location && (
-            <View style={styles.col}>
-              <Text style={styles.label}>Venue</Text>
-              <Text style={styles.value}>{project.location.name}</Text>
+            <View style={s.col}>
+              <Text style={s.label}>Venue</Text>
+              <Text style={s.value}>{project.location.name}</Text>
             </View>
           )}
           {project.loadInDate && (
-            <View style={styles.col}>
-              <Text style={styles.label}>Load In</Text>
-              <Text style={styles.value}>{formatDate(project.loadInDate)}</Text>
+            <View style={s.col}>
+              <Text style={s.label}>Load In</Text>
+              <Text style={s.value}>{formatDate(project.loadInDate)}</Text>
             </View>
           )}
-          <View style={styles.col}>
-            <Text style={styles.label}>Total Items</Text>
-            <Text style={styles.value}>{totalItems}</Text>
+          <View style={s.col}>
+            <Text style={s.label}>Total Items</Text>
+            <Text style={s.value}>{totalItems}</Text>
           </View>
           {totalWeight > 0 && (
-            <View style={styles.col}>
-              <Text style={styles.label}>Est. Weight</Text>
-              <Text style={styles.value}>{totalWeight.toFixed(1)} kg</Text>
+            <View style={s.col}>
+              <Text style={s.label}>Est. Weight</Text>
+              <Text style={s.value}>{totalWeight.toFixed(1)} kg</Text>
             </View>
           )}
         </View>
 
         {/* Items table */}
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <View style={[styles.th, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+        <View style={s.table}>
+          <View style={s.tableHeader}>
+            <View style={[s.th, { width: 20, alignItems: "center", justifyContent: "center" }]}>
               <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#fff", borderRadius: 1 }} />
             </View>
-            <Text style={[styles.th, { flex: 3 }]}>Item</Text>
-            <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Qty</Text>
-            <Text style={[styles.th, { width: 80 }]}>Asset Tag</Text>
-            <Text style={[styles.th, { width: 70 }]}>Category</Text>
+            <Text style={[s.th, { flex: 3 }]}>Item</Text>
+            <Text style={[s.th, { width: 30, textAlign: "center" }]}>Qty</Text>
+            <Text style={[s.th, { width: 80 }]}>Asset Tag</Text>
+            <Text style={[s.th, { width: 70 }]}>Category</Text>
           </View>
 
           {Array.from(groups.entries()).map(([groupName, items]) => (
             <View key={groupName}>
               {groupName !== "Ungrouped" && (
-                <View style={styles.groupHeader}>
-                  <Text style={styles.groupName}>{groupName}</Text>
+                <View style={s.groupHeader}>
+                  <Text style={s.groupName}>{groupName}</Text>
                 </View>
               )}
               {items.map((item, idx) => {
@@ -126,13 +127,13 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                 const children = isKit ? (item.childLineItems || []) : [];
                 return (
                   <View key={item.id}>
-                    <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                      <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                    <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                      <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                         <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
                       </View>
                       <View style={{ flex: 3 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                          <Text style={[styles.td, { fontFamily: isKit ? "Helvetica-Bold" : "Helvetica" }]}>
+                          <Text style={[s.td, { fontFamily: isKit ? "Helvetica-Bold" : "Helvetica" }]}>
                             {isKit
                               ? `[Kit] ${item.description || item.kit?.name || "Kit"}`
                               : item.model
@@ -147,13 +148,13 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                           <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
                         )}
                       </View>
-                      <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                      <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                         {isKit ? children.length : item.quantity}
                       </Text>
-                      <Text style={[styles.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
+                      <Text style={[s.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
                         {isKit ? (item.kit?.assetTag || "-") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "-")}
                       </Text>
-                      <Text style={[styles.td, { width: 70, fontSize: 8, color: "#888" }]}>
+                      <Text style={[s.td, { width: 70, fontSize: 8, color: "#888" }]}>
                         {item.model?.category?.name || "-"}
                       </Text>
                     </View>
@@ -173,20 +174,20 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                       );
                     })()}
                     {children.map((child) => (
-                      <View key={child.id} style={styles.tableRow}>
-                        <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                      <View key={child.id} style={s.tableRow}>
+                        <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                           <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
                         </View>
-                        <Text style={[styles.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
+                        <Text style={[s.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
                           {child.model?.name || child.description || "-"}
                         </Text>
-                        <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                        <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                           {child.quantity}
                         </Text>
-                        <Text style={[styles.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                        <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
                           {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
                         </Text>
-                        <Text style={[styles.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
+                        <Text style={[s.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
                           {child.model?.category?.name || ""}
                         </Text>
                       </View>
@@ -199,7 +200,7 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>
+        <Text style={s.footer}>
           {org.name} - {project.projectNumber} - Printed {formatDate(new Date().toISOString())}
         </Text>
       </Page>

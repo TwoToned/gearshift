@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InviteMember } from "@/components/settings/invite-member";
 import { MemberList } from "@/components/settings/member-list";
+import { BrandingSettings } from "@/components/settings/branding-settings";
 import { CategoryManager } from "@/components/assets/category-manager";
 import { LocationManager } from "@/components/settings/location-manager";
 import { SupplierManager } from "@/components/settings/supplier-manager";
@@ -192,6 +193,19 @@ export default function SettingsPage() {
                 {updateMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Branding */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Branding & Colors</CardTitle>
+            <CardDescription>
+              Customize your organization's colors across the UI and PDF documents.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BrandingSettings orgName={name} settings={settings} />
           </CardContent>
         </Card>
 

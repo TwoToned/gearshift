@@ -1,5 +1,5 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import { styles, formatCurrency, formatDate } from "./styles";
+import { createStyles, formatCurrency, formatDate, type PdfBranding } from "./styles";
 
 interface LineItem {
   id: string;
@@ -31,6 +31,7 @@ interface QuotePDFProps {
     website?: string;
     taxRate?: number;
     taxLabel?: string;
+    branding?: PdfBranding;
   };
   project: {
     projectNumber: string;
@@ -68,6 +69,7 @@ const pricingLabels: Record<string, string> = {
 };
 
 export function QuotePDF({ org, project }: QuotePDFProps) {
+  const s = createStyles(org.branding);
   // Filter out kit children and group line items
   const topLevelItems = project.lineItems.filter((i) => !i.isKitChild);
   const groups = new Map<string, LineItem[]>();
@@ -82,20 +84,20 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.companyName}>{org.name}</Text>
-            <Text style={styles.companyDetails}>
+            <Text style={s.companyName}>{org.name}</Text>
+            <Text style={s.companyDetails}>
               {[org.address, org.phone, org.email, org.website]
                 .filter(Boolean)
                 .join("\n")}
             </Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>QUOTE</Text>
-            <Text style={styles.docMeta}>
+            <Text style={s.docTitle}>QUOTE</Text>
+            <Text style={s.docMeta}>
               {project.projectNumber}
               {"\n"}
               {formatDate(new Date().toISOString())}
@@ -104,39 +106,39 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
         </View>
 
         {/* Client + Project Info */}
-        <View style={styles.row}>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Client</Text>
+        <View style={s.row}>
+          <View style={s.col}>
+            <Text style={s.sectionTitle}>Client</Text>
             {project.client ? (
               <View>
-                <Text style={styles.value}>{project.client.name}</Text>
+                <Text style={s.value}>{project.client.name}</Text>
                 {project.client.contactName && (
-                  <Text style={styles.value}>Attn: {project.client.contactName}</Text>
+                  <Text style={s.value}>Attn: {project.client.contactName}</Text>
                 )}
                 {project.client.contactEmail && (
-                  <Text style={styles.value}>{project.client.contactEmail}</Text>
+                  <Text style={s.value}>{project.client.contactEmail}</Text>
                 )}
                 {project.client.billingAddress && (
-                  <Text style={styles.value}>{project.client.billingAddress}</Text>
+                  <Text style={s.value}>{project.client.billingAddress}</Text>
                 )}
               </View>
             ) : (
-              <Text style={styles.value}>-</Text>
+              <Text style={s.value}>-</Text>
             )}
           </View>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Project Details</Text>
-            <Text style={styles.value}>{project.name}</Text>
+          <View style={s.col}>
+            <Text style={s.sectionTitle}>Project Details</Text>
+            <Text style={s.value}>{project.name}</Text>
             {project.location && (
               <View>
-                <Text style={styles.label}>Venue</Text>
-                <Text style={styles.value}>{project.location.name}</Text>
+                <Text style={s.label}>Venue</Text>
+                <Text style={s.value}>{project.location.name}</Text>
               </View>
             )}
             {project.rentalStartDate && (
               <View>
-                <Text style={styles.label}>Rental Period</Text>
-                <Text style={styles.value}>
+                <Text style={s.label}>Rental Period</Text>
+                <Text style={s.value}>
                   {formatDate(project.rentalStartDate)}
                   {project.rentalEndDate ? ` - ${formatDate(project.rentalEndDate)}` : ""}
                 </Text>
@@ -144,8 +146,8 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
             )}
             {project.eventStartDate && (
               <View>
-                <Text style={styles.label}>Event</Text>
-                <Text style={styles.value}>
+                <Text style={s.label}>Event</Text>
+                <Text style={s.value}>
                   {formatDate(project.eventStartDate)}
                   {project.eventEndDate ? ` - ${formatDate(project.eventEndDate)}` : ""}
                 </Text>
@@ -155,24 +157,24 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
         </View>
 
         {/* Line Items Table */}
-        <View style={[styles.section, { marginTop: 16 }]}>
-          <Text style={styles.sectionTitle}>Equipment &amp; Services</Text>
-          <View style={styles.table}>
+        <View style={[s.section, { marginTop: 16 }]}>
+          <Text style={s.sectionTitle}>Equipment &amp; Services</Text>
+          <View style={s.table}>
             {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, { flex: 3 }]}>Description</Text>
-              <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Qty</Text>
-              <Text style={[styles.th, { width: 60, textAlign: "right" }]}>Unit Price</Text>
-              <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Days</Text>
-              <Text style={[styles.th, { width: 60, textAlign: "right" }]}>Total</Text>
+            <View style={s.tableHeader}>
+              <Text style={[s.th, { flex: 3 }]}>Description</Text>
+              <Text style={[s.th, { width: 30, textAlign: "center" }]}>Qty</Text>
+              <Text style={[s.th, { width: 60, textAlign: "right" }]}>Unit Price</Text>
+              <Text style={[s.th, { width: 30, textAlign: "center" }]}>Days</Text>
+              <Text style={[s.th, { width: 60, textAlign: "right" }]}>Total</Text>
             </View>
 
             {/* Rows by group */}
             {Array.from(groups.entries()).map(([groupName, items]) => (
               <View key={groupName}>
                 {groupName !== "_ungrouped" && (
-                  <View style={styles.groupHeader}>
-                    <Text style={styles.groupName}>{groupName}</Text>
+                  <View style={s.groupHeader}>
+                    <Text style={s.groupName}>{groupName}</Text>
                   </View>
                 )}
                 {items.map((item, idx) => {
@@ -181,10 +183,10 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
                   const children = isItemized ? (item.childLineItems || []) : [];
                   return (
                     <View key={item.id}>
-                      <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+                      <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                         <View style={{ flex: 3 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                            <Text style={styles.td}>
+                            <Text style={s.td}>
                               {isKit
                                 ? (item.description || item.kit?.name || "Kit")
                                 : item.model
@@ -192,7 +194,7 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
                                   : item.description || "-"}
                             </Text>
                             {item.isOptional && (
-                              <Text style={styles.optionalBadge}>Optional</Text>
+                              <Text style={s.optionalBadge}>Optional</Text>
                             )}
                             {item.isOverbooked && (
                               <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
@@ -202,38 +204,38 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
                             <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
                           )}
                         </View>
-                        <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                        <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                           {item.quantity}
                         </Text>
-                        <Text style={[styles.tdRight, { width: 60 }]}>
+                        <Text style={[s.tdRight, { width: 60 }]}>
                           {isItemized ? "-" : item.unitPrice != null
                             ? `${formatCurrency(item.unitPrice)}${pricingLabels[item.pricingType] || ""}`
                             : "-"}
                         </Text>
-                        <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                        <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                           {item.duration}
                         </Text>
-                        <Text style={[styles.tdRight, { width: 60 }]}>
+                        <Text style={[s.tdRight, { width: 60 }]}>
                           {isItemized ? "-" : formatCurrency(item.lineTotal)}
                         </Text>
                       </View>
                       {children.map((child) => (
-                        <View key={child.id} style={styles.tableRow}>
+                        <View key={child.id} style={s.tableRow}>
                           <View style={{ flex: 3, paddingLeft: 12 }}>
-                            <Text style={[styles.td, { fontSize: 8, color: "#555" }]}>
+                            <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
                               {child.model?.name || child.description || "-"}
                             </Text>
                           </View>
-                          <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.quantity}
                           </Text>
-                          <Text style={[styles.tdRight, { width: 60, fontSize: 8 }]}>
+                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
                             {child.unitPrice != null ? formatCurrency(child.unitPrice) : "-"}
                           </Text>
-                          <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.duration}
                           </Text>
-                          <Text style={[styles.tdRight, { width: 60, fontSize: 8 }]}>
+                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
                             {formatCurrency(child.lineTotal)}
                           </Text>
                         </View>
@@ -246,34 +248,34 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
           </View>
 
           {/* Totals */}
-          <View style={styles.totalsContainer}>
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Subtotal</Text>
-              <Text style={styles.totalsValue}>
+          <View style={s.totalsContainer}>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>Subtotal</Text>
+              <Text style={s.totalsValue}>
                 {formatCurrency(project.subtotal)}
               </Text>
             </View>
             {project.discountAmount != null && Number(project.discountAmount) > 0 && (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>
+              <View style={s.totalsRow}>
+                <Text style={s.totalsLabel}>
                   Discount{project.discountPercent ? ` (${project.discountPercent}%)` : ""}
                 </Text>
-                <Text style={styles.totalsValue}>
+                <Text style={s.totalsValue}>
                   -{formatCurrency(project.discountAmount)}
                 </Text>
               </View>
             )}
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>{taxLabel}</Text>
-              <Text style={styles.totalsValue}>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>{taxLabel}</Text>
+              <Text style={s.totalsValue}>
                 {formatCurrency(project.taxAmount)}
               </Text>
             </View>
-            <View style={[styles.totalsRow, styles.totalsDivider]}>
-              <Text style={[styles.totalsLabel, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>
+            <View style={[s.totalsRow, s.totalsDivider]}>
+              <Text style={[s.totalsLabel, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>
                 Total
               </Text>
-              <Text style={styles.totalsBold}>
+              <Text style={s.totalsBold}>
                 {formatCurrency(project.total)}
               </Text>
             </View>
@@ -282,14 +284,14 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
 
         {/* Notes */}
         {project.clientNotes && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
-            <Text style={styles.notes}>{project.clientNotes}</Text>
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Notes</Text>
+            <Text style={s.notes}>{project.clientNotes}</Text>
           </View>
         )}
 
         {/* Footer */}
-        <Text style={styles.footer}>
+        <Text style={s.footer}>
           {org.name} | {org.email || ""} | {org.phone || ""}
           {"\n"}This quote is valid for 30 days from the date of issue.
         </Text>

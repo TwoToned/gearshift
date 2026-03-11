@@ -1,5 +1,5 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import { styles, formatDate } from "./styles";
+import { createStyles, formatDate, type PdfBranding } from "./styles";
 
 interface LineItem {
   id: string;
@@ -19,7 +19,7 @@ interface LineItem {
 }
 
 interface ReturnSheetPDFProps {
-  org: { name: string };
+  org: { name: string; branding?: PdfBranding };
   project: {
     projectNumber: string;
     name: string;
@@ -58,6 +58,7 @@ function ConditionCheckboxes({ fontSize = 7 }: { fontSize?: number }) {
 }
 
 export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
+  const s = createStyles(org.branding);
   // Only include items that were checked out, exclude kit children
   const items = project.lineItems.filter(
     (i) => (i.status === "CHECKED_OUT" || i.status === "RETURNED") && !i.isKitChild
@@ -65,16 +66,16 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.companyName}>{org.name}</Text>
-            <Text style={styles.companyDetails}>Return Sheet</Text>
+            <Text style={s.companyName}>{org.name}</Text>
+            <Text style={s.companyDetails}>Return Sheet</Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>RETURN SHEET</Text>
-            <Text style={styles.docMeta}>
+            <Text style={s.docTitle}>RETURN SHEET</Text>
+            <Text style={s.docMeta}>
               {project.projectNumber}
               {"\n"}{project.name}
               {project.client ? `\n${project.client.name}` : ""}
@@ -84,14 +85,14 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
         </View>
 
         {/* Table */}
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.th, { width: 20, textAlign: "center" }]}>Ret</Text>
-            <Text style={[styles.th, { flex: 2 }]}>Item</Text>
-            <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Qty</Text>
-            <Text style={[styles.th, { width: 80 }]}>Asset Tag</Text>
-            <Text style={[styles.th, { width: 80, textAlign: "center" }]}>Condition</Text>
-            <Text style={[styles.th, { flex: 1 }]}>Notes</Text>
+        <View style={s.table}>
+          <View style={s.tableHeader}>
+            <Text style={[s.th, { width: 20, textAlign: "center" }]}>Ret</Text>
+            <Text style={[s.th, { flex: 2 }]}>Item</Text>
+            <Text style={[s.th, { width: 30, textAlign: "center" }]}>Qty</Text>
+            <Text style={[s.th, { width: 80 }]}>Asset Tag</Text>
+            <Text style={[s.th, { width: 80, textAlign: "center" }]}>Condition</Text>
+            <Text style={[s.th, { flex: 1 }]}>Notes</Text>
           </View>
 
           {items.map((item, idx) => {
@@ -99,13 +100,13 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
             const children = isKit ? (item.childLineItems || []) : [];
             return (
               <View key={item.id}>
-                <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                  <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                  <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                     <Checkbox />
                   </View>
                   <View style={{ flex: 2 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <Text style={styles.td}>
+                      <Text style={s.td}>
                         {isKit
                           ? (item.description || item.kit?.name || "Kit")
                           : item.model
@@ -120,35 +121,35 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
                       <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
                     )}
                   </View>
-                  <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                  <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                     {isKit ? children.length : item.quantity}
                   </Text>
-                  <Text style={[styles.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
+                  <Text style={[s.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
                     {isKit ? (item.kit?.assetTag || "-") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "-")}
                   </Text>
-                  <View style={[styles.td, { width: 80, justifyContent: "center" }]}>
+                  <View style={[s.td, { width: 80, justifyContent: "center" }]}>
                     <ConditionCheckboxes />
                   </View>
-                  <Text style={[styles.td, { flex: 1 }]}> </Text>
+                  <Text style={[s.td, { flex: 1 }]}> </Text>
                 </View>
                 {children.map((child) => (
-                  <View key={child.id} style={styles.tableRow}>
-                    <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                  <View key={child.id} style={s.tableRow}>
+                    <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                       <Checkbox size={6} />
                     </View>
-                    <Text style={[styles.td, { flex: 2, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
+                    <Text style={[s.td, { flex: 2, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
                       {child.model?.name || child.description || "-"}
                     </Text>
-                    <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                    <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                       {child.quantity}
                     </Text>
-                    <Text style={[styles.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                    <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
                       {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
                     </Text>
-                    <View style={[styles.td, { width: 80, justifyContent: "center" }]}>
+                    <View style={[s.td, { width: 80, justifyContent: "center" }]}>
                       <ConditionCheckboxes fontSize={6} />
                     </View>
-                    <Text style={[styles.td, { flex: 1 }]}> </Text>
+                    <Text style={[s.td, { flex: 1 }]}> </Text>
                   </View>
                 ))}
               </View>
@@ -158,26 +159,26 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
 
         {/* Sign-off */}
         <View style={{ marginTop: 40 }}>
-          <View style={[styles.row, { gap: 40 }]}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Returned By</Text>
+          <View style={[s.row, { gap: 40 }]}>
+            <View style={s.col}>
+              <Text style={s.label}>Returned By</Text>
               <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#ccc", marginTop: 30 }} />
-              <Text style={[styles.value, { marginTop: 4 }]}>Name / Signature</Text>
+              <Text style={[s.value, { marginTop: 4 }]}>Name / Signature</Text>
             </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Received By</Text>
+            <View style={s.col}>
+              <Text style={s.label}>Received By</Text>
               <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#ccc", marginTop: 30 }} />
-              <Text style={[styles.value, { marginTop: 4 }]}>Name / Signature</Text>
+              <Text style={[s.value, { marginTop: 4 }]}>Name / Signature</Text>
             </View>
             <View style={{ width: 80 }}>
-              <Text style={styles.label}>Date</Text>
+              <Text style={s.label}>Date</Text>
               <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#ccc", marginTop: 30 }} />
             </View>
           </View>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>
+        <Text style={s.footer}>
           {org.name} | {project.projectNumber} | Printed {formatDate(new Date().toISOString())}
         </Text>
       </Page>

@@ -69,6 +69,8 @@ export async function GET(
     }
   }
 
+  const branding = orgSettings.branding as { primaryColor?: string; accentColor?: string; documentColor?: string } | undefined;
+
   const orgData = {
     name: org?.name || "",
     email: (orgSettings.email as string) || undefined,
@@ -77,6 +79,7 @@ export async function GET(
     website: (orgSettings.website as string) || undefined,
     taxRate: (orgSettings.taxRate as number) || 10,
     taxLabel: (orgSettings.taxLabel as string) || "GST",
+    branding,
   };
 
   // Compute overbooked status dynamically

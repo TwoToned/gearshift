@@ -1,5 +1,5 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import { styles, formatCurrency, formatDate } from "./styles";
+import { createStyles, formatCurrency, formatDate, type PdfBranding } from "./styles";
 
 interface LineItem {
   id: string;
@@ -30,6 +30,7 @@ interface InvoicePDFProps {
     address?: string;
     taxRate?: number;
     taxLabel?: string;
+    branding?: PdfBranding;
   };
   project: {
     projectNumber: string;
@@ -62,6 +63,7 @@ const pricingLabels: Record<string, string> = {
 };
 
 export function InvoicePDF({ org, project }: InvoicePDFProps) {
+  const s = createStyles(org.branding);
   const taxLabel = org.taxLabel || "GST";
   const totalNum = Number(project.total) || 0;
   const depositNum = Number(project.depositPaid) || 0;
@@ -80,18 +82,18 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.companyName}>{org.name}</Text>
-            <Text style={styles.companyDetails}>
+            <Text style={s.companyName}>{org.name}</Text>
+            <Text style={s.companyDetails}>
               {[org.address, org.phone, org.email].filter(Boolean).join("\n")}
             </Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>INVOICE</Text>
-            <Text style={styles.docMeta}>
+            <Text style={s.docTitle}>INVOICE</Text>
+            <Text style={s.docMeta}>
               {project.projectNumber}
               {"\n"}Date: {formatDate(new Date().toISOString())}
               {"\n"}
@@ -103,33 +105,33 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
         </View>
 
         {/* Bill To */}
-        <View style={styles.row}>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Bill To</Text>
+        <View style={s.row}>
+          <View style={s.col}>
+            <Text style={s.sectionTitle}>Bill To</Text>
             {project.client ? (
               <View>
-                <Text style={styles.value}>{project.client.name}</Text>
+                <Text style={s.value}>{project.client.name}</Text>
                 {project.client.contactName && (
-                  <Text style={styles.value}>Attn: {project.client.contactName}</Text>
+                  <Text style={s.value}>Attn: {project.client.contactName}</Text>
                 )}
                 {project.client.billingAddress && (
-                  <Text style={styles.value}>{project.client.billingAddress}</Text>
+                  <Text style={s.value}>{project.client.billingAddress}</Text>
                 )}
                 {project.client.taxId && (
-                  <Text style={styles.value}>ABN: {project.client.taxId}</Text>
+                  <Text style={s.value}>ABN: {project.client.taxId}</Text>
                 )}
               </View>
             ) : (
-              <Text style={styles.value}>-</Text>
+              <Text style={s.value}>-</Text>
             )}
           </View>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Project</Text>
-            <Text style={styles.value}>{project.name}</Text>
+          <View style={s.col}>
+            <Text style={s.sectionTitle}>Project</Text>
+            <Text style={s.value}>{project.name}</Text>
             {project.rentalStartDate && (
               <View>
-                <Text style={styles.label}>Rental Period</Text>
-                <Text style={styles.value}>
+                <Text style={s.label}>Rental Period</Text>
+                <Text style={s.value}>
                   {formatDate(project.rentalStartDate)}
                   {project.rentalEndDate ? ` - ${formatDate(project.rentalEndDate)}` : ""}
                 </Text>
@@ -139,21 +141,21 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
         </View>
 
         {/* Line Items */}
-        <View style={[styles.section, { marginTop: 16 }]}>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, { flex: 3 }]}>Description</Text>
-              <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Qty</Text>
-              <Text style={[styles.th, { width: 60, textAlign: "right" }]}>Rate</Text>
-              <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Days</Text>
-              <Text style={[styles.th, { width: 60, textAlign: "right" }]}>Amount</Text>
+        <View style={[s.section, { marginTop: 16 }]}>
+          <View style={s.table}>
+            <View style={s.tableHeader}>
+              <Text style={[s.th, { flex: 3 }]}>Description</Text>
+              <Text style={[s.th, { width: 30, textAlign: "center" }]}>Qty</Text>
+              <Text style={[s.th, { width: 60, textAlign: "right" }]}>Rate</Text>
+              <Text style={[s.th, { width: 30, textAlign: "center" }]}>Days</Text>
+              <Text style={[s.th, { width: 60, textAlign: "right" }]}>Amount</Text>
             </View>
 
             {Array.from(groups.entries()).map(([groupName, items]) => (
               <View key={groupName}>
                 {groupName !== "_ungrouped" && (
-                  <View style={styles.groupHeader}>
-                    <Text style={styles.groupName}>{groupName}</Text>
+                  <View style={s.groupHeader}>
+                    <Text style={s.groupName}>{groupName}</Text>
                   </View>
                 )}
                 {items.map((item, idx) => {
@@ -162,10 +164,10 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                   const children = isItemized ? (item.childLineItems || []) : [];
                   return (
                     <View key={item.id}>
-                      <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+                      <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                         <View style={{ flex: 3 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                            <Text style={styles.td}>
+                            <Text style={s.td}>
                               {isKit
                                 ? (item.description || item.kit?.name || "Kit")
                                 : item.model
@@ -180,36 +182,36 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                             <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
                           )}
                         </View>
-                        <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                        <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                           {item.quantity}
                         </Text>
-                        <Text style={[styles.tdRight, { width: 60 }]}>
+                        <Text style={[s.tdRight, { width: 60 }]}>
                           {isItemized ? "-" : item.unitPrice != null
                             ? `${formatCurrency(item.unitPrice)}${pricingLabels[item.pricingType] || ""}`
                             : "-"}
                         </Text>
-                        <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
+                        <Text style={[s.td, { width: 30, textAlign: "center" }]}>
                           {item.duration}
                         </Text>
-                        <Text style={[styles.tdRight, { width: 60 }]}>
+                        <Text style={[s.tdRight, { width: 60 }]}>
                           {isItemized ? "-" : formatCurrency(item.lineTotal)}
                         </Text>
                       </View>
                       {children.map((child) => (
-                        <View key={child.id} style={styles.tableRow}>
-                          <Text style={[styles.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
+                        <View key={child.id} style={s.tableRow}>
+                          <Text style={[s.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
                             {child.model?.name || child.description || "-"}
                           </Text>
-                          <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.quantity}
                           </Text>
-                          <Text style={[styles.tdRight, { width: 60, fontSize: 8 }]}>
+                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
                             {child.unitPrice != null ? formatCurrency(child.unitPrice) : "-"}
                           </Text>
-                          <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.duration}
                           </Text>
-                          <Text style={[styles.tdRight, { width: 60, fontSize: 8 }]}>
+                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
                             {formatCurrency(child.lineTotal)}
                           </Text>
                         </View>
@@ -222,40 +224,40 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
           </View>
 
           {/* Totals */}
-          <View style={styles.totalsContainer}>
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Subtotal</Text>
-              <Text style={styles.totalsValue}>{formatCurrency(project.subtotal)}</Text>
+          <View style={s.totalsContainer}>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>Subtotal</Text>
+              <Text style={s.totalsValue}>{formatCurrency(project.subtotal)}</Text>
             </View>
             {project.discountAmount != null && Number(project.discountAmount) > 0 && (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>
+              <View style={s.totalsRow}>
+                <Text style={s.totalsLabel}>
                   Discount{project.discountPercent ? ` (${project.discountPercent}%)` : ""}
                 </Text>
-                <Text style={styles.totalsValue}>-{formatCurrency(project.discountAmount)}</Text>
+                <Text style={s.totalsValue}>-{formatCurrency(project.discountAmount)}</Text>
               </View>
             )}
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>{taxLabel}</Text>
-              <Text style={styles.totalsValue}>{formatCurrency(project.taxAmount)}</Text>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>{taxLabel}</Text>
+              <Text style={s.totalsValue}>{formatCurrency(project.taxAmount)}</Text>
             </View>
-            <View style={[styles.totalsRow, styles.totalsDivider]}>
-              <Text style={[styles.totalsLabel, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>
+            <View style={[s.totalsRow, s.totalsDivider]}>
+              <Text style={[s.totalsLabel, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>
                 Total
               </Text>
-              <Text style={styles.totalsBold}>{formatCurrency(project.total)}</Text>
+              <Text style={s.totalsBold}>{formatCurrency(project.total)}</Text>
             </View>
             {depositNum > 0 && (
               <>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Deposit Paid</Text>
-                  <Text style={styles.totalsValue}>-{formatCurrency(depositNum)}</Text>
+                <View style={s.totalsRow}>
+                  <Text style={s.totalsLabel}>Deposit Paid</Text>
+                  <Text style={s.totalsValue}>-{formatCurrency(depositNum)}</Text>
                 </View>
-                <View style={styles.totalsRow}>
-                  <Text style={[styles.totalsLabel, { fontFamily: "Helvetica-Bold" }]}>
+                <View style={s.totalsRow}>
+                  <Text style={[s.totalsLabel, { fontFamily: "Helvetica-Bold" }]}>
                     Balance Due
                   </Text>
-                  <Text style={[styles.totalsValue, { fontFamily: "Helvetica-Bold" }]}>
+                  <Text style={[s.totalsValue, { fontFamily: "Helvetica-Bold" }]}>
                     {formatCurrency(balanceDue)}
                   </Text>
                 </View>
@@ -265,7 +267,7 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>
+        <Text style={s.footer}>
           {org.name} | {org.email || ""} | {org.phone || ""}
           {"\n"}Thank you for your business.
         </Text>
