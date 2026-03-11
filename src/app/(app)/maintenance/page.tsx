@@ -183,7 +183,9 @@ export default function MaintenancePage() {
           }}
         >
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder="Status">
+              {{ all: "All Statuses", SCHEDULED: "Scheduled", IN_PROGRESS: "In Progress", COMPLETED: "Completed", CANCELLED: "Cancelled" }[statusFilter] || statusFilter}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
@@ -201,7 +203,9 @@ export default function MaintenancePage() {
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Type" />
+            <SelectValue placeholder="Type">
+              {{ all: "All Types", ...typeLabels }[typeFilter] || typeFilter}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
