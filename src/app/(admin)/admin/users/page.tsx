@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { Search, MoreHorizontal, Shield, ShieldOff, Ban, CheckCircle, Trash2, KeyRound, UserPlus, Loader2 } from "lucide-react";
+import { Search, MoreHorizontal, Shield, ShieldOff, Ban, CheckCircle, Trash2, KeyRound, UserPlus, Loader2, Mail, X } from "lucide-react";
 import {
   getAllUsers,
   promoteToSiteAdmin,
@@ -34,6 +34,8 @@ import {
   adminDeleteUser,
   forceDisable2FA,
   adminInviteUser,
+  adminGetPendingInvitations,
+  adminRevokeInvitation,
 } from "@/server/site-admin";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -110,10 +112,25 @@ export default function AdminUsersPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const { data: pendingInvitations } = useQuery({
+    queryKey: ["admin-pending-invitations"],
+    queryFn: adminGetPendingInvitations,
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: adminRevokeInvitation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-pending-invitations"] });
+      toast.success("Invitation revoked");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const inviteMutation = useMutation({
     mutationFn: adminInviteUser,
     onSuccess: (_data) => {
       invalidate();
+      queryClient.invalidateQueries({ queryKey: ["admin-pending-invitations"] });
       toast.success(`Invitation sent to ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail("");
@@ -149,6 +166,54 @@ export default function AdminUsersPage() {
             Invite User
           </Button>
         </div>
+
+        {/* Pending Invitations */}
+        {((pendingInvitations || []) as any[]).length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                Pending Invitations
+              </h3>
+              <div className="space-y-2">
+                {((pendingInvitations || []) as any[]).map((inv: any) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between rounded-md border border-dashed p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{inv.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Invited to {inv.organization.name}
+                          {inv.role ? ` as ${inv.role}` : ""}
+                          {" - "}
+                          {new Date(inv.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => {
+                        if (confirm(`Revoke invitation for ${inv.email}?`)) {
+                          revokeMutation.mutate(inv.id);
+                        }
+                      }}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Revoke
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="p-0">

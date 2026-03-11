@@ -367,3 +367,36 @@ export async function getMembers() {
 
   return serialize(members);
 }
+
+/** Get pending invitations for the current organization. */
+export async function getPendingInvitations() {
+  const { organizationId } = await getOrgContext();
+
+  const invitations = await prisma.invitation.findMany({
+    where: {
+      organizationId,
+      status: "pending",
+      expiresAt: { gte: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return serialize(invitations);
+}
+
+/** Revoke a pending invitation for the current organization. */
+export async function revokeInvitation(invitationId: string) {
+  const { organizationId } = await getOrgContext();
+
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: invitationId, organizationId, status: "pending" },
+  });
+  if (!invitation) throw new Error("Invitation not found");
+
+  await prisma.invitation.update({
+    where: { id: invitationId },
+    data: { status: "cancelled" },
+  });
+
+  return { success: true };
+}

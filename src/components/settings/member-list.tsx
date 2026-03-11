@@ -13,10 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Trash2, Mail, X } from "lucide-react";
 import { NotViewer } from "@/components/auth/permission-gate";
 import { toast } from "sonner";
-import { getMembers } from "@/server/settings";
+import { getMembers, getPendingInvitations, revokeInvitation } from "@/server/settings";
 import { changeMemberRole, removeOrgMember } from "@/server/org-members";
 import { getCustomRoles } from "@/server/custom-roles";
 import { ROLE_COLORS } from "./role-editor-dialog";
@@ -77,6 +77,20 @@ export function MemberList() {
   const { data: customRoles } = useQuery({
     queryKey: ["custom-roles"],
     queryFn: getCustomRoles,
+  });
+
+  const { data: pendingInvitations } = useQuery({
+    queryKey: ["pending-invitations"],
+    queryFn: getPendingInvitations,
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: revokeInvitation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-invitations"] });
+      toast.success("Invitation revoked");
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const changeRoleMut = useMutation({
@@ -148,8 +162,56 @@ export function MemberList() {
 
   const hasCustomRoles = ((customRoles || []) as CustomRoleData[]).length > 0;
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const invites = (pendingInvitations || []) as any[];
+
   return (
     <div className="space-y-3">
+      {invites.length > 0 && (
+        <>
+          {invites.map((inv) => {
+            const display = inv.role ? getRoleDisplay(inv.role, customRolesMap) : { label: "Member", colorClass: roleColors.member };
+            return (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between rounded-md border border-dashed p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{inv.email}</p>
+                    <p className="text-xs text-muted-foreground">Invited</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={display.colorClass}>
+                    {display.label}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    Pending
+                  </Badge>
+                  <NotViewer>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => {
+                        if (confirm(`Revoke invitation for ${inv.email}?`)) {
+                          revokeMut.mutate(inv.id);
+                        }
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </NotViewer>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
       {items.map((member) => {
         const initials = member.user.name
           ?.split(" ")

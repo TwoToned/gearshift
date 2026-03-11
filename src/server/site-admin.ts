@@ -495,6 +495,43 @@ export async function adminInviteUser(email: string) {
   return { success: true, email: normalizedEmail };
 }
 
+// ─── Pending Invitations (Site Admin) ─────────────────────────────────────
+
+export async function adminGetPendingInvitations() {
+  await requireSiteAdmin();
+
+  const invitations = await prisma.invitation.findMany({
+    where: {
+      status: "pending",
+      expiresAt: { gte: new Date() },
+    },
+    include: {
+      organization: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return serialize(invitations);
+}
+
+export async function adminRevokeInvitation(invitationId: string) {
+  await requireSiteAdmin();
+
+  const invitation = await prisma.invitation.findUnique({
+    where: { id: invitationId },
+  });
+  if (!invitation || invitation.status !== "pending") {
+    throw new Error("Invitation not found or already processed.");
+  }
+
+  await prisma.invitation.update({
+    where: { id: invitationId },
+    data: { status: "cancelled" },
+  });
+
+  return { success: true };
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────────────
 
 export async function getAdminDashboardStats() {

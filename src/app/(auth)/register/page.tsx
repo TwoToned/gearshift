@@ -30,6 +30,7 @@ function RegisterContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [policy, setPolicy] = useState<string | null>(null);
+  const [inviteEmailLocked, setInviteEmailLocked] = useState(false);
 
   useEffect(() => {
     fetch("/api/registration-policy", { cache: "no-store" })
@@ -37,6 +38,20 @@ function RegisterContent() {
       .then((d) => setPolicy(d.policy))
       .catch(() => setPolicy("OPEN"));
   }, []);
+
+  // Prefill email from invitation
+  useEffect(() => {
+    if (inviteId) {
+      import("@/server/invitations").then(({ getInvitationEmail }) => {
+        getInvitationEmail(inviteId).then((invEmail) => {
+          if (invEmail) {
+            setEmail(invEmail);
+            setInviteEmailLocked(true);
+          }
+        });
+      });
+    }
+  }, [inviteId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,7 +173,14 @@ function RegisterContent() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={inviteEmailLocked}
+              className={inviteEmailLocked ? "bg-muted" : ""}
             />
+            {inviteEmailLocked && (
+              <p className="text-xs text-muted-foreground">
+                Email is set from your invitation and cannot be changed.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>

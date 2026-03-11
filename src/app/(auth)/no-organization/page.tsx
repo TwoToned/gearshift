@@ -14,9 +14,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Building2, LogOut, Loader2 } from "lucide-react";
+import { Building2, LogOut, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { getMyPendingInvitations } from "@/server/invitations";
+import { getMyPendingInvitations, checkIsSiteAdmin } from "@/server/invitations";
 
 export default function NoOrganizationPage() {
   const router = useRouter();
@@ -27,6 +27,11 @@ export default function NoOrganizationPage() {
     queryKey: ["my-pending-invitations"],
     queryFn: getMyPendingInvitations,
     refetchInterval: 30_000,
+  });
+
+  const { data: isSiteAdmin } = useQuery({
+    queryKey: ["is-site-admin"],
+    queryFn: checkIsSiteAdmin,
   });
 
   const acceptMutation = useMutation({
@@ -107,9 +112,20 @@ export default function NoOrganizationPage() {
           </p>
         )}
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="flex flex-col gap-2">
+        {isSiteAdmin && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push("/admin")}
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            Admin Panel
+          </Button>
+        )}
         <Button
           variant="ghost"
+          className="w-full"
           onClick={async () => {
             await signOut();
             router.push("/login");
