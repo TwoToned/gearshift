@@ -35,6 +35,7 @@ import {
   UserPlus,
   Trash2,
   Shield,
+  Download,
 } from "lucide-react";
 import {
   adminGetOrganizationDetails,
@@ -105,6 +106,31 @@ export default function AdminOrgDetailPage({
     userId: string;
     name: string;
   } | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/admin/org-export/${orgId}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Export failed" }));
+        throw new Error(body.error || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `org-export-${orgId}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const { data: org, isLoading } = useQuery({
     queryKey: ["admin-org-detail", orgId],
@@ -178,20 +204,28 @@ export default function AdminOrgDetailPage({
     <AdminShell>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" render={<Link href="/admin/organizations" />}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {isLoading ? "Loading..." : org?.name}
-            </h1>
-            {org && (
-              <p className="text-muted-foreground text-sm font-mono">
-                {org.slug}
-              </p>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" render={<Link href="/admin/organizations" />}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {isLoading ? "Loading..." : org?.name}
+              </h1>
+              {org && (
+                <p className="text-muted-foreground text-sm font-mono">
+                  {org.slug}
+                </p>
+              )}
+            </div>
           </div>
+          {org && (
+            <Button variant="outline" disabled={exporting} onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? "Exporting..." : "Export Backup"}
+            </Button>
+          )}
         </div>
 
         {/* Stats */}

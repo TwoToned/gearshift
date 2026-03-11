@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, Trash2, Building2, Eye } from "lucide-react";
+import { Search, Trash2, Building2, Eye, Upload, Download } from "lucide-react";
 import Link from "next/link";
 import {
   getAllOrganizations,
@@ -32,11 +32,45 @@ export default function AdminOrganizationsPage() {
     name: string;
   } | null>(null);
   const [confirmName, setConfirmName] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importName, setImportName] = useState("");
+  const [importSlug, setImportSlug] = useState("");
+  const [importing, setImporting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-organizations", search, page],
     queryFn: () => getAllOrganizations({ page, pageSize: 20, search }),
   });
+
+  async function handleImport() {
+    if (!importFile) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      if (importName.trim()) formData.append("name", importName.trim());
+      if (importSlug.trim()) formData.append("slug", importSlug.trim());
+
+      const res = await fetch("/api/admin/org-import", {
+        method: "POST",
+        body: formData,
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Import failed");
+
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations"] });
+      toast.success(`Imported "${body.name}" successfully`);
+      setImportOpen(false);
+      setImportFile(null);
+      setImportName("");
+      setImportSlug("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (orgId: string) => adminDeleteOrganization(orgId),
@@ -59,7 +93,7 @@ export default function AdminOrganizationsPage() {
           </p>
         </div>
 
-        {/* Search */}
+        {/* Search + Import */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -73,6 +107,10 @@ export default function AdminOrganizationsPage() {
               className="pl-9"
             />
           </div>
+          <Button onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import Organization
+          </Button>
         </div>
 
         {/* Table */}
@@ -138,6 +176,29 @@ export default function AdminOrganizationsPage() {
                                 render={<Link href={`/admin/organizations/${org.id}`} />}
                               >
                                 <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Export backup"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/admin/org-export/${org.id}`);
+                                    if (!res.ok) throw new Error("Export failed");
+                                    const blob = await res.blob();
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `org-export-${org.slug}.zip`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                    toast.success("Export downloaded");
+                                  } catch {
+                                    toast.error("Export failed");
+                                  }
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -233,6 +294,71 @@ export default function AdminOrganizationsPage() {
               }
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Organization"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Import Organization Dialog */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setImportOpen(false);
+            setImportFile(null);
+            setImportName("");
+            setImportSlug("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Organization</DialogTitle>
+            <DialogDescription>
+              Upload an organization export (.zip) to create a new organization
+              with all its data and media.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Export File</label>
+              <Input
+                type="file"
+                accept=".zip"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                New Organization Name{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                placeholder="Leave blank to auto-generate"
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                New Slug{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                placeholder="Leave blank to auto-generate"
+                value={importSlug}
+                onChange={(e) => setImportSlug(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!importFile || importing}
+              onClick={handleImport}
+            >
+              {importing ? "Importing..." : "Import Organization"}
             </Button>
           </DialogFooter>
         </DialogContent>
