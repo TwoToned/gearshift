@@ -20,6 +20,8 @@ interface LineItem {
   overbookedReducedOnly?: boolean;
   overbookedHasOverbooked?: boolean;
   overbookedHasReduced?: boolean;
+  isSubhire?: boolean;
+  showSubhireOnDocs?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -121,6 +123,9 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
                       ) : item.isOverbooked ? (
                         <Text style={{ fontSize: 6, color: item.overbookedReducedOnly ? "#7c3aed" : item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedReducedOnly ? "#ede9fe" : item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{item.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
                       ) : null}
+                      {item.isSubhire && item.showSubhireOnDocs && (
+                        <Text style={{ fontSize: 6, color: "#0891b2", backgroundColor: "#cffafe", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>SUBHIRE</Text>
+                      )}
                     </View>
                     {item.notes && (
                       <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>

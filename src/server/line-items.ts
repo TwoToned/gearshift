@@ -167,11 +167,15 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
       groupName: parsed.groupName || null,
       notes: parsed.notes || null,
       isOptional: parsed.isOptional,
+      isSubhire: parsed.isSubhire,
+      showSubhireOnDocs: parsed.showSubhireOnDocs,
+      supplierId: parsed.supplierId || null,
     },
     include: {
       model: true,
       asset: true,
       bulkAsset: true,
+      supplier: true,
     },
   });
 
@@ -208,11 +212,15 @@ export async function updateLineItem(id: string, data: LineItemFormValues, allow
       groupName: parsed.groupName || null,
       notes: parsed.notes || null,
       isOptional: parsed.isOptional,
+      isSubhire: parsed.isSubhire,
+      showSubhireOnDocs: parsed.showSubhireOnDocs,
+      supplierId: parsed.supplierId || null,
     },
     include: {
       model: true,
       asset: true,
       bulkAsset: true,
+      supplier: true,
     },
   });
 
@@ -433,7 +441,8 @@ export async function checkAvailability(
     const totalStock = model.assets.length;
     const inMaintenance = model.assets.filter((a) => a.status === "IN_MAINTENANCE").length;
     const lost = model.assets.filter((a) => a.status === "LOST").length;
-    const unavailable = inMaintenance + lost;
+    const retired = model.assets.filter((a) => a.status === "RETIRED").length;
+    const unavailable = inMaintenance + lost + retired;
     const effectiveStock = totalStock - unavailable;
     const available = Math.max(0, effectiveStock - booked);
 

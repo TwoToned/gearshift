@@ -119,6 +119,7 @@ interface LineItem {
   asset: { assetTag: string } | null;
   bulkAsset: { assetTag: string } | null;
   kit: { id: string; assetTag: string; name: string } | null;
+  isSubhire: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -438,12 +439,14 @@ export default function WarehouseProjectPage({
           return;
         }
         const detail = "detail" in result ? (result.detail as string) : "";
+        const assetStatus = "assetStatus" in result ? (result.assetStatus as string) : "";
         const messages: Record<string, string> = {
           already_checked_out: "Already checked out on this project",
           asset_checked_out_elsewhere: `Already checked out${detail}`,
           not_on_project: "Asset not assigned to this project",
           not_checked_out: "Asset is not checked out on this project",
           already_returned: "All units already returned",
+          asset_unavailable: `Asset is ${assetStatus.replace("_", " ").toLowerCase()} and cannot be checked out`,
         };
         toast.error(messages[result.reason as string] || "Cannot check out this asset");
         setScanValue("");
@@ -709,11 +712,11 @@ export default function WarehouseProjectPage({
     // Find serialized items that need asset assignment
     const unassignedSerialized = serializedLineItemIds
       .map((id) => lineItems.find((li) => li.id === id))
-      .filter((li): li is LineItem => !!li && !li.assetId && !isBulkItem(li) && !!li.modelId);
+      .filter((li): li is LineItem => !!li && !li.assetId && !isBulkItem(li) && !!li.modelId && !li.isSubhire);
 
     const alreadyAssigned = serializedLineItemIds
       .map((id) => lineItems.find((li) => li.id === id))
-      .filter((li): li is LineItem => !!li && (!!li.assetId || isBulkItem(li)));
+      .filter((li): li is LineItem => !!li && (!!li.assetId || isBulkItem(li) || li.isSubhire));
 
     const bulkItems = Array.from(bulkQtyMap.entries()).map(([lineItemId, qty]) => ({
       lineItemId,
@@ -1151,6 +1154,9 @@ export default function WarehouseProjectPage({
                           </TableCell>
                           <TableCell>
                             <span className="font-medium">{modelDisplayName(item)}</span>
+                            {item.isSubhire && (
+                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-sm text-muted-foreground">
                             {item.asset?.assetTag || item.bulkAsset?.assetTag || "—"}
@@ -1431,6 +1437,9 @@ export default function WarehouseProjectPage({
                           </TableCell>
                           <TableCell>
                             <span className="font-medium">{modelDisplayName(item)}</span>
+                            {item.isSubhire && (
+                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-sm text-muted-foreground">
                             {assetTag || "—"}

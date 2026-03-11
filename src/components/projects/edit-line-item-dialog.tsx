@@ -12,6 +12,7 @@ import {
   type LineItemFormValues,
 } from "@/lib/validations/line-item";
 import { updateLineItem, checkAvailability } from "@/server/line-items";
+import { getSuppliers } from "@/server/suppliers";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { QuickCreateSupplier } from "@/components/assets/quick-create-supplier";
 
 interface EditLineItemDialogProps {
   projectId: string;
@@ -48,6 +50,9 @@ interface EditLineItemDialogProps {
     groupName: string | null;
     notes: string | null;
     isOptional: boolean;
+    isSubhire?: boolean;
+    showSubhireOnDocs?: boolean;
+    supplierId?: string | null;
     model?: { name: string; modelNumber?: string | null } | null;
   } | null;
   open: boolean;
@@ -65,6 +70,13 @@ export function EditLineItemDialog({
   onOpenChange,
 }: EditLineItemDialogProps) {
   const queryClient = useQueryClient();
+  const [showCreateSupplier, setShowCreateSupplier] = useState(false);
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: () => getSuppliers(),
+    enabled: open && !!lineItem?.isSubhire,
+  });
 
   const form = useForm<LineItemFormValues>({
     resolver: zodResolver(lineItemSchema),
@@ -87,6 +99,9 @@ export function EditLineItemDialog({
         groupName: lineItem.groupName || undefined,
         notes: lineItem.notes || undefined,
         isOptional: lineItem.isOptional,
+        isSubhire: lineItem.isSubhire ?? false,
+        showSubhireOnDocs: lineItem.showSubhireOnDocs ?? false,
+        supplierId: lineItem.supplierId || undefined,
       });
     }
   }, [lineItem, open, form]);
@@ -141,6 +156,7 @@ export function EditLineItemDialog({
   });
 
   const isEquipment = lineItem?.type === "EQUIPMENT";
+  const isSubhire = lineItem?.isSubhire ?? false;
   const itemName = isEquipment
     ? [lineItem?.model?.name, lineItem?.model?.modelNumber]
         .filter(Boolean)
@@ -148,6 +164,7 @@ export function EditLineItemDialog({
     : lineItem?.description || "Item";
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -158,30 +175,50 @@ export function EditLineItemDialog({
           className="space-y-4 py-2"
         >
           {!isEquipment && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="edit-type">Type</Label>
-                <select
-                  id="edit-type"
-                  {...form.register("type")}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="SERVICE">Service</option>
-                  <option value="LABOUR">Labour</option>
-                  <option value="TRANSPORT">Transport</option>
-                  <option value="MISC">Misc</option>
-                </select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-type">Type</Label>
+              <select
+                id="edit-type"
+                {...form.register("type")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="SERVICE">Service</option>
+                <option value="LABOUR">Labour</option>
+                <option value="TRANSPORT">Transport</option>
+                <option value="MISC">Misc</option>
+              </select>
+            </div>
+          )}
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Input
-                  id="edit-description"
-                  {...form.register("description")}
-                  placeholder="e.g. Sound Engineer - 8hrs"
-                />
-              </div>
-            </>
+          {(!isEquipment || isSubhire) && (
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                {...form.register("description")}
+                placeholder={isSubhire ? "e.g. 4x Shure SM58" : "e.g. Sound Engineer - 8hrs"}
+              />
+            </div>
+          )}
+
+          {isSubhire && (
+            <div className="space-y-2">
+              <Label>Supplier</Label>
+              <ComboboxPicker
+                value={form.watch("supplierId") || ""}
+                onChange={(v) => form.setValue("supplierId", v)}
+                options={(suppliers as Array<{ id: string; name: string; contactName?: string | null }>).map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  description: s.contactName || undefined,
+                }))}
+                placeholder="Select supplier"
+                searchPlaceholder="Search suppliers..."
+                onCreateNew={() => setShowCreateSupplier(true)}
+                createNewLabel="New supplier"
+                allowClear
+              />
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -274,6 +311,25 @@ export function EditLineItemDialog({
             />
           </div>
 
+          {isSubhire && (
+            <div className="flex items-center gap-2">
+              <Controller
+                control={form.control}
+                name="showSubhireOnDocs"
+                render={({ field }) => (
+                  <Checkbox
+                    id="edit-showSubhireOnDocs"
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+              <Label htmlFor="edit-showSubhireOnDocs" className="text-sm font-normal">
+                Show as &quot;Subhire&quot; on quotes, invoices &amp; delivery dockets
+              </Label>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <Controller
               control={form.control}
@@ -327,5 +383,14 @@ export function EditLineItemDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    {isSubhire && (
+      <QuickCreateSupplier
+        open={showCreateSupplier}
+        onOpenChange={setShowCreateSupplier}
+        onCreated={(id) => form.setValue("supplierId", id)}
+      />
+    )}
+    </>
   );
 }

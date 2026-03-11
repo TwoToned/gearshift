@@ -477,7 +477,8 @@ model Supplier {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  assets Asset[]
+  assets    Asset[]
+  lineItems ProjectLineItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -865,6 +866,10 @@ model ProjectLineItem {
   returnedBy      User?          @relation("ReturnedBy", fields: [returnedById], references: [id])
   returnCondition ReturnCondition?
   returnNotes     String?
+  isSubhire       Boolean        @default(false)
+  showSubhireOnDocs Boolean      @default(false)
+  supplierId      String?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -875,6 +880,7 @@ model ProjectLineItem {
   @@index([bulkAssetId])
   @@index([kitId])
   @@index([parentLineItemId])
+  @@index([supplierId])
   @@map("project_line_item")
 }
 

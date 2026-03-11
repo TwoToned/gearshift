@@ -14,6 +14,7 @@ import {
   Container,
   ChevronRight,
   GripVertical,
+  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -73,6 +74,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AddEquipmentDialog } from "./add-equipment-dialog";
 import { AddServiceDialog } from "./add-service-dialog";
+import { AddSubhireDialog } from "./add-subhire-dialog";
 import { EditLineItemDialog } from "./edit-line-item-dialog";
 
 interface LineItemsPanelProps {
@@ -417,8 +419,21 @@ function SortableItemRow({
                       Optional
                     </Badge>
                   )}
+                  {item.isSubhire && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 text-xs bg-cyan-500/10 text-cyan-600 border-cyan-500/20"
+                    >
+                      Subhire
+                    </Badge>
+                  )}
                   {item.isOverbooked && (
                     <OverbookedBadge info={item.overbookedInfo} />
+                  )}
+                  {item.isSubhire && item.supplier && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      via {item.supplier.name}
+                    </p>
                   )}
                   {item.notes && (
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -634,6 +649,7 @@ export function LineItemsPanel({
   const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [kitDialogOpen, setKitDialogOpen] = useState(false);
+  const [subhireDialogOpen, setSubhireDialogOpen] = useState(false);
   const [selectedKitId, setSelectedKitId] = useState("");
   const [kitPricingMode, setKitPricingMode] = useState<
     "KIT_PRICE" | "ITEMIZED"
@@ -1006,6 +1022,14 @@ export function LineItemsPanel({
           <Container className="mr-1.5 h-4 w-4" />
           Add Kit
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setSubhireDialogOpen(true)}
+        >
+          <ArrowUpRight className="mr-1.5 h-4 w-4" />
+          Add Subhire
+        </Button>
       </div>
 
       {topLevelItems.length === 0 ? (
@@ -1179,6 +1203,14 @@ export function LineItemsPanel({
         onGroupCreated={addExtraGroup}
         open={serviceDialogOpen}
         onOpenChange={setServiceDialogOpen}
+      />
+
+      <AddSubhireDialog
+        projectId={projectId}
+        existingGroups={existingGroups}
+        onGroupCreated={addExtraGroup}
+        open={subhireDialogOpen}
+        onOpenChange={setSubhireDialogOpen}
       />
 
       <EditLineItemDialog

@@ -107,6 +107,15 @@ export async function lookupAssetForScan(
     ? [asset.model.name, asset.customName ? `(${asset.customName})` : null].filter(Boolean).join(" ")
     : bulkAsset!.model.name;
 
+  // Block checkout of retired/in-maintenance/lost assets
+  if (mode === "checkout" && asset && (asset.status === "RETIRED" || asset.status === "IN_MAINTENANCE" || asset.status === "LOST")) {
+    return serialize({
+      found: true as const, type: null, lineItemId: null, assetId: asset.id,
+      assetName, reason: "asset_unavailable" as const,
+      assetStatus: asset.status,
+    });
+  }
+
   // For serialized assets, first try to find a line item with this exact asset assigned
   let lineItem = null;
   if (asset) {
@@ -310,6 +319,9 @@ export async function checkOutItems(
           });
           if (assetRecord && assetRecord.status === "CHECKED_OUT") {
             throw new Error(`Asset ${assetRecord.assetTag} is already checked out`);
+          }
+          if (assetRecord && (assetRecord.status === "RETIRED" || assetRecord.status === "IN_MAINTENANCE" || assetRecord.status === "LOST")) {
+            throw new Error(`Asset ${assetRecord.assetTag} is ${assetRecord.status.replace("_", " ").toLowerCase()} and cannot be checked out`);
           }
         }
 

@@ -16,6 +16,9 @@ export const lineItemSchema = z.object({
   groupName: z.string().optional(),
   notes: z.string().optional(),
   isOptional: z.boolean().default(false),
+  isSubhire: z.boolean().default(false),
+  showSubhireOnDocs: z.boolean().default(false),
+  supplierId: z.string().optional(),
 });
 
 export type LineItemFormValues = z.input<typeof lineItemSchema>;

@@ -104,7 +104,7 @@ export async function computeOverbookedStatus(
     if (model.assetType === "SERIALIZED") {
       const total = model.assets.length;
       const unavailable = model.assets.filter(
-        (a) => a.status === "IN_MAINTENANCE" || a.status === "LOST"
+        (a) => a.status === "IN_MAINTENANCE" || a.status === "LOST" || a.status === "RETIRED"
       ).length;
       stockByModel.set(model.id, total);
       effectiveStockByModel.set(model.id, total - unavailable);
