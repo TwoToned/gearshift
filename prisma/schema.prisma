@@ -117,6 +117,7 @@ model Organization {
   kitMedia           KitMedia[]
   projectMedia       ProjectMedia[]
   clientMedia        ClientMedia[]
+  locationMedia      LocationMedia[]
 
   @@map("organization")
 }
@@ -596,6 +597,7 @@ model Location {
   bulkAssets BulkAsset[]
   kits       Kit[]
   projects   Project[]
+  media      LocationMedia[]
 
   @@index([organizationId])
   @@index([parentId])
@@ -834,7 +836,8 @@ model FileUpload {
   assetMedia   AssetMedia[]
   kitMedia     KitMedia[]
   projectMedia ProjectMedia[]
-  clientMedia  ClientMedia[]
+  clientMedia    ClientMedia[]
+  locationMedia  LocationMedia[]
 
   @@index([organizationId])
   @@map("file_upload")
@@ -936,4 +939,23 @@ model ClientMedia {
   @@index([organizationId])
   @@index([clientId])
   @@map("client_media")
+}
+
+model LocationMedia {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationId     String
+  location       Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           MediaType    @default(DOCUMENT)
+  displayName    String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([locationId, fileId])
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("location_media")
 }

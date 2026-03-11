@@ -231,6 +231,13 @@ export async function checkOutItems(
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
 
+    // Fetch the project's location to update asset locations on checkout
+    const project = await tx.project.findUnique({
+      where: { id: projectId, organizationId },
+      select: { locationId: true },
+    });
+    const projectLocationId = project?.locationId || null;
+
     for (const item of items) {
       // Verify line item belongs to this project and org
       const lineItem = await tx.projectLineItem.findFirst({
@@ -316,12 +323,15 @@ export async function checkOutItems(
           include: { model: true, asset: true, bulkAsset: true },
         });
 
-        // Mark the serialized asset as checked out
+        // Mark the serialized asset as checked out and update location to project venue
         const assetIdToUpdate = item.assetId || lineItem.assetId;
         if (assetIdToUpdate) {
           await tx.asset.update({
             where: { id: assetIdToUpdate },
-            data: { status: "CHECKED_OUT" },
+            data: {
+              status: "CHECKED_OUT",
+              ...(projectLocationId && { locationId: projectLocationId }),
+            },
           });
         }
 
@@ -364,6 +374,13 @@ export async function checkInItems(
 
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
+
+    // Find the org's default location to restore assets to on return
+    const defaultLocation = await tx.location.findFirst({
+      where: { organizationId, isDefault: true },
+      select: { id: true },
+    });
+    const defaultLocationId = defaultLocation?.id || null;
 
     for (const item of items) {
       // Verify line item belongs to this project and org
@@ -430,7 +447,7 @@ export async function checkInItems(
           include: { model: true, asset: true, bulkAsset: true },
         });
 
-        // Update serialized asset status based on return condition
+        // Update serialized asset status and restore location based on return condition
         if (lineItem.assetId) {
           let assetStatus: "AVAILABLE" | "IN_MAINTENANCE" | "LOST";
 
@@ -449,7 +466,11 @@ export async function checkInItems(
 
           await tx.asset.update({
             where: { id: lineItem.assetId },
-            data: { status: assetStatus },
+            data: {
+              status: assetStatus,
+              // Restore location to default, or clear it if no default exists
+              locationId: defaultLocationId,
+            },
           });
         }
 
@@ -489,6 +510,13 @@ export async function checkOutKit(projectId: string, kitId: string) {
     });
     if (!kitLineItem) throw new Error("Kit not found on this project");
 
+    // Fetch the project's location to update kit/asset locations
+    const project = await tx.project.findUnique({
+      where: { id: projectId },
+      select: { locationId: true },
+    });
+    const projectLocationId = project?.locationId || null;
+
     // Update kit parent line item
     await tx.projectLineItem.update({
       where: { id: kitLineItem.id },
@@ -501,13 +529,25 @@ export async function checkOutKit(projectId: string, kitId: string) {
       data: { status: "CHECKED_OUT", checkedOutQuantity: 1, checkedOutAt: new Date(), checkedOutById: userId },
     });
 
-    // Update Kit status
-    await tx.kit.update({ where: { id: kitId }, data: { status: "CHECKED_OUT" } });
+    // Update Kit status and location
+    await tx.kit.update({
+      where: { id: kitId },
+      data: {
+        status: "CHECKED_OUT",
+        ...(projectLocationId && { locationId: projectLocationId }),
+      },
+    });
 
-    // Update all serialized assets inside the kit
+    // Update all serialized assets inside the kit — status and location
     const kitItems = await tx.kitSerializedItem.findMany({ where: { kitId } });
     for (const ki of kitItems) {
-      await tx.asset.update({ where: { id: ki.assetId }, data: { status: "CHECKED_OUT" } });
+      await tx.asset.update({
+        where: { id: ki.assetId },
+        data: {
+          status: "CHECKED_OUT",
+          ...(projectLocationId && { locationId: projectLocationId }),
+        },
+      });
     }
 
     // Create scan log for the kit
@@ -536,6 +576,13 @@ export async function checkInKit(
     });
     if (!kitLineItem) throw new Error("Kit not found on this project");
 
+    // Find the org's default location to restore kit/assets to
+    const defaultLocation = await tx.location.findFirst({
+      where: { organizationId, isDefault: true },
+      select: { id: true },
+    });
+    const defaultLocationId = defaultLocation?.id || null;
+
     // Update kit parent line item
     await tx.projectLineItem.update({
       where: { id: kitLineItem.id },
@@ -548,15 +595,27 @@ export async function checkInKit(
       data: { status: "RETURNED", returnedQuantity: 1, returnedAt: new Date(), returnedById: userId, returnCondition },
     });
 
-    // Update Kit status
+    // Update Kit status and restore location (default, or clear if no default)
     const newKitStatus = returnCondition === "DAMAGED" ? "IN_MAINTENANCE" : returnCondition === "MISSING" ? "INCOMPLETE" : "AVAILABLE";
-    await tx.kit.update({ where: { id: kitId }, data: { status: newKitStatus } });
+    await tx.kit.update({
+      where: { id: kitId },
+      data: {
+        status: newKitStatus,
+        locationId: defaultLocationId,
+      },
+    });
 
-    // Update all serialized assets inside the kit
+    // Update all serialized assets inside the kit — status and restore location
     const kitItems = await tx.kitSerializedItem.findMany({ where: { kitId } });
     const assetStatus = returnCondition === "DAMAGED" ? "IN_MAINTENANCE" : returnCondition === "MISSING" ? "LOST" : "AVAILABLE";
     for (const ki of kitItems) {
-      await tx.asset.update({ where: { id: ki.assetId }, data: { status: assetStatus } });
+      await tx.asset.update({
+        where: { id: ki.assetId },
+        data: {
+          status: assetStatus,
+          locationId: defaultLocationId,
+        },
+      });
     }
 
     // Create scan log

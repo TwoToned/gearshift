@@ -8,6 +8,7 @@ import {
   Boxes,
   FolderOpen,
   Users,
+  MapPin,
   Wrench,
   BarChart3,
   Settings,
@@ -62,6 +63,11 @@ const navItems = [
     title: "Clients",
     url: "/clients",
     icon: Users,
+  },
+  {
+    title: "Locations",
+    url: "/locations",
+    icon: MapPin,
   },
   {
     title: "Maintenance",

@@ -59,10 +59,11 @@ export function LocationManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [parentId, setParentId] = useState<string | null>(null);
 
-  const { data: locations, isLoading } = useQuery({
+  const { data: locationsData, isLoading } = useQuery({
     queryKey: ["locations"],
-    queryFn: getLocations,
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations;
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationSchema),

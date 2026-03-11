@@ -99,10 +99,10 @@ export function ProjectForm({ initialData }: ProjectFormProps) {
 
   const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
 
-  const locationOptions = (locationsData || []).map((l) => ({
+  const locationOptions = (locationsData?.locations || []).map((l) => ({
     value: l.id,
     label: l.parent ? `${l.parent.name} → ${l.name}` : l.name,
     description: l.address || undefined,

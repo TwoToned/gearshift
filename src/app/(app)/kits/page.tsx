@@ -45,10 +45,11 @@ export default function KitsPage() {
   const [status, setStatus] = useState("");
   const [locationId, setLocationId] = useState("");
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations || [];
 
   const { data, isLoading } = useQuery({
     queryKey: ["kits", { search, status, locationId, page, pageSize, sortBy, sortOrder }],

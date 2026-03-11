@@ -30,11 +30,12 @@ export function QuickCreateLocation({ open, onOpenChange, onCreated }: QuickCrea
   const [parentId, setParentId] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
     staleTime: 0,
   });
+  const locations = locationsData?.locations || [];
 
   // Only top-level locations can be parents
   const parentOptions = locations

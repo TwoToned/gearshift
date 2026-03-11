@@ -70,10 +70,11 @@ export function AssetTable() {
 
   const queryClient = useQueryClient();
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations || [];
 
   const serializedQuery = useQuery({
     queryKey: ["assets", { search, status, locationId, page, pageSize, sortBy, sortOrder }],

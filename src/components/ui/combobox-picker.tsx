@@ -88,7 +88,7 @@ function ComboboxPicker({
           <span
             role="button"
             className="pointer-events-auto size-4 text-muted-foreground hover:text-foreground"
-            onClick={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
               onChange("")

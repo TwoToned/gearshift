@@ -36,10 +36,11 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
     queryFn: () => getModels({ assetType: "BULK", pageSize: 200 }),
   });
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations || [];
 
   const form = useForm<BulkAssetFormValues>({
     resolver: zodResolver(bulkAssetSchema),
@@ -126,6 +127,7 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
               searchPlaceholder="Search locations..."
               onCreateNew={() => setShowCreateLocation(true)}
               createNewLabel="New location"
+              allowClear
             />
           </div>
           <div className="space-y-2">

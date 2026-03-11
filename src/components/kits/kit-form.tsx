@@ -35,10 +35,11 @@ export function KitForm({ initialData }: KitFormProps) {
     queryFn: () => getCategories(),
   });
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations || [];
 
   const form = useForm<KitFormValues>({
     resolver: zodResolver(kitSchema),

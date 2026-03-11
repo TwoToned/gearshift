@@ -40,10 +40,11 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
     queryFn: () => getModels({ assetType: "SERIALIZED", pageSize: 200 }),
   });
 
-  const { data: locations = [] } = useQuery({
+  const { data: locationsData } = useQuery({
     queryKey: ["locations"],
-    queryFn: () => getLocations(),
+    queryFn: () => getLocations({ pageSize: 100 }),
   });
+  const locations = locationsData?.locations || [];
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
@@ -216,6 +217,7 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
               searchPlaceholder="Search locations..."
               onCreateNew={() => setShowCreateLocation(true)}
               createNewLabel="New location"
+              allowClear
             />
           </div>
           <div className="space-y-2">

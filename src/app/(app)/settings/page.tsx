@@ -13,7 +13,7 @@ import { InviteMember } from "@/components/settings/invite-member";
 import { MemberList } from "@/components/settings/member-list";
 import { BrandingSettings } from "@/components/settings/branding-settings";
 import { CategoryManager } from "@/components/assets/category-manager";
-import { LocationManager } from "@/components/settings/location-manager";
+import Link from "next/link";
 import { SupplierManager } from "@/components/settings/supplier-manager";
 import {
   getOrganization,
@@ -225,7 +225,9 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LocationManager />
+            <Button variant="outline" render={<Link href="/locations" />}>
+              Manage Locations
+            </Button>
           </CardContent>
         </Card>
 

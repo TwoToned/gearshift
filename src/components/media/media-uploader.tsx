@@ -51,7 +51,7 @@ export interface MediaItem {
 }
 
 interface MediaUploaderProps {
-  entityType: "model" | "asset" | "kit" | "project" | "client";
+  entityType: "model" | "asset" | "kit" | "project" | "client" | "location";
   entityId: string;
   accept?: string;
   maxFiles?: number;
@@ -201,7 +201,7 @@ export function MediaUploader({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("folder", entityType === "model" ? "models" : entityType === "asset" ? "assets" : entityType === "kit" ? "kits" : entityType === "client" ? "clients" : "projects");
+      formData.append("folder", entityType === "model" ? "models" : entityType === "asset" ? "assets" : entityType === "kit" ? "kits" : entityType === "client" ? "clients" : entityType === "location" ? "locations" : "projects");
       formData.append("entityId", entityId);
 
       const res = await fetch("/api/uploads", {
