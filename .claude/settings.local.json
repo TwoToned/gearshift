@@ -9,7 +9,12 @@
       "Bash(npm ls:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "Bash(git add:*)"
     ]
   }
 }

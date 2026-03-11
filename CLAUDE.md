@@ -127,6 +127,21 @@ No test framework is configured.
 - `SortableTableHead` and `PageSizeSelect` in `src/components/ui/sortable-table-head.tsx`.
 - `useTablePreferences` hook (`src/lib/use-table-preferences.ts`) persists sort, page size, and view mode to localStorage per table key.
 
+### Test & Tag (T&T) Module
+- **Routes**: `src/app/(app)/test-and-tag/` — register, new item, quick test, reports, item detail `[id]`.
+- **API route**: `src/app/api/test-tag-reports/[reportType]/route.tsx` — serves PDF and CSV for all 10 report types.
+- **Server actions**: `src/server/test-tag-assets.ts` (CRUD, batch create, sync), `src/server/test-tag-records.ts` (test records, status recalculation), `src/server/test-tag-reports.ts` (report data + CSV exports).
+- **PDF templates**: `src/lib/pdf/test-tag-*.tsx` — 10 report PDFs plus shared components in `test-tag-pdf-shared.tsx`.
+- **Validations**: `src/lib/validations/test-tag.ts` — schemas for asset, record, and batch create forms.
+- **Equipment classes** (AS/NZS 3760:2022): `CLASS_I`, `CLASS_II`, `CLASS_II_DOUBLE_INSULATED`, `LEAD_CORD_ASSEMBLY`.
+  - Lead/Cord Assembly behaves like Class I for earth continuity but always requires polarity testing (not conditional on appliance type).
+- **T&T settings** stored in `Organization.metadata` JSON under `testTag` key: `prefix`, `digits`, `counter`, `defaultIntervalMonths`, `defaultEquipmentClass`, `dueSoonThresholdDays`, `companyName`, `defaultTesterName`, `defaultTestMethod`, `checkoutPolicy`.
+- **Auto-incrementing test tag IDs**: Same pattern as asset tags — `peekNextTestTagIds(count)` for preview, `reserveTestTagIds(count)` for atomic creation.
+- **Status lifecycle**: `NOT_YET_TESTED` → `CURRENT` → `DUE_SOON` → `OVERDUE` / `FAILED` / `RETIRED`. Recalculated after each test record.
+- **Bulk asset linking**: New T&T item form shows bulk asset picker first; selecting one auto-populates description, make, equipment class, appliance type, test interval, and location from the bulk asset's model.
+- **Reports**: Full Register, Overdue/Non-Compliant, Test Session, Item History, Due Schedule, Class Summary, Tester Activity, Failed Items, Bulk Asset Summary, Compliance Certificate. Each has PDF; 8 have CSV export.
+- **Date serialization in API route**: Prisma `Date` objects must be JSON-serialized before passing to PDF components: `JSON.parse(JSON.stringify(data, (_key, value) => value instanceof Date ? value.toISOString() : value))`.
+
 ### Client Component Patterns
 - All hooks must be called unconditionally (before any early returns) to satisfy React's Rules of Hooks.
 - Query/mutation pattern: `useQuery` for data fetching, `useMutation` for writes, `queryClient.invalidateQueries()` on success.
