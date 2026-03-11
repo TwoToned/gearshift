@@ -30,10 +30,12 @@ export async function getReportsSummary() {
     }),
     prisma.client.count({ where: { organizationId, isActive: true } }),
     prisma.project.findMany({
-      where: { organizationId, status: { in: ["COMPLETED", "INVOICED"] } },
-      select: { total: true },
+      where: {
+        organizationId,
+        status: { in: ["INVOICED", "COMPLETED"] },
+      },
+      select: { total: true, invoicedTotal: true },
       orderBy: { createdAt: "desc" },
-      take: 100,
     }),
     prisma.maintenanceRecord.groupBy({
       by: ["status"],
@@ -43,7 +45,10 @@ export async function getReportsSummary() {
   ]);
 
   const totalRevenue = recentProjects.reduce(
-    (sum, p) => sum + (p.total ? Number(p.total) : 0),
+    (sum, p) => {
+      const amount = p.invoicedTotal != null ? Number(p.invoicedTotal) : (p.total ? Number(p.total) : 0);
+      return sum + amount;
+    },
     0
   );
 

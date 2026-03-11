@@ -68,6 +68,9 @@ export default function EditProjectPage({
     depositPaid: project.depositPaid
       ? Number(project.depositPaid)
       : undefined,
+    invoicedTotal: project.invoicedTotal
+      ? Number(project.invoicedTotal)
+      : undefined,
     tags: project.tags || [],
   };
 

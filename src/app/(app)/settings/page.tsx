@@ -205,7 +205,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <BrandingSettings orgName={name} settings={settings} />
+            <BrandingSettings orgName={name} settings={settings} onBrandingChange={(branding) => setSettings((prev) => ({ ...prev, branding }))} />
           </CardContent>
         </Card>
 

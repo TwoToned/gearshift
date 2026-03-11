@@ -251,8 +251,8 @@ export function ProjectTable() {
                     )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {project.total != null
-                      ? `$${Number(project.total).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`
+                    {(project.invoicedTotal != null || project.total != null)
+                      ? `$${Number(project.invoicedTotal ?? project.total).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`
                       : "—"}
                   </TableCell>
                 </TableRow>

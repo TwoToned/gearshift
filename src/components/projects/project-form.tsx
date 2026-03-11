@@ -81,6 +81,7 @@ export function ProjectForm({ initialData }: ProjectFormProps) {
           discountPercent: undefined,
           depositPercent: undefined,
           depositPaid: undefined,
+          invoicedTotal: undefined,
           tags: [],
         },
   });

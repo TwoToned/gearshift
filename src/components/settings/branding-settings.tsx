@@ -12,13 +12,14 @@ import { Label } from "@/components/ui/label";
 interface BrandingSettingsProps {
   orgName: string;
   settings: OrgSettings;
+  onBrandingChange?: (branding: OrgBranding | undefined) => void;
 }
 
 const DEFAULT_PRIMARY = "#0d4f4f";
 const DEFAULT_ACCENT = "#10b981";
 const DEFAULT_DOCUMENT = "#0d4f4f";
 
-export function BrandingSettings({ orgName, settings }: BrandingSettingsProps) {
+export function BrandingSettings({ orgName, settings, onBrandingChange }: BrandingSettingsProps) {
   const queryClient = useQueryClient();
   const branding = settings.branding || {};
 
@@ -51,7 +52,15 @@ export function BrandingSettings({ orgName, settings }: BrandingSettingsProps) {
         },
       });
     },
-    onSuccess: () => {
+    onSuccess: (_result, _vars, _ctx) => {
+      // Sync branding to parent state so the org card's save doesn't overwrite it
+      const newBranding: OrgBranding = {
+        primaryColor: primaryColor !== DEFAULT_PRIMARY ? primaryColor : undefined,
+        accentColor: accentColor !== DEFAULT_ACCENT ? accentColor : undefined,
+        documentColor: documentColor !== DEFAULT_DOCUMENT ? documentColor : undefined,
+      };
+      const hasBranding = newBranding.primaryColor || newBranding.accentColor || newBranding.documentColor;
+      onBrandingChange?.(hasBranding ? newBranding : undefined);
       queryClient.invalidateQueries({ queryKey: ["organization"] });
       toast.success("Branding saved");
     },
