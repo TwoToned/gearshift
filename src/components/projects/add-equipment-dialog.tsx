@@ -183,7 +183,7 @@ export function AddEquipmentDialog({
     if (!availability) return "";
     if (availability.available <= 0)
       return "text-red-600 dark:text-red-400";
-    if (availability.available <= Math.ceil(availability.totalStock * 0.2))
+    if (availability.available <= Math.ceil((availability.effectiveStock ?? availability.totalStock) * 0.2))
       return "text-amber-600 dark:text-amber-400";
     return "text-green-600 dark:text-green-400";
   }
@@ -257,14 +257,23 @@ export function AddEquipmentDialog({
                       <p className={getAvailabilityColor()}>
                         <span className="font-semibold">{availability.available}</span>{" "}
                         available out of{" "}
-                        <span className="font-semibold">{availability.totalStock}</span>{" "}
-                        total
+                        <span className="font-semibold">{availability.effectiveStock ?? availability.totalStock}</span>{" "}
+                        usable
                         {availability.bookedOnThisProject > 0 && (
                           <span className="text-muted-foreground font-normal">
                             {" "}({availability.bookedOnThisProject} already on this project)
                           </span>
                         )}
                       </p>
+                      {(availability.unavailable ?? 0) > 0 && (
+                        <p className="text-purple-600 dark:text-purple-400 text-xs">
+                          {availability.unavailable} of {availability.totalStock} total not usable
+                          {" "}({[
+                            availability.inMaintenance ? `${availability.inMaintenance} in maintenance` : "",
+                            availability.lost ? `${availability.lost} lost` : "",
+                          ].filter(Boolean).join(", ")})
+                        </p>
+                      )}
                       {availability.conflicts.length > 0 && (
                         <div className="flex items-start gap-2 text-amber-600 dark:text-amber-400">
                           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -283,23 +292,34 @@ export function AddEquipmentDialog({
                 </div>
               )}
 
-              {isOverbooked && (
-                <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3 space-y-2">
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                    <AlertTriangle className="inline-block mr-1.5 h-3.5 w-3.5" />
-                    This will overbook {requestedQty} units with only {availability?.available ?? 0} available
-                  </p>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={overbookConfirmed}
-                      onChange={(e) => setOverbookConfirmed(e.target.checked)}
-                      className="accent-red-500"
-                    />
-                    <span className="text-red-600 dark:text-red-400">I understand, overbook anyway</span>
-                  </label>
-                </div>
-              )}
+              {isOverbooked && (() => {
+                const isReducedOnly = (availability?.unavailable ?? 0) > 0
+                  && requestedQty <= (availability?.totalStock ?? 0) - ((availability?.booked ?? 0) - (availability?.bookedOnThisProject ?? 0));
+                const borderColor = isReducedOnly ? "border-purple-500/50 bg-purple-500/10" : "border-red-500/50 bg-red-500/10";
+                const textColor = isReducedOnly ? "text-purple-600 dark:text-purple-400" : "text-red-600 dark:text-red-400";
+                const accentColor = isReducedOnly ? "accent-purple-500" : "accent-red-500";
+                return (
+                  <div className={`rounded-md border ${borderColor} p-3 space-y-2`}>
+                    <p className={`text-sm font-medium ${textColor}`}>
+                      <AlertTriangle className="inline-block mr-1.5 h-3.5 w-3.5" />
+                      {isReducedOnly
+                        ? `Requesting ${requestedQty} but only ${availability?.available ?? 0} usable — ${availability?.unavailable ?? 0} asset${(availability?.unavailable ?? 0) !== 1 ? "s" : ""} in maintenance or lost`
+                        : `This will overbook ${requestedQty} units with only ${availability?.available ?? 0} available`}
+                    </p>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={overbookConfirmed}
+                        onChange={(e) => setOverbookConfirmed(e.target.checked)}
+                        className={accentColor}
+                      />
+                      <span className={textColor}>
+                        {isReducedOnly ? "I understand, add anyway" : "I understand, overbook anyway"}
+                      </span>
+                    </label>
+                  </div>
+                );
+              })()}
             </>
           )}
 

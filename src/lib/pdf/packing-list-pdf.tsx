@@ -22,6 +22,9 @@ interface LineItem {
   notes: string | null;
   isOverbooked?: boolean;
   overbookedInherited?: boolean;
+  overbookedReducedOnly?: boolean;
+  overbookedHasOverbooked?: boolean;
+  overbookedHasReduced?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -138,9 +141,14 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                                 ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
                                 : item.description || "-"}
                           </Text>
-                          {item.isOverbooked && (
-                            <Text style={{ fontSize: 6, color: item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
-                          )}
+                          {item.isOverbooked && item.overbookedHasOverbooked && item.overbookedHasReduced ? (
+                            <>
+                              <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                              <Text style={{ fontSize: 6, color: "#7c3aed", backgroundColor: "#ede9fe", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>REDUCED STOCK</Text>
+                            </>
+                          ) : item.isOverbooked ? (
+                            <Text style={{ fontSize: 6, color: item.overbookedReducedOnly ? "#7c3aed" : item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedReducedOnly ? "#ede9fe" : item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{item.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
+                          ) : null}
                         </View>
                         {item.notes && (
                           <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
@@ -185,7 +193,7 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                                   {childName}
                                 </Text>
                                 {child.isOverbooked && (
-                                  <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                                  <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
                                 )}
                               </View>
                             </View>

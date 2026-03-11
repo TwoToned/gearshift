@@ -386,7 +386,7 @@ export async function checkAvailability(
   });
 
   if (!model) {
-    return serialize({ totalStock: 0, booked: 0, available: 0, bookedOnThisProject: 0, conflicts: [] });
+    return serialize({ totalStock: 0, effectiveStock: 0, booked: 0, available: 0, bookedOnThisProject: 0, unavailable: 0, inMaintenance: 0, lost: 0, conflicts: [] as string[] });
   }
 
   // Find overlapping projects (where the project rental period overlaps with the given dates)
@@ -424,28 +424,35 @@ export async function checkAvailability(
     ).values(),
   ];
 
+  const booked = overlappingLineItems.reduce(
+    (sum, li) => sum + li.quantity,
+    0
+  );
+
   if (model.assetType === "SERIALIZED") {
     const totalStock = model.assets.length;
-    const booked = overlappingLineItems.reduce(
-      (sum, li) => sum + li.quantity,
-      0
-    );
-    const available = Math.max(0, totalStock - booked);
+    const inMaintenance = model.assets.filter((a) => a.status === "IN_MAINTENANCE").length;
+    const lost = model.assets.filter((a) => a.status === "LOST").length;
+    const unavailable = inMaintenance + lost;
+    const effectiveStock = totalStock - unavailable;
+    const available = Math.max(0, effectiveStock - booked);
 
-    return serialize({ totalStock, booked, available, bookedOnThisProject, conflicts });
+    return serialize({
+      totalStock, effectiveStock, booked, available, bookedOnThisProject,
+      unavailable, inMaintenance, lost, conflicts,
+    });
   } else {
     // BULK: sum up total quantity across all bulk assets
     const totalStock = model.bulkAssets.reduce(
       (sum, ba) => sum + ba.totalQuantity,
       0
     );
-    const booked = overlappingLineItems.reduce(
-      (sum, li) => sum + li.quantity,
-      0
-    );
     const available = Math.max(0, totalStock - booked);
 
-    return serialize({ totalStock, booked, available, bookedOnThisProject, conflicts });
+    return serialize({
+      totalStock, effectiveStock: totalStock, booked, available, bookedOnThisProject,
+      unavailable: 0, inMaintenance: 0, lost: 0, conflicts,
+    });
   }
 }
 

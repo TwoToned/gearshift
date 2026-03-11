@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 
 import {
   maintenanceSchema,
@@ -19,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import {
   Select,
   SelectContent,
@@ -26,6 +30,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const typeLabels: Record<string, string> = {
+  REPAIR: "Repair",
+  PREVENTATIVE: "Preventative",
+  INSPECTION: "Inspection",
+  CLEANING: "Cleaning",
+  FIRMWARE_UPDATE: "Firmware Update",
+};
+
+const statusLabels: Record<string, string> = {
+  SCHEDULED: "Scheduled",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
 
 interface MaintenanceFormProps {
   initialData?: MaintenanceFormValues & { id: string };
@@ -40,10 +59,14 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
     queryFn: getAssetsForMaintenanceSelect,
   });
 
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(
+    initialData?.assetId ? [initialData.assetId] : []
+  );
+
   const form = useForm<MaintenanceFormValues>({
     resolver: zodResolver(maintenanceSchema),
     defaultValues: initialData || {
-      assetId: "",
+      assetIds: [],
       type: "REPAIR",
       status: "SCHEDULED",
       title: "",
@@ -63,7 +86,14 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
         ? updateMaintenanceRecord(initialData!.id, data)
         : createMaintenanceRecord(data),
     onSuccess: () => {
-      toast.success(isEdit ? "Record updated" : "Record created");
+      const count = selectedAssetIds.length;
+      toast.success(
+        isEdit
+          ? "Record updated"
+          : count > 1
+            ? `${count} maintenance records created`
+            : "Record created"
+      );
       router.push("/maintenance");
     },
     onError: (e) => toast.error(e.message),
@@ -72,33 +102,98 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
   const statusValue = form.watch("status");
   const typeValue = form.watch("type");
 
+  const assetOptions = (assets || []).map((a: { id: string; label: string }) => ({
+    value: a.id,
+    label: a.label,
+  }));
+
+  // Filter out already-selected assets from combobox options
+  const availableOptions = assetOptions.filter(
+    (opt: { value: string }) => !selectedAssetIds.includes(opt.value)
+  );
+
+  function addAsset(assetId: string) {
+    if (!assetId || selectedAssetIds.includes(assetId)) return;
+    const next = [...selectedAssetIds, assetId];
+    setSelectedAssetIds(next);
+    form.setValue("assetIds", next);
+    form.clearErrors("assetIds");
+  }
+
+  function removeAsset(assetId: string) {
+    const next = selectedAssetIds.filter((id) => id !== assetId);
+    setSelectedAssetIds(next);
+    form.setValue("assetIds", next);
+  }
+
+  function handleSubmit(data: MaintenanceFormValues) {
+    if (isEdit) {
+      // Edit mode: pass the single assetId
+      mutation.mutate({ ...data, assetId: selectedAssetIds[0] });
+    } else {
+      mutation.mutate({ ...data, assetIds: selectedAssetIds });
+    }
+  }
+
   return (
     <form
-      onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+      onSubmit={form.handleSubmit(handleSubmit)}
       className="space-y-6 max-w-2xl"
     >
-      {/* Asset */}
+      {/* Assets */}
       <div className="space-y-2">
-        <Label htmlFor="assetId">Asset *</Label>
-        <Select
-          value={form.watch("assetId")}
-          onValueChange={(v) => form.setValue("assetId", v ?? "")}
-          disabled={isEdit}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select an asset..." />
-          </SelectTrigger>
-          <SelectContent>
-            {(assets || []).map((a: { id: string; label: string }) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {form.formState.errors.assetId && (
+        <Label>{isEdit ? "Asset" : "Assets *"}</Label>
+        {isEdit ? (
+          <div>
+            <Badge variant="secondary" className="text-sm py-1 px-2.5">
+              {assetOptions.find((o: { value: string; label: string }) => o.value === selectedAssetIds[0])?.label ||
+                selectedAssetIds[0]}
+            </Badge>
+          </div>
+        ) : (
+          <>
+            <ComboboxPicker
+              value=""
+              onChange={(v) => {
+                addAsset(v);
+              }}
+              options={availableOptions}
+              placeholder="Search and select assets..."
+              searchPlaceholder="Search by tag, model, or name..."
+              emptyMessage={
+                selectedAssetIds.length > 0 && availableOptions.length === 0
+                  ? "All matching assets already selected."
+                  : "No assets found."
+              }
+            />
+            {selectedAssetIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {selectedAssetIds.map((id) => {
+                  const opt = assetOptions.find((o: { value: string; label: string }) => o.value === id);
+                  return (
+                    <Badge
+                      key={id}
+                      variant="secondary"
+                      className="text-sm py-1 pl-2.5 pr-1 gap-1"
+                    >
+                      {opt?.label || id}
+                      <button
+                        type="button"
+                        onClick={() => removeAsset(id)}
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+        {form.formState.errors.assetIds && (
           <p className="text-sm text-destructive">
-            {form.formState.errors.assetId.message}
+            {form.formState.errors.assetIds.message}
           </p>
         )}
       </div>
@@ -123,12 +218,13 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
             onValueChange={(v) => form.setValue("type", v as MaintenanceFormValues["type"])}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select type">
+                {typeLabels[typeValue || ""] || typeValue}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="REPAIR">Repair</SelectItem>
               <SelectItem value="PREVENTATIVE">Preventative</SelectItem>
-              <SelectItem value="TEST_AND_TAG">Test &amp; Tag</SelectItem>
               <SelectItem value="INSPECTION">Inspection</SelectItem>
               <SelectItem value="CLEANING">Cleaning</SelectItem>
               <SelectItem value="FIRMWARE_UPDATE">Firmware Update</SelectItem>
@@ -142,7 +238,9 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
             onValueChange={(v) => form.setValue("status", v as MaintenanceFormValues["status"])}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select status">
+                {statusLabels[statusValue || ""] || statusValue}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="SCHEDULED">Scheduled</SelectItem>
@@ -200,7 +298,7 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
       </div>
 
       {/* Result + Next Due */}
-      {(typeValue === "TEST_AND_TAG" || statusValue === "COMPLETED") && (
+      {statusValue === "COMPLETED" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Result</Label>
@@ -211,7 +309,9 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select result..." />
+                <SelectValue placeholder="Select result...">
+                  {({ PASS: "Pass", FAIL: "Fail", CONDITIONAL: "Conditional" } as Record<string, string>)[form.watch("result") || ""] || "Select result..."}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PASS">Pass</SelectItem>
@@ -234,7 +334,9 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
             ? "Saving..."
             : isEdit
               ? "Update Record"
-              : "Create Record"}
+              : selectedAssetIds.length > 1
+                ? `Create ${selectedAssetIds.length} Records`
+                : "Create Record"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel

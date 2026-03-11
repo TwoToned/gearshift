@@ -72,7 +72,6 @@ const statusConfig: Record<
 const typeLabels: Record<string, string> = {
   REPAIR: "Repair",
   PREVENTATIVE: "Preventative",
-  TEST_AND_TAG: "Test & Tag",
   INSPECTION: "Inspection",
   CLEANING: "Cleaning",
   FIRMWARE_UPDATE: "Firmware Update",
@@ -136,7 +135,7 @@ export default function MaintenancePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Maintenance</h1>
           <p className="text-muted-foreground">
-            Track repairs, test &amp; tag, and preventative maintenance.
+            Track repairs, inspections, and preventative maintenance.
           </p>
         </div>
         <CanDo resource="maintenance" action="create">
@@ -207,7 +206,6 @@ export default function MaintenancePage() {
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="REPAIR">Repair</SelectItem>
             <SelectItem value="PREVENTATIVE">Preventative</SelectItem>
-            <SelectItem value="TEST_AND_TAG">Test &amp; Tag</SelectItem>
             <SelectItem value="INSPECTION">Inspection</SelectItem>
             <SelectItem value="CLEANING">Cleaning</SelectItem>
             <SelectItem value="FIRMWARE_UPDATE">Firmware Update</SelectItem>

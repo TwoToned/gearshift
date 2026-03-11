@@ -48,11 +48,63 @@ function formatDate(date: string | null | undefined): string {
   });
 }
 
-function PullSheetOverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null }) {
+function PullSheetOverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; effectiveStock?: number; totalBooked: number; inherited?: boolean; unavailableAssets?: number; reducedOnly?: boolean; hasOverbookedChildren?: boolean; hasReducedChildren?: boolean } | null }) {
   if (!info) return null;
-  const colorClass = info.inherited
-    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-    : "bg-red-500/10 text-red-600 border-red-500/20";
+  const effective = info.effectiveStock ?? info.totalStock;
+  const unavail = info.unavailableAssets || 0;
+
+  // Kit parents with BOTH overbooked and reduced children show two badges
+  if (info.inherited && info.hasOverbookedChildren && info.hasReducedChildren) {
+    return (
+      <>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="ml-1.5 cursor-help text-xs print:border-red-500 print:text-red-600 bg-red-500/10 text-red-600 border-red-500/20">
+                  Overbooked
+                </Badge>
+              }
+            />
+            <TooltipContent>Contains items that are over capacity</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="ml-1.5 cursor-help text-xs print:border-purple-500 print:text-purple-600 bg-purple-500/10 text-purple-600 border-purple-500/20">
+                  Reduced Stock
+                </Badge>
+              }
+            />
+            <TooltipContent>Contains items with {unavail} asset{unavail !== 1 ? "s" : ""} in maintenance or lost</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </>
+    );
+  }
+
+  const isReduced = info.reducedOnly;
+  const colorClass = isReduced
+    ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+    : info.inherited
+      ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+      : "bg-red-500/10 text-red-600 border-red-500/20";
+  const label = isReduced ? "Reduced Stock" : "Overbooked";
+
+  function getTooltip() {
+    if (info!.inherited) {
+      return isReduced
+        ? `Contains items with ${unavail} asset${unavail !== 1 ? "s" : ""} in maintenance or lost`
+        : `Contains items that are ${info!.overBy} over capacity`;
+    }
+    if (isReduced) {
+      return `${info!.overBy} over usable stock — ${unavail} of ${info!.totalStock} in maintenance or lost`;
+    }
+    return `${info!.overBy} over capacity (${info!.totalBooked} booked / ${effective} usable${unavail > 0 ? `, ${unavail} unavailable` : ""})`;
+  }
+
   return (
     <TooltipProvider>
       <Tooltip>
@@ -62,14 +114,12 @@ function PullSheetOverbookedBadge({ info }: { info?: { overBy: number; totalStoc
               variant="outline"
               className={`ml-1.5 cursor-help text-xs print:border-red-500 print:text-red-600 ${colorClass}`}
             >
-              Overbooked
+              {label}
             </Badge>
           }
         />
         <TooltipContent>
-          {info.inherited
-            ? `Contains items that are ${info.overBy} over capacity`
-            : `${info.overBy} over capacity (${info.totalBooked} booked / ${info.totalStock} total)`}
+          {getTooltip()}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -10,6 +10,7 @@ import {
   PackageCheck,
   ArrowRight,
   ScanBarcode,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -161,68 +162,125 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            {!activity || activity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No recent activity. Scan assets to see activity here.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {activity.map((log: Record<string, unknown>) => {
-                  const asset = log.asset as Record<string, unknown> | null;
-                  const bulkAsset = log.bulkAsset as Record<string, unknown> | null;
-                  const project = log.project as Record<string, unknown> | null;
-                  const user = log.scannedBy as Record<string, unknown> | null;
-                  const model = asset
-                    ? (asset.model as Record<string, unknown>)
-                    : bulkAsset
-                      ? (bulkAsset.model as Record<string, unknown>)
-                      : null;
-                  const isCheckOut = log.action === "CHECK_OUT";
+            {(() => {
+              const logs = (activity as Record<string, unknown> | undefined)?.logs as Record<string, unknown>[] | undefined;
+              const testRecords = (activity as Record<string, unknown> | undefined)?.testRecords as Record<string, unknown>[] | undefined;
 
-                  return (
-                    <div key={log.id as string} className="flex items-start gap-3">
-                      <div
-                        className={`mt-0.5 rounded-full p-1.5 ${
-                          isCheckOut
-                            ? "bg-purple-500/10 text-purple-500"
-                            : "bg-teal-500/10 text-teal-500"
-                        }`}
-                      >
-                        <ScanBarcode className="h-3.5 w-3.5" />
+              // Merge into a unified timeline
+              const items: { type: "scan" | "test"; time: Date; data: Record<string, unknown> }[] = [];
+              for (const log of logs || []) {
+                items.push({ type: "scan", time: new Date(log.scannedAt as string), data: log });
+              }
+              for (const rec of testRecords || []) {
+                items.push({ type: "test", time: new Date(rec.testDate as string), data: rec });
+              }
+              items.sort((a, b) => b.time.getTime() - a.time.getTime());
+              const displayed = items.slice(0, 12);
+
+              if (displayed.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    No recent activity. Scan assets to see activity here.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {displayed.map((item) => {
+                    if (item.type === "scan") {
+                      const log = item.data;
+                      const asset = log.asset as Record<string, unknown> | null;
+                      const bulkAsset = log.bulkAsset as Record<string, unknown> | null;
+                      const project = log.project as Record<string, unknown> | null;
+                      const user = log.scannedBy as Record<string, unknown> | null;
+                      const model = asset
+                        ? (asset.model as Record<string, unknown>)
+                        : bulkAsset
+                          ? (bulkAsset.model as Record<string, unknown>)
+                          : null;
+                      const isCheckOut = log.action === "CHECK_OUT";
+
+                      return (
+                        <div key={`scan-${log.id}`} className="flex items-start gap-3">
+                          <div
+                            className={`mt-0.5 rounded-full p-1.5 ${
+                              isCheckOut
+                                ? "bg-purple-500/10 text-purple-500"
+                                : "bg-teal-500/10 text-teal-500"
+                            }`}
+                          >
+                            <ScanBarcode className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">
+                              <span className="font-medium">
+                                {model?.name as string || "Asset"}
+                              </span>
+                              {" "}
+                              <span className="text-muted-foreground">
+                                {isCheckOut ? "checked out to" : "returned from"}
+                              </span>
+                              {" "}
+                              {project ? (
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="font-medium hover:underline"
+                                >
+                                  {project.name as string}
+                                </Link>
+                              ) : (
+                                <span className="text-muted-foreground">unknown project</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {user?.name as string || "Unknown"} &middot;{" "}
+                              {formatDistanceToNow(item.time, { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Test & tag record
+                    const rec = item.data;
+                    const ttAsset = rec.testTagAsset as Record<string, unknown> | null;
+                    const tester = rec.testedBy as Record<string, unknown> | null;
+                    const result = rec.result as string;
+                    const resultColor = result === "PASS"
+                      ? "text-green-500"
+                      : result === "FAIL"
+                        ? "text-red-500"
+                        : "text-amber-500";
+
+                    return (
+                      <div key={`test-${rec.id}`} className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full p-1.5 bg-blue-500/10 text-blue-500">
+                          <Zap className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">
+                            <span className="font-medium">
+                              {ttAsset?.description as string || ttAsset?.testTagId as string || "Item"}
+                            </span>
+                            {" "}
+                            <span className="text-muted-foreground">tested —</span>
+                            {" "}
+                            <span className={`font-medium ${resultColor}`}>
+                              {result}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {tester?.name as string || "Unknown"} &middot;{" "}
+                            {formatDistanceToNow(item.time, { addSuffix: true })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm">
-                          <span className="font-medium">
-                            {model?.name as string || "Asset"}
-                          </span>
-                          {" "}
-                          <span className="text-muted-foreground">
-                            {isCheckOut ? "checked out to" : "returned from"}
-                          </span>
-                          {" "}
-                          {project ? (
-                            <Link
-                              href={`/projects/${project.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {project.name as string}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">unknown project</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {user?.name as string || "Unknown"} &middot;{" "}
-                          {formatDistanceToNow(new Date(log.scannedAt as string), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

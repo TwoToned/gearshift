@@ -6,7 +6,7 @@ import {
   projectSchema,
   type ProjectFormValues,
 } from "@/lib/validations/project";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma, ProjectStatus } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 
@@ -90,6 +90,63 @@ export async function getProjects(params?: {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   });
+}
+
+/**
+ * For a list of project IDs, returns which ones have overbooked or reduced-stock issues.
+ * Only computes for projects in active statuses (not completed/cancelled/etc).
+ */
+export async function getProjectIssueFlags(projectIds: string[]) {
+  const { organizationId } = await getOrgContext();
+  if (projectIds.length === 0) return {} as Record<string, { hasOverbooked: boolean; hasReducedStock: boolean }>;
+
+  // Only compute for active projects
+  const activeStatuses: ProjectStatus[] = ["ENQUIRY", "QUOTING", "QUOTED", "CONFIRMED", "PREPPING", "CHECKED_OUT", "ON_SITE"];
+  const projects = await prisma.project.findMany({
+    where: { id: { in: projectIds }, organizationId, status: { in: activeStatuses } },
+    select: { id: true, rentalStartDate: true, rentalEndDate: true },
+  });
+
+  if (projects.length === 0) return {} as Record<string, { hasOverbooked: boolean; hasReducedStock: boolean }>;
+
+  const activeIds = projects.map((p) => p.id);
+
+  // Batch fetch all line items across all active projects
+  const allLineItems = await prisma.projectLineItem.findMany({
+    where: {
+      organizationId,
+      projectId: { in: activeIds },
+      status: { not: "CANCELLED" },
+    },
+    select: {
+      id: true, projectId: true, modelId: true, quantity: true,
+      isKitChild: true, parentLineItemId: true, kitId: true, status: true,
+    },
+  });
+
+  const result: Record<string, { hasOverbooked: boolean; hasReducedStock: boolean }> = {};
+
+  // Compute per project
+  for (const project of projects) {
+    const items = allLineItems.filter((li) => li.projectId === project.id);
+    if (items.length === 0) continue;
+
+    const overbookedMap = await computeOverbookedStatus(
+      organizationId, items, project.rentalStartDate, project.rentalEndDate, project.id,
+    );
+
+    if (overbookedMap.size === 0) continue;
+
+    let hasOverbooked = false;
+    let hasReducedStock = false;
+    for (const info of overbookedMap.values()) {
+      if (info.reducedOnly) hasReducedStock = true;
+      else hasOverbooked = true;
+    }
+    result[project.id] = { hasOverbooked, hasReducedStock };
+  }
+
+  return result;
 }
 
 export async function getProject(id: string) {

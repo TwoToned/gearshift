@@ -3,9 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, AlertTriangle } from "lucide-react";
 
-import { getProjects } from "@/server/projects";
+import { getProjects, getProjectIssueFlags } from "@/server/projects";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
@@ -111,6 +117,13 @@ export function ProjectTable() {
   const projects = data?.projects || [];
   const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
+
+  const projectIds = projects.map((p) => p.id);
+  const { data: issueFlags } = useQuery({
+    queryKey: ["project-issues", projectIds],
+    queryFn: () => getProjectIssueFlags(projectIds),
+    enabled: projectIds.length > 0,
+  });
 
   return (
     <div className="space-y-4">
@@ -221,12 +234,17 @@ export function ProjectTable() {
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {project.name}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/projects/${project.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {project.name}
+                      </Link>
+                      {issueFlags?.[project.id] && (
+                        <ProjectIssueBadge issues={issueFlags[project.id]} />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {project.client?.name || "—"}
@@ -293,5 +311,31 @@ export function ProjectTable() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ProjectIssueBadge({ issues }: { issues: { hasOverbooked: boolean; hasReducedStock: boolean } }) {
+  const parts: string[] = [];
+  if (issues.hasOverbooked) parts.push("Overbooked items");
+  if (issues.hasReducedStock) parts.push("Reduced stock (assets in maintenance/lost)");
+  if (parts.length === 0) return null;
+
+  const color = issues.hasOverbooked
+    ? "text-red-500"
+    : "text-purple-500";
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          className={`inline-flex items-center justify-center rounded-full ${color}`}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+        </TooltipTrigger>
+        <TooltipContent>
+          {parts.join(" & ")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

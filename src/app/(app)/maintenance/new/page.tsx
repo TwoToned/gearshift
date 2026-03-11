@@ -6,7 +6,7 @@ export default function NewMaintenancePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">New Maintenance Record</h1>
         <p className="text-muted-foreground">
-          Log a repair, test &amp; tag, or other maintenance work.
+          Log a repair, inspection, or other maintenance work.
         </p>
       </div>
       <MaintenanceForm />

@@ -82,47 +82,59 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
   const { organizationId, userId } = await getOrgContext();
   const parsed = maintenanceSchema.parse(data);
 
-  const record = await prisma.maintenanceRecord.create({
-    data: {
-      organizationId,
-      assetId: parsed.assetId,
-      type: parsed.type,
-      status: parsed.status,
-      title: parsed.title,
-      description: parsed.description || null,
-      reportedById: userId,
-      assignedToId: parsed.assignedToId || null,
-      scheduledDate: parsed.scheduledDate ?? null,
-      completedDate: parsed.completedDate ?? null,
-      cost: parsed.cost ?? null,
-      partsUsed: parsed.partsUsed || null,
-      result: parsed.result ?? null,
-      nextDueDate: parsed.nextDueDate ?? null,
-    },
-    include: {
-      asset: { include: { model: true } },
-    },
-  });
+  // Support both single assetId and multiple assetIds
+  const assetIds = parsed.assetIds?.length
+    ? parsed.assetIds
+    : parsed.assetId
+      ? [parsed.assetId]
+      : [];
 
-  // If status is IN_PROGRESS or SCHEDULED, set asset to IN_MAINTENANCE
+  if (assetIds.length === 0) throw new Error("At least one asset is required");
+
+  const records = await prisma.$transaction(
+    assetIds.map((assetId) =>
+      prisma.maintenanceRecord.create({
+        data: {
+          organizationId,
+          assetId,
+          type: parsed.type,
+          status: parsed.status,
+          title: parsed.title,
+          description: parsed.description || null,
+          reportedById: userId,
+          assignedToId: parsed.assignedToId || null,
+          scheduledDate: parsed.scheduledDate ?? null,
+          completedDate: parsed.completedDate ?? null,
+          cost: parsed.cost ?? null,
+          partsUsed: parsed.partsUsed || null,
+          result: parsed.result ?? null,
+          nextDueDate: parsed.nextDueDate ?? null,
+        },
+        include: {
+          asset: { include: { model: true } },
+        },
+      })
+    )
+  );
+
+  // Update asset statuses
   if (parsed.status === "IN_PROGRESS") {
-    await prisma.asset.update({
-      where: { id: parsed.assetId },
+    await prisma.asset.updateMany({
+      where: { id: { in: assetIds } },
       data: { status: "IN_MAINTENANCE" },
     });
   }
 
-  // If completed, update asset back to AVAILABLE (or based on result)
   if (parsed.status === "COMPLETED") {
-    await prisma.asset.update({
-      where: { id: parsed.assetId },
+    await prisma.asset.updateMany({
+      where: { id: { in: assetIds } },
       data: {
         status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
       },
     });
   }
 
-  return serialize(record);
+  return serialize(records.length === 1 ? records[0] : records);
 }
 
 export async function updateMaintenanceRecord(
@@ -158,29 +170,30 @@ export async function updateMaintenanceRecord(
     },
   });
 
-  // Handle status transitions
-  if (parsed.status === "IN_PROGRESS" && existing.status !== "IN_PROGRESS") {
-    await prisma.asset.update({
-      where: { id: parsed.assetId },
-      data: { status: "IN_MAINTENANCE" },
-    });
-  }
+  // Handle status transitions (use the existing record's assetId)
+  if (existing.assetId) {
+    if (parsed.status === "IN_PROGRESS" && existing.status !== "IN_PROGRESS") {
+      await prisma.asset.update({
+        where: { id: existing.assetId },
+        data: { status: "IN_MAINTENANCE" },
+      });
+    }
 
-  if (parsed.status === "COMPLETED" && existing.status !== "COMPLETED") {
-    await prisma.asset.update({
-      where: { id: parsed.assetId },
-      data: {
-        status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
-      },
-    });
-  }
+    if (parsed.status === "COMPLETED" && existing.status !== "COMPLETED") {
+      await prisma.asset.update({
+        where: { id: existing.assetId },
+        data: {
+          status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
+        },
+      });
+    }
 
-  if (parsed.status === "CANCELLED" && existing.status === "IN_PROGRESS") {
-    // If cancelling an in-progress record, set asset back to available
-    await prisma.asset.update({
-      where: { id: parsed.assetId },
-      data: { status: "AVAILABLE" },
-    });
+    if (parsed.status === "CANCELLED" && existing.status === "IN_PROGRESS") {
+      await prisma.asset.update({
+        where: { id: existing.assetId },
+        data: { status: "AVAILABLE" },
+      });
+    }
   }
 
   return serialize(record);

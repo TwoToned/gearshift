@@ -109,11 +109,15 @@ export async function GET(
       ...li,
       isOverbooked: !!info,
       overbookedInherited: info?.inherited ?? false,
+      overbookedReducedOnly: info?.reducedOnly ?? false,
+      overbookedHasOverbooked: info?.hasOverbookedChildren ?? false,
+      overbookedHasReduced: info?.hasReducedChildren ?? false,
       childLineItems: (li as unknown as { childLineItems?: typeof project.lineItems }).childLineItems?.map((child) => {
         const childInfo = overbookedMap.get(child.id);
         return {
           ...child,
           isOverbooked: !!childInfo,
+          overbookedReducedOnly: childInfo?.reducedOnly ?? false,
         };
       }),
     };

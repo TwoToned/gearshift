@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const maintenanceSchema = z.object({
-  assetId: z.string().min(1, "Asset is required"),
+  assetId: z.string().optional(),
+  assetIds: z.array(z.string().min(1)).optional(),
   type: z
     .enum([
       "REPAIR",
@@ -33,6 +34,9 @@ export const maintenanceSchema = z.object({
     .union([z.literal(""), z.coerce.date()])
     .optional()
     .transform((v) => (v === "" ? undefined : v)),
-});
+}).refine(
+  (data) => (data.assetId && data.assetId.length > 0) || (data.assetIds && data.assetIds.length > 0),
+  { message: "At least one asset is required", path: ["assetIds"] }
+);
 
 export type MaintenanceFormValues = z.input<typeof maintenanceSchema>;

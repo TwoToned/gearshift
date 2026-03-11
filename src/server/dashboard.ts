@@ -86,17 +86,28 @@ export async function getUpcomingProjects() {
 export async function getRecentActivity() {
   const { organizationId } = await getOrgContext();
 
-  const logs = await prisma.assetScanLog.findMany({
-    where: { organizationId },
-    include: {
-      asset: { include: { model: true } },
-      bulkAsset: { include: { model: true } },
-      project: true,
-      scannedBy: true,
-    },
-    orderBy: { scannedAt: "desc" },
-    take: 10,
-  });
+  const [logs, testRecords] = await Promise.all([
+    prisma.assetScanLog.findMany({
+      where: { organizationId },
+      include: {
+        asset: { include: { model: true } },
+        bulkAsset: { include: { model: true } },
+        project: true,
+        scannedBy: true,
+      },
+      orderBy: { scannedAt: "desc" },
+      take: 10,
+    }),
+    prisma.testTagRecord.findMany({
+      where: { organizationId },
+      include: {
+        testTagAsset: { select: { testTagId: true, description: true } },
+        testedBy: { select: { id: true, name: true } },
+      },
+      orderBy: { testDate: "desc" },
+      take: 10,
+    }),
+  ]);
 
-  return serialize(logs);
+  return serialize({ logs, testRecords });
 }
