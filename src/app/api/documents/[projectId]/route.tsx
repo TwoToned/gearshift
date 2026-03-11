@@ -95,7 +95,7 @@ export async function GET(
   };
 
   // Compute overbooked status dynamically
-  const overbookedIds = await computeOverbookedStatus(
+  const overbookedMap = await computeOverbookedStatus(
     organizationId,
     project.lineItems,
     project.rentalStartDate,
@@ -105,7 +105,7 @@ export async function GET(
 
   const enrichedLineItems = project.lineItems.map((li) => ({
     ...li,
-    isOverbooked: overbookedIds.has(li.id),
+    isOverbooked: overbookedMap.has(li.id),
   }));
 
   // Serialize Decimals to numbers

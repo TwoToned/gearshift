@@ -390,6 +390,7 @@ export async function checkAvailability(
   }
 
   // Find overlapping projects (where the project rental period overlaps with the given dates)
+  // Include both regular items AND kit children — they all consume stock
   const overlappingLineItems = await prisma.projectLineItem.findMany({
     where: {
       organizationId,

@@ -65,6 +65,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { AddEquipmentDialog } from "./add-equipment-dialog";
 import { AddServiceDialog } from "./add-service-dialog";
 import { EditLineItemDialog } from "./edit-line-item-dialog";
@@ -102,6 +108,29 @@ const statusColors: Record<string, string> = {
 function formatCurrency(value: number | null | undefined): string {
   if (value == null) return "--";
   return `$${Number(value).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
+}
+
+function OverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; totalBooked: number } | null }) {
+  if (!info) return null;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Badge
+              variant="outline"
+              className="ml-1.5 cursor-help text-xs bg-red-500/10 text-red-600 border-red-500/20"
+            >
+              Overbooked
+            </Badge>
+          }
+        />
+        <TooltipContent>
+          {info.overBy} over capacity ({info.totalBooked} booked / {info.totalStock} total)
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +336,9 @@ function SortableItemRow({
                       Itemized
                     </Badge>
                   )}
+                  {item.isOverbooked && (
+                    <OverbookedBadge info={item.overbookedInfo} />
+                  )}
                   <span className="ml-2 text-xs text-muted-foreground">
                     {childItems.length} item{childItems.length !== 1 ? "s" : ""}
                   </span>
@@ -326,12 +358,7 @@ function SortableItemRow({
                     </Badge>
                   )}
                   {item.isOverbooked && (
-                    <Badge
-                      variant="outline"
-                      className="ml-2 text-xs bg-red-500/10 text-red-600 border-red-500/20"
-                    >
-                      Overbooked
-                    </Badge>
+                    <OverbookedBadge info={item.overbookedInfo} />
                   )}
                   {item.notes && (
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -398,6 +425,8 @@ function SortableItemRow({
             duration: number;
             unitPrice?: unknown;
             lineTotal?: unknown;
+            isOverbooked?: boolean;
+            overbookedInfo?: { overBy: number; totalStock: number; totalBooked: number } | null;
           }>
         ).map((child) => (
           <TableRow key={child.id} className="bg-muted/10">
@@ -413,6 +442,9 @@ function SortableItemRow({
                     <span className="ml-1.5 text-xs text-muted-foreground">
                       ({child.asset.assetTag})
                     </span>
+                  )}
+                  {child.isOverbooked && (
+                    <OverbookedBadge info={child.overbookedInfo} />
                   )}
                 </div>
               </div>

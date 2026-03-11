@@ -120,7 +120,7 @@ export async function getProject(id: string) {
   });
   if (!project) return null;
 
-  const overbookedIds = await computeOverbookedStatus(
+  const overbookedMap = await computeOverbookedStatus(
     organizationId,
     project.lineItems,
     project.rentalStartDate,
@@ -128,10 +128,22 @@ export async function getProject(id: string) {
     project.id,
   );
 
-  const enrichedLineItems = project.lineItems.map((li) => ({
-    ...li,
-    isOverbooked: overbookedIds.has(li.id),
-  }));
+  const enrichedLineItems = project.lineItems.map((li) => {
+    const info = overbookedMap.get(li.id);
+    return {
+      ...li,
+      isOverbooked: !!info,
+      overbookedInfo: info ?? null,
+      childLineItems: li.childLineItems?.map((child) => {
+        const childInfo = overbookedMap.get(child.id);
+        return {
+          ...child,
+          isOverbooked: !!childInfo,
+          overbookedInfo: childInfo ?? null,
+        };
+      }),
+    };
+  });
 
   return serialize({ ...project, lineItems: enrichedLineItems });
 }
