@@ -4,7 +4,7 @@ import { importOrganization } from "@/lib/org-import";
 
 export async function POST(req: NextRequest) {
   try {
-    await requireSiteAdminApi();
+    const { userId } = await requireSiteAdminApi();
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const result = await importOrganization(buffer, {
       newOrgName: newOrgName || undefined,
       newOrgSlug: newOrgSlug || undefined,
+      importedByUserId: userId,
     });
 
     return NextResponse.json(result);

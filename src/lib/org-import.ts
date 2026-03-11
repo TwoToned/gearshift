@@ -27,7 +27,7 @@ function safeDateOpt(value: unknown): Date | undefined {
  */
 export async function importOrganization(
   zipBuffer: Buffer,
-  options: { newOrgName?: string; newOrgSlug?: string } = {}
+  options: { newOrgName?: string; newOrgSlug?: string; importedByUserId?: string } = {}
 ) {
   // ── Extract manifest and files from zip ──────────────────────────
   let manifest: OrgExportManifest | null = null;
@@ -82,6 +82,10 @@ export async function importOrganization(
   function remapUser(oldId: string | null | undefined): string | undefined {
     if (!oldId) return undefined;
     return userIdMap.get(oldId) ?? undefined;
+  }
+  /** For required user FK fields — falls back to the importing admin */
+  function remapUserRequired(oldId: string | null | undefined): string {
+    return remapUser(oldId) ?? options.importedByUserId ?? Object.values(Object.fromEntries(userIdMap))[0] ?? "";
   }
 
   // ── Create the new organization ──────────────────────────────────
@@ -301,7 +305,7 @@ export async function importOrganization(
         position: r.position ?? null,
         sortOrder: r.sortOrder ?? 0,
         addedAt: safeDate(r.addedAt ?? r.createdAt),
-        addedById: remapUser(r.addedById) ?? null,
+        addedById: remapUserRequired(r.addedById),
         notes: r.notes ?? null,
       } as any,
     });
@@ -320,7 +324,7 @@ export async function importOrganization(
         position: r.position ?? null,
         sortOrder: r.sortOrder ?? 0,
         addedAt: safeDate(r.addedAt ?? r.createdAt),
-        addedById: remapUser(r.addedById) ?? null,
+        addedById: remapUserRequired(r.addedById),
         notes: r.notes ?? null,
       } as any,
     });
@@ -512,7 +516,7 @@ export async function importOrganization(
         storageKey: newStorageKey,
         url: newUrl,
         thumbnailUrl: null, // Thumbnails aren't exported; clear to avoid 403 on old org URLs
-        uploadedById: remapUser(r.uploadedById) ?? null,
+        uploadedById: remapUserRequired(r.uploadedById),
         createdAt: safeDate(r.createdAt),
         updatedAt: safeDate(r.updatedAt),
       } as any,
