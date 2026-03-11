@@ -167,6 +167,14 @@ export async function deleteBulkAsset(id: string) {
   return { id };
 }
 
+export async function updateBulkAssetNotes(id: string, notes: string) {
+  const { organizationId } = await getOrgContext();
+  return serialize(await prisma.bulkAsset.update({
+    where: { id, organizationId },
+    data: { notes: notes || null },
+  }));
+}
+
 export async function archiveBulkAsset(id: string) {
   const { organizationId } = await getOrgContext();
   return serialize(await prisma.bulkAsset.update({

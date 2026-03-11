@@ -1,5 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { createStyles, formatDate, type PdfBranding } from "./styles";
+import { PdfHeader } from "./pdf-header";
 
 interface LineItem {
   id: string;
@@ -19,7 +20,7 @@ interface LineItem {
 }
 
 interface ReturnSheetPDFProps {
-  org: { name: string; branding?: PdfBranding };
+  org: { name: string; branding?: PdfBranding; logoData?: string | null; iconData?: string | null };
   project: {
     projectNumber: string;
     name: string;
@@ -68,21 +69,16 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
     <Document>
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.companyName}>{org.name}</Text>
-            <Text style={s.companyDetails}>Return Sheet</Text>
-          </View>
-          <View>
-            <Text style={s.docTitle}>RETURN SHEET</Text>
-            <Text style={s.docMeta}>
-              {project.projectNumber}
-              {"\n"}{project.name}
-              {project.client ? `\n${project.client.name}` : ""}
-              {project.loadOutDate ? `\nLoad Out: ${formatDate(project.loadOutDate)}` : ""}
-            </Text>
-          </View>
-        </View>
+        <PdfHeader
+          orgName={org.name}
+          orgDetails="Return Sheet"
+          docTitle="RETURN SHEET"
+          docMeta={`${project.projectNumber}\n${project.name}${project.client ? `\n${project.client.name}` : ""}${project.loadOutDate ? `\nLoad Out: ${formatDate(project.loadOutDate)}` : ""}`}
+          branding={org.branding}
+          logoData={org.logoData}
+          iconData={org.iconData}
+          styles={s}
+        />
 
         {/* Table */}
         <View style={s.table}>

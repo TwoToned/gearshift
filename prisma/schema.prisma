@@ -32,6 +32,7 @@ model User {
   returnedLineItems   ProjectLineItem[]   @relation("ReturnedBy")
   addedKitSerializedItems KitSerializedItem[] @relation("KitSerializedItemAddedBy")
   addedKitBulkItems       KitBulkItem[]      @relation("KitBulkItemAddedBy")
+  uploads                 FileUpload[]
 
   @@map("user")
 }
@@ -110,6 +111,12 @@ model Organization {
   kits               Kit[]
   kitSerializedItems KitSerializedItem[]
   kitBulkItems       KitBulkItem[]
+  fileUploads        FileUpload[]
+  modelMedia         ModelMedia[]
+  assetMedia         AssetMedia[]
+  kitMedia           KitMedia[]
+  projectMedia       ProjectMedia[]
+  clientMedia        ClientMedia[]
 
   @@map("organization")
 }
@@ -283,6 +290,28 @@ enum KitPricingMode {
   ITEMIZED
 }
 
+enum MediaType {
+  PHOTO
+  MANUAL
+  SPEC_SHEET
+  WIRING_DIAGRAM
+  DOCUMENT
+  OTHER
+}
+
+enum ProjectMediaType {
+  FLOOR_PLAN
+  QUOTE
+  INVOICE
+  SITE_MAP
+  RISK_ASSESSMENT
+  CLIENT_BRIEF
+  CAD
+  CONTRACT
+  PHOTO
+  OTHER
+}
+
 // ─── Category ────────────────────────────────────────────────────────────────
 
 model Category {
@@ -341,6 +370,7 @@ model Model {
   assets     Asset[]
   bulkAssets BulkAsset[]
   lineItems  ProjectLineItem[]
+  media      ModelMedia[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -408,6 +438,7 @@ model Kit {
   lineItems        ProjectLineItem[]
   scanLogs         AssetScanLog[]
   maintenanceRecords MaintenanceRecord[]
+  media            KitMedia[]
 
   @@unique([organizationId, assetTag])
   @@index([organizationId])
@@ -498,6 +529,7 @@ model Asset {
   maintenanceRecords MaintenanceRecord[]
   lineItems          ProjectLineItem[]
   scanLogs           AssetScanLog[]
+  media              AssetMedia[]
 
   @@unique([organizationId, assetTag])
   @@index([organizationId])
@@ -628,6 +660,7 @@ model Client {
   updatedAt       DateTime   @updatedAt
 
   projects Project[]
+  media    ClientMedia[]
 
   @@index([organizationId])
   @@index([isActive])
@@ -681,6 +714,7 @@ model Project {
 
   lineItems ProjectLineItem[]
   scanLogs  AssetScanLog[]
+  media     ProjectMedia[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId])
@@ -775,4 +809,131 @@ model AssetScanLog {
   @@index([projectId])
   @@index([scannedAt])
   @@map("asset_scan_log")
+}
+
+// ─── File Upload & Media ────────────────────────────────────────────────────
+
+model FileUpload {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fileName       String
+  fileSize       Int
+  mimeType       String
+  storageKey     String
+  url            String
+  thumbnailUrl   String?
+  width          Int?
+  height         Int?
+  uploadedById   String
+  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  modelMedia   ModelMedia[]
+  assetMedia   AssetMedia[]
+  kitMedia     KitMedia[]
+  projectMedia ProjectMedia[]
+  clientMedia  ClientMedia[]
+
+  @@index([organizationId])
+  @@map("file_upload")
+}
+
+model ModelMedia {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  modelId        String
+  model          Model        @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           MediaType    @default(PHOTO)
+  isPrimary      Boolean      @default(false)
+  displayName    String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([modelId, fileId])
+  @@index([organizationId])
+  @@index([modelId])
+  @@map("model_media")
+}
+
+model AssetMedia {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assetId        String
+  asset          Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           MediaType    @default(PHOTO)
+  isPrimary      Boolean      @default(false)
+  displayName    String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([assetId, fileId])
+  @@index([organizationId])
+  @@index([assetId])
+  @@map("asset_media")
+}
+
+model KitMedia {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kitId          String
+  kit            Kit          @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           MediaType    @default(PHOTO)
+  isPrimary      Boolean      @default(false)
+  displayName    String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([kitId, fileId])
+  @@index([organizationId])
+  @@index([kitId])
+  @@map("kit_media")
+}
+
+model ProjectMedia {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           ProjectMediaType @default(OTHER)
+  displayName    String?
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+
+  @@unique([projectId, fileId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("project_media")
+}
+
+model ClientMedia {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fileId         String
+  file           FileUpload   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  type           MediaType    @default(DOCUMENT)
+  displayName    String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([clientId, fileId])
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("client_media")
 }

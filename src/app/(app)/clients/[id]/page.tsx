@@ -7,10 +7,14 @@ import { Pencil, Archive, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getClient, archiveClient } from "@/server/clients";
+import { getClient, archiveClient, updateClientNotes } from "@/server/clients";
+import { NotesEditor } from "@/components/ui/notes-editor";
+import { addClientMedia, removeClientMedia } from "@/server/client-media";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
 import {
   Table,
   TableBody,
@@ -143,16 +147,16 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           <CardContent className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span>ABN</span>
-              <span className="font-medium">{client.taxId || "—"}</span>
+              <span className="font-medium">{client.taxId || "\u2014"}</span>
             </div>
             <div className="flex justify-between">
               <span>Payment Terms</span>
-              <span className="font-medium">{client.paymentTerms || "—"}</span>
+              <span className="font-medium">{client.paymentTerms || "\u2014"}</span>
             </div>
             <div className="flex justify-between">
               <span>Default Discount</span>
               <span className="font-medium">
-                {client.defaultDiscount != null ? `${Number(client.defaultDiscount)}%` : "—"}
+                {client.defaultDiscount != null ? `${Number(client.defaultDiscount)}%` : "\u2014"}
               </span>
             </div>
           </CardContent>
@@ -188,69 +192,106 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         </Card>
       </div>
 
-      {/* Notes */}
-      {client.notes && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{client.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Tabs */}
+      <Tabs defaultValue="projects">
+        <TabsList>
+          <TabsTrigger value="projects">
+            Projects ({client.projects.length})
+          </TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="files">
+            Files ({client.media?.length || 0})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Projects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Recent Projects ({client.projects.length})
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {client.projects.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No projects yet.</p>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project #</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Line Items</TableHead>
-                    <TableHead>Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {client.projects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell>
-                        <Link href={`/projects/${project.id}`} className="font-mono text-sm font-medium hover:underline">
-                          {project.projectNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{project.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={projectStatusColors[project.status] || ""}>
-                          {project.status.replace("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{project._count.lineItems}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {new Date(project.createdAt).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="projects" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Recent Projects
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {client.projects.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No projects yet.</p>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Project #</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Line Items</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {client.projects.map((project) => (
+                        <TableRow key={project.id}>
+                          <TableCell>
+                            <Link href={`/projects/${project.id}`} className="font-mono text-sm font-medium hover:underline">
+                              {project.projectNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{project.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={projectStatusColors[project.status] || ""}>
+                              {project.status.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{project._count.lineItems}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(project.createdAt).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-4">
+          <NotesEditor
+            initialNotes={client.notes || ""}
+            queryKey={["client", id]}
+            onSave={(notes) => updateClientNotes(id, notes)}
+            placeholder="Add notes about this client..."
+          />
+        </TabsContent>
+
+        <TabsContent value="files" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Files</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MediaUploader
+                entityType="client"
+                entityId={id}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
+                existingMedia={(client.media || []).map((m: MediaItem) => m)}
+                queryKey={["client", id]}
+                onUploadComplete={async (fileUpload) => {
+                  await addClientMedia({
+                    clientId: id,
+                    fileId: fileUpload.id,
+                  });
+                }}
+                onRemove={async (mediaId) => {
+                  await removeClientMedia(mediaId);
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

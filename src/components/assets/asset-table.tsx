@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -281,12 +282,22 @@ export function AssetTable() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Link href={`/assets/registry/${asset.id}`} className="font-mono font-medium text-sm hover:underline">
-                        {asset.assetTag}
-                      </Link>
-                      {asset.customName && (
-                        <p className="text-xs text-muted-foreground">{asset.customName}</p>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <MediaThumbnail
+                          url={asset.media?.[0]?.file?.url || asset.model?.media?.[0]?.file?.url}
+                          thumbnailUrl={asset.media?.[0]?.file?.thumbnailUrl || asset.model?.media?.[0]?.file?.thumbnailUrl}
+                          alt={asset.assetTag}
+                          size={32}
+                        />
+                        <div>
+                          <Link href={`/assets/registry/${asset.id}`} className="font-mono font-medium text-sm hover:underline">
+                            {asset.assetTag}
+                          </Link>
+                          {asset.customName && (
+                            <p className="text-xs text-muted-foreground">{asset.customName}</p>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Link href={`/assets/models/${asset.modelId}`} className="hover:underline">

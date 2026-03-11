@@ -63,6 +63,11 @@ export async function getKits(params?: {
         category: { select: { name: true } },
         location: { select: { name: true } },
         _count: { select: { serializedItems: true, bulkItems: true } },
+        media: {
+          where: { type: "PHOTO", isPrimary: true },
+          include: { file: true },
+          take: 1,
+        },
       },
       orderBy: sortBy === "category" ? { category: { name: sortOrder } }
         : sortBy === "location" ? { location: { name: sortOrder } }
@@ -113,6 +118,10 @@ export async function getKit(id: string) {
         maintenanceRecords: {
           take: 20,
           orderBy: { createdAt: "desc" },
+        },
+        media: {
+          include: { file: true },
+          orderBy: { sortOrder: "asc" },
         },
       },
     }),
@@ -190,6 +199,14 @@ export async function updateKit(id: string, data: KitFormValues) {
       },
     }),
   );
+}
+
+export async function updateKitNotes(id: string, notes: string) {
+  const { organizationId } = await getOrgContext();
+  return serialize(await prisma.kit.update({
+    where: { id, organizationId },
+    data: { notes: notes || null },
+  }));
 }
 
 // ---------------------------------------------------------------------------

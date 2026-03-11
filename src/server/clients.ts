@@ -62,6 +62,10 @@ export async function getClient(id: string) {
           _count: { select: { lineItems: true } },
         },
       },
+      media: {
+        include: { file: true },
+        orderBy: { sortOrder: "asc" },
+      },
     },
   }));
 }
@@ -111,6 +115,14 @@ export async function updateClient(id: string, data: ClientFormValues) {
       tags: parsed.tags,
       isActive: parsed.isActive,
     },
+  }));
+}
+
+export async function updateClientNotes(id: string, notes: string) {
+  const { organizationId } = await getOrgContext();
+  return serialize(await prisma.client.update({
+    where: { id, organizationId },
+    data: { notes: notes || null },
   }));
 }
 

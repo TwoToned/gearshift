@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   getKit,
   updateKit,
+  updateKitNotes,
   addSerializedItemsToKit,
   removeSerializedItemFromKit,
   addBulkItemToKit,
@@ -16,11 +17,20 @@ import {
   getAvailableAssetsForKit,
   getAvailableBulkAssetsForKit,
 } from "@/server/kits";
+import {
+  addKitMedia,
+  removeKitMedia,
+  setKitPrimaryPhoto,
+} from "@/server/kit-media";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NotesEditor } from "@/components/ui/notes-editor";
+import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { resolveKitPhotoUrl } from "@/lib/media-utils";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import {
   Dialog,
@@ -174,11 +184,21 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
   if (!kit) return <div className="text-muted-foreground">Kit not found.</div>;
 
+  const kitPhotos = ((kit.media || []) as MediaItem[]).filter((m) => m.type === "PHOTO");
+  const kitPhotoUrl = resolveKitPhotoUrl(kit, false);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="flex gap-4">
+          <MediaThumbnail
+            url={kitPhotoUrl}
+            alt={kit.assetTag}
+            size={64}
+            className="flex-shrink-0"
+          />
+          <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{kit.assetTag}</h1>
             <select
@@ -204,6 +224,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
             {kit.name}
             {kit.category && <> &middot; {kit.category.name}</>}
           </p>
+          </div>
         </div>
         <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
           <Pencil className="mr-2 h-4 w-4" />
@@ -476,17 +497,42 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
         </CardContent>
       </Card>
 
+      {/* Photos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Photos ({kitPhotos.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MediaUploader
+            entityType="kit"
+            entityId={id}
+            accept="image/*"
+            existingMedia={kitPhotos}
+            queryKey={["kit", id]}
+            onUploadComplete={async (fileUpload) => {
+              await addKitMedia({
+                kitId: id,
+                fileId: fileUpload.id,
+                type: "PHOTO",
+              });
+            }}
+            onRemove={async (mediaId) => {
+              await removeKitMedia(mediaId);
+            }}
+            onSetPrimary={async (mediaId) => {
+              await setKitPrimaryPhoto(id, mediaId);
+            }}
+          />
+        </CardContent>
+      </Card>
+
       {/* Notes */}
-      {kit.notes && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{kit.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+      <NotesEditor
+        initialNotes={kit.notes || ""}
+        queryKey={["kit", id]}
+        onSave={(notes) => updateKitNotes(id, notes)}
+        placeholder="Add notes about this kit..."
+      />
 
       {/* Add Serialized Items Dialog */}
       <Dialog

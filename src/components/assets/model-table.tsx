@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
 
 export function ModelTable() {
   const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
@@ -148,12 +149,22 @@ export function ModelTable() {
               models.map((model) => (
                 <TableRow key={model.id}>
                   <TableCell>
-                    <Link href={`/assets/models/${model.id}`} className="font-medium hover:underline">
-                      {model.name}
-                    </Link>
-                    {model.modelNumber && (
-                      <span className="ml-2 text-xs text-muted-foreground">{model.modelNumber}</span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <MediaThumbnail
+                        url={model.media?.[0]?.file?.url}
+                        thumbnailUrl={model.media?.[0]?.file?.thumbnailUrl}
+                        alt={model.name}
+                        size={36}
+                      />
+                      <div>
+                        <Link href={`/assets/models/${model.id}`} className="font-medium hover:underline">
+                          {model.name}
+                        </Link>
+                        {model.modelNumber && (
+                          <span className="ml-2 text-xs text-muted-foreground">{model.modelNumber}</span>
+                        )}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{model.manufacturer || "—"}</TableCell>
                   <TableCell>

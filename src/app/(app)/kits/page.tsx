@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -161,12 +162,20 @@ export default function KitsPage() {
               kits.map((kit) => (
                 <TableRow key={kit.id}>
                   <TableCell>
-                    <Link
-                      href={`/kits/${kit.id}`}
-                      className="font-mono font-medium text-sm hover:underline"
-                    >
-                      {kit.assetTag}
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <MediaThumbnail
+                        url={kit.media?.[0]?.file?.url}
+                        thumbnailUrl={kit.media?.[0]?.file?.thumbnailUrl}
+                        alt={kit.assetTag}
+                        size={32}
+                      />
+                      <Link
+                        href={`/kits/${kit.id}`}
+                        className="font-mono font-medium text-sm hover:underline"
+                      >
+                        {kit.assetTag}
+                      </Link>
+                    </div>
                   </TableCell>
                   <TableCell className="font-medium">{kit.name}</TableCell>
                   <TableCell className="text-muted-foreground">

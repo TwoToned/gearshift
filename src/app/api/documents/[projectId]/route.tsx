@@ -8,6 +8,7 @@ import { PullSlipPDF } from "@/lib/pdf/packing-list-pdf";
 import { ReturnSheetPDF } from "@/lib/pdf/return-sheet-pdf";
 import { DeliveryDocketPDF } from "@/lib/pdf/delivery-docket-pdf";
 import { computeOverbookedStatus } from "@/lib/availability";
+import { getFileAsDataUri } from "@/lib/storage";
 
 export async function GET(
   request: NextRequest,
@@ -69,7 +70,16 @@ export async function GET(
     }
   }
 
-  const branding = orgSettings.branding as { primaryColor?: string; accentColor?: string; documentColor?: string } | undefined;
+  const branding = orgSettings.branding as {
+    primaryColor?: string; accentColor?: string; documentColor?: string;
+    logoUrl?: string; iconUrl?: string; documentLogoMode?: "logo" | "icon" | "none";
+  } | undefined;
+
+  // Read logo/icon directly from S3 as base64 data URIs for PDF embedding
+  const [logoData, iconData] = await Promise.all([
+    branding?.logoUrl ? getFileAsDataUri(branding.logoUrl) : null,
+    branding?.iconUrl ? getFileAsDataUri(branding.iconUrl) : null,
+  ]);
 
   const orgData = {
     name: org?.name || "",
@@ -80,6 +90,8 @@ export async function GET(
     taxRate: (orgSettings.taxRate as number) || 10,
     taxLabel: (orgSettings.taxLabel as string) || "GST",
     branding,
+    logoData,
+    iconData,
   };
 
   // Compute overbooked status dynamically

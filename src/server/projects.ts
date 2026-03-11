@@ -112,6 +112,10 @@ export async function getProject(id: string) {
         },
         orderBy: { sortOrder: "asc" },
       },
+      media: {
+        include: { file: true },
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
   if (!project) return null;
@@ -232,6 +236,18 @@ export async function updateProjectStatus(
       data: { status },
     })
   );
+}
+
+export async function updateProjectNotes(
+  id: string,
+  field: "crewNotes" | "internalNotes" | "clientNotes",
+  notes: string,
+) {
+  const { organizationId } = await getOrgContext();
+  return serialize(await prisma.project.update({
+    where: { id, organizationId },
+    data: { [field]: notes || null },
+  }));
 }
 
 export async function archiveProject(id: string) {

@@ -46,6 +46,11 @@ export async function getModels(params?: {
       include: {
         category: true,
         _count: { select: { assets: true, bulkAssets: true } },
+        media: {
+          where: { type: "PHOTO", isPrimary: true },
+          include: { file: true },
+          take: 1,
+        },
       },
       orderBy: sortBy === "category" ? { category: { name: sortOrder } }
         : { [sortBy]: sortOrder },
@@ -73,6 +78,10 @@ export async function getModel(id: string) {
         where: { isActive: true },
         include: { location: true },
         orderBy: { assetTag: "asc" },
+      },
+      media: {
+        include: { file: true },
+        orderBy: { sortOrder: "asc" },
       },
     },
   });

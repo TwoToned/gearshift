@@ -4,12 +4,17 @@ import { use, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Archive, Pencil, Trash2 } from "lucide-react";
+import { Archive, Pencil, Trash2, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getAsset, archiveAsset, deleteAsset } from "@/server/assets";
-import { getBulkAsset, archiveBulkAsset, deleteBulkAsset } from "@/server/bulk-assets";
+import { getAsset, archiveAsset, deleteAsset, updateAssetNotes } from "@/server/assets";
+import { getBulkAsset, archiveBulkAsset, deleteBulkAsset, updateBulkAssetNotes } from "@/server/bulk-assets";
+import {
+  addAssetMedia,
+  removeAssetMedia,
+  setAssetPrimaryPhoto,
+} from "@/server/asset-media";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +28,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AssetQRCode } from "@/components/assets/asset-qr-code";
+import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { NotesEditor } from "@/components/ui/notes-editor";
+import { resolveAssetPhotoUrl, isAssetPhotoCustom } from "@/lib/media-utils";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -183,16 +192,12 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </Card>
         </div>
 
-        {ba.notes && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{ba.notes}</p>
-            </CardContent>
-          </Card>
-        )}
+        <NotesEditor
+          initialNotes={ba.notes || ""}
+          queryKey={["bulkAsset", id]}
+          onSave={(notes) => updateBulkAssetNotes(id, notes)}
+          placeholder="Add notes about this bulk asset..."
+        />
       </div>
     );
   }
@@ -201,11 +206,22 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const asset = assetQuery.data;
   if (!asset) return <div className="text-muted-foreground">Asset not found.</div>;
 
+  const assetPhotos = ((asset.media || []) as MediaItem[]).filter((m) => m.type === "PHOTO");
+  const photoUrl = resolveAssetPhotoUrl(asset, false);
+  const hasCustomPhoto = isAssetPhotoCustom(asset);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="flex gap-4">
+          <MediaThumbnail
+            url={photoUrl}
+            alt={asset.assetTag}
+            size={64}
+            className="flex-shrink-0"
+          />
+          <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{asset.assetTag}</h1>
             <Badge variant="outline" className={statusColors[asset.status] || ""}>
@@ -222,6 +238,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
             </Link>
             {asset.model.category && <> &middot; {asset.model.category.name}</>}
           </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
@@ -255,6 +272,9 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="history">History ({asset.lineItems.length})</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance ({asset.maintenanceRecords.length})</TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
+          <TabsTrigger value="documents">Model Documents</TabsTrigger>
           <TabsTrigger value="qr">QR Code</TabsTrigger>
         </TabsList>
 
@@ -329,16 +349,6 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
             </Card>
           </div>
 
-          {asset.notes && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{asset.notes}</p>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
@@ -426,6 +436,105 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </Table>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-4">
+          <NotesEditor
+            initialNotes={asset.notes || ""}
+            queryKey={["asset", id]}
+            onSave={(notes) => updateAssetNotes(id, notes)}
+            placeholder="Add notes about this asset..."
+          />
+        </TabsContent>
+
+        <TabsContent value="photos" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Asset Photos
+                {!hasCustomPhoto && photoUrl && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    Showing model photo — upload a custom photo to override
+                  </span>
+                )}
+                {hasCustomPhoto && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    Custom photo — remove to revert to model photo
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MediaUploader
+                entityType="asset"
+                entityId={id}
+                accept="image/*"
+                existingMedia={assetPhotos}
+                queryKey={["asset", id]}
+                onUploadComplete={async (fileUpload) => {
+                  await addAssetMedia({
+                    assetId: id,
+                    fileId: fileUpload.id,
+                    type: "PHOTO",
+                  });
+                }}
+                onRemove={async (mediaId) => {
+                  await removeAssetMedia(mediaId);
+                }}
+                onSetPrimary={async (mediaId) => {
+                  await setAssetPrimaryPhoto(id, mediaId);
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Model Documents
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  From {asset.model.name} — manage on the model page
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const modelDocs = (asset.model?.media || []).filter((m: MediaItem) => m.type !== "PHOTO");
+                if (modelDocs.length === 0) {
+                  return (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      No documents attached to this model.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    {modelDocs.map((doc: MediaItem) => (
+                      <a
+                        key={doc.id}
+                        href={doc.file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors"
+                      >
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {doc.displayName || doc.file.fileName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.type.replace("_", " ")} — {(doc.file.fileSize / 1024).toFixed(0)} KB
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="qr" className="mt-4">

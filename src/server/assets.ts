@@ -56,8 +56,22 @@ export async function getAssets(params?: {
     prisma.asset.findMany({
       where,
       include: {
-        model: { include: { category: true } },
+        model: {
+          include: {
+            category: true,
+            media: {
+              where: { type: "PHOTO", isPrimary: true },
+              include: { file: true },
+              take: 1,
+            },
+          },
+        },
         location: true,
+        media: {
+          where: { type: "PHOTO", isPrimary: true },
+          include: { file: true },
+          take: 1,
+        },
       },
       orderBy: sortBy === "model" ? { model: { name: sortOrder } }
         : sortBy === "location" ? { location: { name: sortOrder } }
@@ -76,9 +90,21 @@ export async function getAsset(id: string) {
   return serialize(await prisma.asset.findUnique({
     where: { id, organizationId },
     include: {
-      model: { include: { category: true } },
+      model: {
+        include: {
+          category: true,
+          media: {
+            include: { file: true },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      },
       location: true,
       supplier: true,
+      media: {
+        include: { file: true },
+        orderBy: { sortOrder: "asc" },
+      },
       maintenanceRecords: {
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -286,6 +312,14 @@ export async function deleteAsset(id: string) {
 
   await prisma.asset.delete({ where: { id, organizationId } });
   return { id };
+}
+
+export async function updateAssetNotes(id: string, notes: string) {
+  const { organizationId } = await getOrgContext();
+  return serialize(await prisma.asset.update({
+    where: { id, organizationId },
+    data: { notes: notes || null },
+  }));
 }
 
 export async function archiveAsset(id: string) {

@@ -1,5 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { createStyles, formatCurrency, formatDate, type PdfBranding } from "./styles";
+import { PdfHeader } from "./pdf-header";
 
 interface LineItem {
   id: string;
@@ -31,6 +32,8 @@ interface InvoicePDFProps {
     taxRate?: number;
     taxLabel?: string;
     branding?: PdfBranding;
+    logoData?: string | null;
+    iconData?: string | null;
   };
   project: {
     projectNumber: string;
@@ -84,25 +87,16 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
     <Document>
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.companyName}>{org.name}</Text>
-            <Text style={s.companyDetails}>
-              {[org.address, org.phone, org.email].filter(Boolean).join("\n")}
-            </Text>
-          </View>
-          <View>
-            <Text style={s.docTitle}>INVOICE</Text>
-            <Text style={s.docMeta}>
-              {project.projectNumber}
-              {"\n"}Date: {formatDate(new Date().toISOString())}
-              {"\n"}
-              {project.client?.paymentTerms
-                ? `Terms: ${project.client.paymentTerms}`
-                : "Terms: Due on receipt"}
-            </Text>
-          </View>
-        </View>
+        <PdfHeader
+          orgName={org.name}
+          orgDetails={[org.address, org.phone, org.email].filter(Boolean).join("\n")}
+          docTitle="INVOICE"
+          docMeta={`${project.projectNumber}\nDate: ${formatDate(new Date().toISOString())}\n${project.client?.paymentTerms ? `Terms: ${project.client.paymentTerms}` : "Terms: Due on receipt"}`}
+          branding={org.branding}
+          logoData={org.logoData}
+          iconData={org.iconData}
+          styles={s}
+        />
 
         {/* Bill To */}
         <View style={s.row}>

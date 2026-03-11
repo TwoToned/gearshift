@@ -1,5 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { createStyles, formatDate, type PdfBranding } from "./styles";
+import { PdfHeader } from "./pdf-header";
 
 interface LineItem {
   id: string;
@@ -24,7 +25,7 @@ interface LineItem {
 }
 
 interface PullSlipPDFProps {
-  org: { name: string; branding?: PdfBranding };
+  org: { name: string; branding?: PdfBranding; logoData?: string | null; iconData?: string | null };
   project: {
     projectNumber: string;
     name: string;
@@ -62,20 +63,16 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
     <Document>
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.companyName}>{org.name}</Text>
-            <Text style={s.companyDetails}>Pull Slip</Text>
-          </View>
-          <View>
-            <Text style={s.docTitle}>PULL SLIP</Text>
-            <Text style={s.docMeta}>
-              {project.projectNumber}
-              {"\n"}{project.name}
-              {project.client ? `\n${project.client.name}` : ""}
-            </Text>
-          </View>
-        </View>
+        <PdfHeader
+          orgName={org.name}
+          orgDetails="Pull Slip"
+          docTitle="PULL SLIP"
+          docMeta={`${project.projectNumber}\n${project.name}${project.client ? `\n${project.client.name}` : ""}`}
+          branding={org.branding}
+          logoData={org.logoData}
+          iconData={org.iconData}
+          styles={s}
+        />
 
         {/* Info row */}
         <View style={[s.row, { marginBottom: 12 }]}>

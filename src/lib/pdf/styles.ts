@@ -5,6 +5,10 @@ export interface PdfBranding {
   primaryColor?: string;
   accentColor?: string;
   documentColor?: string;
+  logoUrl?: string;
+  iconUrl?: string;
+  documentLogoMode?: "logo" | "icon" | "none";
+  showOrgNameOnDocuments?: boolean;
 }
 
 const DEFAULT_DOC_COLOR = "#0d4f4f";
@@ -24,6 +28,27 @@ export function createStyles(branding?: PdfBranding) {
       flexDirection: "row",
       justifyContent: "space-between",
       marginBottom: 24,
+    },
+    logoRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    logoImage: {
+      maxWidth: 180,
+      maxHeight: 60,
+      objectFit: "contain" as const,
+    },
+    headerLeft: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+    },
+    iconImage: {
+      width: 40,
+      height: 40,
+      objectFit: "contain" as const,
     },
     companyName: {
       fontSize: 18,

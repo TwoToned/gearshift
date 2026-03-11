@@ -8,6 +8,12 @@ export interface OrgBranding {
   primaryColor?: string;
   accentColor?: string;
   documentColor?: string;
+  logoUrl?: string;
+  iconUrl?: string;
+  /** Which image to show on PDFs: "logo" (full width above header), "icon" (inline), or "none" */
+  documentLogoMode?: "logo" | "icon" | "none";
+  /** Whether to show the org name text on PDF documents (default true) */
+  showOrgNameOnDocuments?: boolean;
 }
 
 export interface OrgSettings {

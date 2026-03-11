@@ -1,5 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { createStyles, formatDate, type PdfBranding } from "./styles";
+import { PdfHeader } from "./pdf-header";
 
 interface LineItem {
   id: string;
@@ -35,6 +36,8 @@ interface DeliveryDocketPDFProps {
     phone?: string;
     address?: string;
     branding?: PdfBranding;
+    logoData?: string | null;
+    iconData?: string | null;
   };
   project: {
     projectNumber: string;
@@ -81,21 +84,16 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
     <Document>
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.companyName}>{org.name}</Text>
-            <Text style={s.companyDetails}>
-              {[org.address, org.phone, org.email].filter(Boolean).join("\n")}
-            </Text>
-          </View>
-          <View>
-            <Text style={s.docTitle}>DELIVERY DOCKET</Text>
-            <Text style={s.docMeta}>
-              {project.projectNumber}
-              {"\n"}Date: {formatDate(new Date().toISOString())}
-            </Text>
-          </View>
-        </View>
+        <PdfHeader
+          orgName={org.name}
+          orgDetails={[org.address, org.phone, org.email].filter(Boolean).join("\n")}
+          docTitle="DELIVERY DOCKET"
+          docMeta={`${project.projectNumber}\nDate: ${formatDate(new Date().toISOString())}`}
+          branding={org.branding}
+          logoData={org.logoData}
+          iconData={org.iconData}
+          styles={s}
+        />
 
         {/* Project & Client Info */}
         <View style={s.row}>

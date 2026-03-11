@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import {
   getProject,
   updateProjectStatus,
+  updateProjectNotes,
   archiveProject,
   deleteProject,
 } from "@/server/projects";
@@ -49,6 +50,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { addProjectMedia, removeProjectMedia, getProjectMedia } from "@/server/project-media";
+import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
+import { NotesEditor } from "@/components/ui/notes-editor";
+import type { ProjectMediaType } from "@/generated/prisma/client";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -284,6 +289,7 @@ export default function ProjectDetailPage({
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="equipment">Equipment</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="files">Files ({(project.media || []).length})</TabsTrigger>
         </TabsList>
 
         {/* Details Tab */}
@@ -583,41 +589,59 @@ export default function ProjectDetailPage({
 
         {/* Notes Tab */}
         <TabsContent value="notes">
-          <div className="grid gap-4 pt-4 sm:grid-cols-1">
+          <div className="grid gap-4 pt-4">
+            <NotesEditor
+              title="Crew Notes"
+              initialNotes={project.crewNotes || ""}
+              queryKey={["project", id]}
+              onSave={(notes) => updateProjectNotes(id, "crewNotes", notes)}
+              placeholder="Notes for crew members..."
+              rows={4}
+            />
+            <NotesEditor
+              title="Internal Notes"
+              initialNotes={project.internalNotes || ""}
+              queryKey={["project", id]}
+              onSave={(notes) => updateProjectNotes(id, "internalNotes", notes)}
+              placeholder="Internal notes (not visible to client)..."
+              rows={4}
+            />
+            <NotesEditor
+              title="Client Notes"
+              initialNotes={project.clientNotes || ""}
+              queryKey={["project", id]}
+              onSave={(notes) => updateProjectNotes(id, "clientNotes", notes)}
+              placeholder="Notes visible to client on documents..."
+              rows={4}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files">
+          <div className="space-y-4 pt-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Crew Notes
-                </CardTitle>
+              <CardHeader>
+                <CardTitle className="text-base">Project Files & Documents</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-wrap">
-                  {project.crewNotes || "No crew notes."}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Internal Notes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">
-                  {project.internalNotes || "No internal notes."}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Client Notes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">
-                  {project.clientNotes || "No client notes."}
-                </p>
+                <MediaUploader
+                  entityType="project"
+                  entityId={id}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.txt"
+                  existingMedia={(project.media || []) as MediaItem[]}
+                  queryKey={["project", id]}
+                  onUploadComplete={async (fileUpload) => {
+                    await addProjectMedia({
+                      projectId: id,
+                      fileId: fileUpload.id,
+                      type: "OTHER" as ProjectMediaType,
+                    });
+                  }}
+                  onRemove={async (mediaId) => {
+                    await removeProjectMedia(mediaId);
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

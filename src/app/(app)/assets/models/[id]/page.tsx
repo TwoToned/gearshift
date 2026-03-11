@@ -8,6 +8,12 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getModel, archiveModel } from "@/server/models";
+import {
+  addModelMedia,
+  removeModelMedia,
+  setModelPrimaryPhoto,
+  reorderModelMedia,
+} from "@/server/model-media";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
+import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { resolveModelPhotoUrl } from "@/lib/media-utils";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -62,11 +71,22 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
 
   const specs = (model.specifications as Record<string, string>) || {};
 
+  const photos = ((model.media || []) as MediaItem[]).filter((m) => m.type === "PHOTO");
+  const documents = ((model.media || []) as MediaItem[]).filter((m) => m.type !== "PHOTO");
+  const primaryPhotoUrl = resolveModelPhotoUrl(model, false);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="flex gap-4">
+          <MediaThumbnail
+            url={primaryPhotoUrl}
+            alt={model.name}
+            size={64}
+            className="flex-shrink-0"
+          />
+          <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{model.name}</h1>
             <Badge variant={model.assetType === "SERIALIZED" ? "default" : "outline"}>
@@ -78,6 +98,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
             {[model.manufacturer, model.modelNumber].filter(Boolean).join(" — ") || "No manufacturer info"}
             {model.category && <> &middot; {model.category.name}</>}
           </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=${model.assetType === "SERIALIZED" ? "serialized" : "bulk"}`} />}>
@@ -108,6 +129,8 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
             Assets ({model.assets.length + model.bulkAssets.length})
           </TabsTrigger>
           <TabsTrigger value="specs">Specifications</TabsTrigger>
+          <TabsTrigger value="photos">Photos ({photos.length})</TabsTrigger>
+          <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">
@@ -301,6 +324,66 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="photos" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Model Photos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MediaUploader
+                entityType="model"
+                entityId={id}
+                accept="image/*"
+                existingMedia={photos}
+                queryKey={["model", id]}
+                onUploadComplete={async (fileUpload) => {
+                  await addModelMedia({
+                    modelId: id,
+                    fileId: fileUpload.id,
+                    type: "PHOTO",
+                  });
+                }}
+                onRemove={async (mediaId) => {
+                  await removeModelMedia(mediaId);
+                }}
+                onSetPrimary={async (mediaId) => {
+                  await setModelPrimaryPhoto(id, mediaId);
+                }}
+                onReorder={async (orderedIds) => {
+                  await reorderModelMedia(id, orderedIds);
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Manuals & Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MediaUploader
+                entityType="model"
+                entityId={id}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                existingMedia={documents}
+                queryKey={["model", id]}
+                onUploadComplete={async (fileUpload) => {
+                  await addModelMedia({
+                    modelId: id,
+                    fileId: fileUpload.id,
+                    type: "MANUAL",
+                  });
+                }}
+                onRemove={async (mediaId) => {
+                  await removeModelMedia(mediaId);
+                }}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
