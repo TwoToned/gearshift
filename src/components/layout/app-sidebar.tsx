@@ -15,6 +15,7 @@ import {
   CalendarRange,
   Warehouse,
   Container,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -75,6 +76,16 @@ const navItems = [
     icon: Wrench,
   },
   {
+    title: "Test & Tag",
+    url: "/test-and-tag",
+    icon: ShieldCheck,
+    items: [
+      { title: "Registry", url: "/test-and-tag/registry", icon: Package },
+      { title: "Quick Test", url: "/test-and-tag/quick-test", icon: ShieldCheck },
+      { title: "Reports", url: "/test-and-tag/reports", icon: BarChart3 },
+    ],
+  },
+  {
     title: "Reports",
     url: "/reports",
     icon: BarChart3,
@@ -104,7 +115,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       render={<Link href={item.url!} />}
-                      isActive={pathname === item.url || pathname.startsWith("/assets/registry")}
+                      isActive={pathname === item.url || pathname.startsWith(item.url)}
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -114,7 +125,7 @@ export function AppSidebar() {
                         <SidebarMenuSubItem key={sub.title}>
                           <SidebarMenuSubButton
                             render={<Link href={sub.url} />}
-                            isActive={pathname === sub.url}
+                            isActive={pathname === sub.url || pathname.startsWith(sub.url + "/")}
                           >
                             <sub.icon className="h-4 w-4" />
                             <span>{sub.title}</span>

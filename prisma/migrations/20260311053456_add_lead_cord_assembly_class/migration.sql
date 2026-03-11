@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "EquipmentClass" ADD VALUE 'LEAD_CORD_ASSEMBLY';

@@ -181,10 +181,8 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Test & tag interval</span>
-                  <span className="font-medium">
-                    {model.testAndTagIntervalDays ? `${model.testAndTagIntervalDays} days` : "—"}
-                  </span>
+                  <span>Requires T&T</span>
+                  <span className="font-medium">{model.requiresTestAndTag ? "Yes" : "No"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Maintenance interval</span>

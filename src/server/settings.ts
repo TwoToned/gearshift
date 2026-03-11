@@ -16,6 +16,19 @@ export interface OrgBranding {
   showOrgNameOnDocuments?: boolean;
 }
 
+export interface TestTagSettings {
+  prefix?: string;
+  digits?: number;
+  counter?: number;
+  defaultIntervalMonths?: number;
+  defaultEquipmentClass?: "CLASS_I" | "CLASS_II" | "CLASS_II_DOUBLE_INSULATED" | "LEAD_CORD_ASSEMBLY";
+  dueSoonThresholdDays?: number;
+  companyName?: string;
+  defaultTesterName?: string;
+  defaultTestMethod?: "INSULATION_RESISTANCE" | "LEAKAGE_CURRENT" | "BOTH";
+  checkoutPolicy?: "WARN" | "BLOCK";
+}
+
 export interface OrgSettings {
   phone?: string;
   email?: string;
@@ -28,6 +41,7 @@ export interface OrgSettings {
   assetTagCounter?: number;
   assetTagDigits?: number;
   branding?: OrgBranding;
+  testTag?: TestTagSettings;
 }
 
 export async function getOrganization() {
@@ -66,6 +80,19 @@ export async function updateOrganization(data: {
   });
 
   return serialize(updated);
+}
+
+/** Get org-level T&T settings (for fallback defaults). */
+export async function getOrgTestTagSettings(): Promise<TestTagSettings> {
+  const { organizationId } = await getOrgContext();
+  const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+  if (!org?.metadata) return {};
+  try {
+    const settings = JSON.parse(org.metadata) as OrgSettings;
+    return settings.testTag || {};
+  } catch {
+    return {};
+  }
 }
 
 /** Read-only preview of the next N asset tags — does NOT increment the counter. */
@@ -133,6 +160,76 @@ export async function reserveAssetTags(count = 1): Promise<string[]> {
     });
 
     return tags;
+  });
+}
+
+/** Read-only preview of the next N test tag IDs — does NOT increment the counter. */
+export async function peekNextTestTagIds(count = 1): Promise<string[]> {
+  const { organizationId } = await getOrgContext();
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+  });
+  if (!org) throw new Error("Organization not found");
+
+  let settings: OrgSettings = {};
+  if (org.metadata) {
+    try {
+      settings = JSON.parse(org.metadata);
+    } catch {
+      // ignore
+    }
+  }
+
+  const tt = settings.testTag || {};
+  const prefix = tt.prefix || "TT";
+  const digits = tt.digits || 4;
+  const currentCounter = tt.counter || 0;
+
+  const ids: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    ids.push(`${prefix}${String(currentCounter + i).padStart(digits, "0")}`);
+  }
+  return ids;
+}
+
+/** Atomically reserve N test tag IDs — increments the counter. Call only at creation time. */
+export async function reserveTestTagIds(count = 1): Promise<string[]> {
+  const { organizationId } = await getOrgContext();
+
+  return prisma.$transaction(async (tx) => {
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+    });
+    if (!org) throw new Error("Organization not found");
+
+    let settings: OrgSettings = {};
+    if (org.metadata) {
+      try {
+        settings = JSON.parse(org.metadata);
+      } catch {
+        // ignore
+      }
+    }
+
+    const tt = settings.testTag || {};
+    const prefix = tt.prefix || "TT";
+    const digits = tt.digits || 4;
+    const currentCounter = tt.counter || 0;
+
+    const ids: string[] = [];
+    for (let i = 1; i <= count; i++) {
+      ids.push(`${prefix}${String(currentCounter + i).padStart(digits, "0")}`);
+    }
+
+    settings.testTag = { ...tt, counter: currentCounter + count };
+
+    await tx.organization.update({
+      where: { id: organizationId },
+      data: { metadata: JSON.stringify(settings) },
+    });
+
+    return ids;
   });
 }
 

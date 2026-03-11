@@ -1,0 +1,250 @@
+"use client";
+
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
+import { batchCreateTestTagSchema, type BatchCreateTestTagFormValues } from "@/lib/validations/test-tag";
+import { createTestTagAssetsFromBulk } from "@/server/test-tag-assets";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const equipmentClassOptions = [
+  { value: "CLASS_I", label: "Class I" },
+  { value: "CLASS_II", label: "Class II" },
+  { value: "CLASS_II_DOUBLE_INSULATED", label: "Class II (Double Insulated)" },
+  { value: "LEAD_CORD_ASSEMBLY", label: "Lead / Cord Assembly" },
+];
+
+const applianceTypeOptions = [
+  { value: "APPLIANCE", label: "Appliance" },
+  { value: "CORD_SET", label: "Cord Set" },
+  { value: "EXTENSION_LEAD", label: "Extension Lead" },
+  { value: "POWER_BOARD", label: "Power Board" },
+  { value: "RCD_PORTABLE", label: "RCD (Portable)" },
+  { value: "RCD_FIXED", label: "RCD (Fixed)" },
+  { value: "THREE_PHASE", label: "Three Phase" },
+  { value: "OTHER", label: "Other" },
+];
+
+interface BatchCreateDialogProps {
+  bulkAssetId: string;
+  bulkAssetName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function BatchCreateDialog({
+  bulkAssetId,
+  bulkAssetName,
+  open,
+  onOpenChange,
+}: BatchCreateDialogProps) {
+  const queryClient = useQueryClient();
+
+  const form = useForm<BatchCreateTestTagFormValues>({
+    resolver: zodResolver(batchCreateTestTagSchema),
+    defaultValues: {
+      bulkAssetId,
+      count: 1,
+      description: bulkAssetName,
+      equipmentClass: "CLASS_I",
+      applianceType: "APPLIANCE",
+      testIntervalMonths: 3,
+      make: "",
+      modelName: "",
+      location: "",
+    },
+  });
+
+  // Reset form when dialog opens with new props
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        bulkAssetId,
+        count: 1,
+        description: bulkAssetName,
+        equipmentClass: "CLASS_I",
+        applianceType: "APPLIANCE",
+        testIntervalMonths: 3,
+        make: "",
+        modelName: "",
+        location: "",
+      });
+    }
+  }, [open, bulkAssetId, bulkAssetName, form]);
+
+  const mutation = useMutation({
+    mutationFn: (data: BatchCreateTestTagFormValues) =>
+      createTestTagAssetsFromBulk({
+        bulkAssetId: data.bulkAssetId,
+        count: Number(data.count),
+        description: data.description,
+        equipmentClass: data.equipmentClass,
+        applianceType: data.applianceType,
+        testIntervalMonths: Number(data.testIntervalMonths),
+        make: data.make || undefined,
+        modelName: data.modelName || undefined,
+        location: data.location || undefined,
+      }),
+    onSuccess: (result) => {
+      toast.success(`Created ${result.count} test tag items`);
+      queryClient.invalidateQueries({ queryKey: ["test-tag-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["test-tag-dashboard"] });
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Batch Create Test & Tag Items</DialogTitle>
+          <DialogDescription>
+            Create multiple test & tag items linked to {bulkAssetName}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+          className="space-y-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="count">Count *</Label>
+              <Input
+                id="count"
+                type="number"
+                min={1}
+                max={500}
+                {...form.register("count")}
+              />
+              {form.formState.errors.count && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.count.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="testIntervalMonths">Test Interval (months)</Label>
+              <Input
+                id="testIntervalMonths"
+                type="number"
+                min={1}
+                max={120}
+                {...form.register("testIntervalMonths")}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="batch-description">Description *</Label>
+            <Input
+              id="batch-description"
+              {...form.register("description")}
+              placeholder="Description for each item"
+            />
+            {form.formState.errors.description && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.description.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Equipment Class</Label>
+              <Select
+                value={form.watch("equipmentClass")}
+                onValueChange={(v) => v && form.setValue("equipmentClass", v as BatchCreateTestTagFormValues["equipmentClass"])}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipmentClassOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Appliance Type</Label>
+              <Select
+                value={form.watch("applianceType")}
+                onValueChange={(v) => v && form.setValue("applianceType", v as BatchCreateTestTagFormValues["applianceType"])}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {applianceTypeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Make</Label>
+              <Input {...form.register("make")} placeholder="Optional" />
+            </div>
+            <div className="space-y-2">
+              <Label>Model</Label>
+              <Input {...form.register("modelName")} placeholder="Optional" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="batch-location">Location</Label>
+            <Input
+              id="batch-location"
+              {...form.register("location")}
+              placeholder="e.g. Warehouse A"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create {Number(form.watch("count")) || 0} Items
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

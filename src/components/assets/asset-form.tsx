@@ -127,8 +127,6 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
   });
 
   const models = modelsData?.models || [];
-  const selectedModelId = form.watch("modelId");
-  const selectedModel = models.find((m) => m.id === selectedModelId);
   const totalCount = 1 + extraAssets.length;
 
   return (
@@ -288,24 +286,6 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
           </div>
         </CardContent>
       </Card>
-
-      {selectedModel?.requiresTestAndTag && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Test & Tag</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="lastTestAndTagDate">Last Test & Tag Date</Label>
-              <Input id="lastTestAndTagDate" type="date" {...form.register("lastTestAndTagDate")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input id="barcode" {...form.register("barcode")} placeholder="Auto-generated from asset tag" />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardContent className="pt-6">

@@ -33,6 +33,7 @@ model User {
   addedKitSerializedItems KitSerializedItem[] @relation("KitSerializedItemAddedBy")
   addedKitBulkItems       KitBulkItem[]      @relation("KitBulkItemAddedBy")
   uploads                 FileUpload[]
+  testTagRecords          TestTagRecord[]
 
   @@map("user")
 }
@@ -118,6 +119,8 @@ model Organization {
   projectMedia       ProjectMedia[]
   clientMedia        ClientMedia[]
   locationMedia      LocationMedia[]
+  testTagAssets      TestTagAsset[]
+  testTagRecords     TestTagRecord[]
 
   @@map("organization")
 }
@@ -300,6 +303,55 @@ enum MediaType {
   OTHER
 }
 
+// ─── Test & Tag Enums ───────────────────────────────────────────────────────
+
+enum TestTagStatus {
+  NOT_YET_TESTED
+  CURRENT
+  DUE_SOON
+  OVERDUE
+  FAILED
+  RETIRED
+}
+
+enum EquipmentClass {
+  CLASS_I
+  CLASS_II
+  CLASS_II_DOUBLE_INSULATED
+  LEAD_CORD_ASSEMBLY
+}
+
+enum ApplianceType {
+  APPLIANCE
+  CORD_SET
+  EXTENSION_LEAD
+  POWER_BOARD
+  RCD_PORTABLE
+  RCD_FIXED
+  THREE_PHASE
+  OTHER
+}
+
+enum TestResult {
+  PASS
+  FAIL
+  NOT_APPLICABLE
+}
+
+enum TestMethod {
+  INSULATION_RESISTANCE
+  LEAKAGE_CURRENT
+  BOTH
+}
+
+enum FailureAction {
+  NONE
+  REPAIRED
+  REMOVED_FROM_SERVICE
+  DISPOSED
+  REFERRED_TO_ELECTRICIAN
+}
+
 enum ProjectMediaType {
   FLOOR_PLAN
   QUOTE
@@ -359,9 +411,11 @@ model Model {
   replacementCost         Decimal?     @db.Decimal(10, 2)
   weight                  Decimal?     @db.Decimal(8, 2)
   powerDraw               Int?
-  requiresTestAndTag      Boolean      @default(false)
-  testAndTagIntervalDays  Int?
-  maintenanceIntervalDays Int?
+  requiresTestAndTag         Boolean         @default(false)
+  testAndTagIntervalDays     Int?
+  defaultEquipmentClass      EquipmentClass?
+  defaultApplianceType       ApplianceType?
+  maintenanceIntervalDays    Int?
   assetType               AssetType    @default(SERIALIZED)
   barcodeLabelTemplate    String?
   isActive                Boolean      @default(true)
@@ -531,6 +585,7 @@ model Asset {
   lineItems          ProjectLineItem[]
   scanLogs           AssetScanLog[]
   media              AssetMedia[]
+  testTagAsset       TestTagAsset?
 
   @@unique([organizationId, assetTag])
   @@index([organizationId])
@@ -564,9 +619,10 @@ model BulkAsset {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  kitBulkItems KitBulkItem[]
-  lineItems    ProjectLineItem[]
-  scanLogs     AssetScanLog[]
+  kitBulkItems  KitBulkItem[]
+  lineItems     ProjectLineItem[]
+  scanLogs      AssetScanLog[]
+  testTagAssets TestTagAsset[]
 
   @@unique([organizationId, assetTag])
   @@index([organizationId])
@@ -958,4 +1014,114 @@ model LocationMedia {
   @@index([organizationId])
   @@index([locationId])
   @@map("location_media")
+}
+
+// ─── Test & Tag Asset ───────────────────────────────────────────────────────
+
+model TestTagAsset {
+  id                 String         @id @default(cuid())
+  organizationId     String
+  organization       Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  testTagId          String
+  description        String
+  equipmentClass     EquipmentClass @default(CLASS_I)
+  applianceType      ApplianceType  @default(APPLIANCE)
+  make               String?
+  modelName          String?
+  serialNumber       String?
+  location           String?
+  testIntervalMonths Int            @default(3)
+  status             TestTagStatus  @default(NOT_YET_TESTED)
+  lastTestDate       DateTime?
+  nextDueDate        DateTime?
+  notes              String?
+
+  assetId            String?        @unique
+  asset              Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  bulkAssetId        String?
+  bulkAsset          BulkAsset?     @relation(fields: [bulkAssetId], references: [id], onDelete: SetNull)
+
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  testRecords        TestTagRecord[]
+
+  @@unique([organizationId, testTagId])
+  @@index([organizationId, status])
+  @@index([organizationId, nextDueDate])
+  @@index([organizationId, assetId])
+  @@index([organizationId, bulkAssetId])
+  @@map("test_tag_asset")
+}
+
+// ─── Test & Tag Record ──────────────────────────────────────────────────────
+
+model TestTagRecord {
+  id                     String         @id @default(cuid())
+  organizationId         String
+  organization           Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  testTagAssetId         String
+  testTagAsset           TestTagAsset   @relation(fields: [testTagAssetId], references: [id], onDelete: Cascade)
+  testDate               DateTime
+  testedById             String
+  testedBy               User           @relation(fields: [testedById], references: [id])
+  testerName             String
+
+  result                 TestResult     @default(PASS)
+
+  // Visual inspection
+  visualInspectionResult TestResult     @default(PASS)
+  visualCordCondition    Boolean?
+  visualPlugCondition    Boolean?
+  visualHousingCondition Boolean?
+  visualSwitchCondition  Boolean?
+  visualVentsUnobstructed Boolean?
+  visualCordGrip         Boolean?
+  visualEarthPin         Boolean?
+  visualMarkingsLegible  Boolean?
+  visualNoModifications  Boolean?
+  visualNotes            String?
+
+  // Electrical tests
+  equipmentClassTested   EquipmentClass @default(CLASS_I)
+  testMethod             TestMethod     @default(INSULATION_RESISTANCE)
+
+  // Earth continuity (Class I only)
+  earthContinuityResult  TestResult     @default(NOT_APPLICABLE)
+  earthContinuityReading Float?
+
+  // Insulation resistance
+  insulationResult       TestResult     @default(NOT_APPLICABLE)
+  insulationReading      Float?
+  insulationTestVoltage  Int?
+
+  // Leakage current
+  leakageCurrentResult   TestResult     @default(NOT_APPLICABLE)
+  leakageCurrentReading  Float?
+
+  // Polarity
+  polarityResult         TestResult     @default(NOT_APPLICABLE)
+
+  // RCD trip time
+  rcdTripTimeResult      TestResult     @default(NOT_APPLICABLE)
+  rcdTripTimeReading     Float?
+
+  // Functional test
+  functionalTestResult   TestResult     @default(NOT_APPLICABLE)
+  functionalTestNotes    String?
+
+  // Failure actions
+  failureAction          FailureAction  @default(NONE)
+  failureNotes           String?
+
+  // Next test
+  nextDueDate            DateTime
+
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@index([organizationId, testTagAssetId])
+  @@index([organizationId, testDate])
+  @@map("test_tag_record")
 }

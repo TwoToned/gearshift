@@ -333,18 +333,44 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 <CardTitle className="text-sm text-muted-foreground">Test & Tag</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Last tested</span>
-                  <span className="font-medium">{formatDate(asset.lastTestAndTagDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Next due</span>
-                  <span className="font-medium">{formatDate(asset.nextTestAndTagDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Location</span>
-                  <span className="font-medium">{asset.location?.name || "—"}</span>
-                </div>
+                {asset.testTagAsset ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Status</span>
+                      <span className="font-medium">{asset.testTagAsset.status?.replace(/_/g, " ") || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Last tested</span>
+                      <span className="font-medium">{formatDate(asset.testTagAsset.lastTestDate)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Next due</span>
+                      <span className="font-medium">{formatDate(asset.testTagAsset.nextDueDate)}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      render={<Link href={`/test-and-tag/${asset.testTagAsset.id}`} />}
+                    >
+                      View T&T Details
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground">Not registered</p>
+                    {asset.model?.requiresTestAndTag && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        render={<Link href={`/test-and-tag/new?assetId=${asset.id}`} />}
+                      >
+                        Register for T&T
+                      </Button>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

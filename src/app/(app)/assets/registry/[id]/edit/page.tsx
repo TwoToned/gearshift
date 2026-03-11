@@ -90,7 +90,6 @@ function EditAssetContent({ params }: { params: Promise<{ id: string }> }) {
     warrantyExpiry: formatDateForInput(asset.warrantyExpiry),
     notes: asset.notes || "",
     locationId: asset.locationId || "",
-    lastTestAndTagDate: formatDateForInput(asset.lastTestAndTagDate),
     barcode: asset.barcode || "",
     images: asset.images || [],
     isActive: asset.isActive,

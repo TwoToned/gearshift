@@ -84,6 +84,16 @@ export async function getBulkAsset(id: string) {
         take: 20,
         include: { project: true },
       },
+      testTagAssets: {
+        select: {
+          id: true,
+          testTagId: true,
+          status: true,
+          lastTestDate: true,
+          nextDueDate: true,
+        },
+        orderBy: { testTagId: "asc" },
+      },
     },
   }));
 }

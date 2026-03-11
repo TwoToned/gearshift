@@ -118,12 +118,6 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
       where: { id: parsed.assetId },
       data: {
         status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
-        lastTestAndTagDate:
-          parsed.type === "TEST_AND_TAG" ? new Date() : undefined,
-        nextTestAndTagDate:
-          parsed.type === "TEST_AND_TAG" && parsed.nextDueDate
-            ? parsed.nextDueDate
-            : undefined,
       },
     });
   }
@@ -177,12 +171,6 @@ export async function updateMaintenanceRecord(
       where: { id: parsed.assetId },
       data: {
         status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
-        lastTestAndTagDate:
-          parsed.type === "TEST_AND_TAG" ? new Date() : undefined,
-        nextTestAndTagDate:
-          parsed.type === "TEST_AND_TAG" && parsed.nextDueDate
-            ? parsed.nextDueDate
-            : undefined,
       },
     });
   }

@@ -5,6 +5,8 @@ import { serialize } from "@/lib/serialize";
 import { getOrgContext } from "@/lib/org-context";
 import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
 import type { Prisma } from "@/generated/prisma/client";
+import { backfillTestTagAssets } from "@/server/test-tag-assets";
+import { getOrgTestTagSettings } from "@/server/settings";
 
 export type ModelWithRelations = Prisma.ModelGetPayload<{
   include: {
@@ -91,7 +93,7 @@ export async function getModel(id: string) {
 export async function createModel(data: ModelFormValues) {
   const { organizationId } = await getOrgContext();
   const parsed = modelSchema.parse(data);
-  return serialize(await prisma.model.create({
+  const model = await prisma.model.create({
     data: {
       organizationId,
       name: parsed.name,
@@ -111,18 +113,26 @@ export async function createModel(data: ModelFormValues) {
       powerDraw: parsed.powerDraw,
       requiresTestAndTag: parsed.requiresTestAndTag,
       testAndTagIntervalDays: parsed.requiresTestAndTag ? parsed.testAndTagIntervalDays : null,
+      defaultEquipmentClass: parsed.requiresTestAndTag ? (parsed.defaultEquipmentClass || "CLASS_I") : null,
+      defaultApplianceType: parsed.requiresTestAndTag ? (parsed.defaultApplianceType || "APPLIANCE") : null,
       maintenanceIntervalDays: parsed.maintenanceIntervalDays,
       assetType: parsed.assetType,
       barcodeLabelTemplate: parsed.barcodeLabelTemplate,
       isActive: parsed.isActive,
     },
-  }));
+  });
+
+  if (parsed.requiresTestAndTag) {
+    await backfillTestTagAssets();
+  }
+
+  return serialize(model);
 }
 
 export async function updateModel(id: string, data: ModelFormValues) {
   const { organizationId } = await getOrgContext();
   const parsed = modelSchema.parse(data);
-  return serialize(await prisma.model.update({
+  const model = await prisma.model.update({
     where: { id, organizationId },
     data: {
       name: parsed.name,
@@ -142,12 +152,48 @@ export async function updateModel(id: string, data: ModelFormValues) {
       powerDraw: parsed.powerDraw,
       requiresTestAndTag: parsed.requiresTestAndTag,
       testAndTagIntervalDays: parsed.requiresTestAndTag ? parsed.testAndTagIntervalDays : null,
+      defaultEquipmentClass: parsed.requiresTestAndTag ? (parsed.defaultEquipmentClass || "CLASS_I") : null,
+      defaultApplianceType: parsed.requiresTestAndTag ? (parsed.defaultApplianceType || "APPLIANCE") : null,
       maintenanceIntervalDays: parsed.maintenanceIntervalDays,
       assetType: parsed.assetType,
       barcodeLabelTemplate: parsed.barcodeLabelTemplate,
       isActive: parsed.isActive,
     },
-  }));
+  });
+
+  if (parsed.requiresTestAndTag) {
+    await backfillTestTagAssets();
+
+    // Propagate updated T&T defaults to all active linked TestTagAssets for this model's assets
+    const orgTT = await getOrgTestTagSettings();
+    const equipmentClass = parsed.defaultEquipmentClass || "CLASS_I";
+    const applianceType = parsed.defaultApplianceType || "APPLIANCE";
+    const intervalMonths = parsed.testAndTagIntervalDays
+      ? Math.max(1, Math.round(parsed.testAndTagIntervalDays / 30))
+      : (orgTT.defaultIntervalMonths || 3);
+
+    const assetIds = (await prisma.asset.findMany({
+      where: { modelId: id, organizationId, isActive: true },
+      select: { id: true },
+    })).map((a) => a.id);
+
+    if (assetIds.length > 0) {
+      await prisma.testTagAsset.updateMany({
+        where: {
+          organizationId,
+          assetId: { in: assetIds },
+          isActive: true,
+        },
+        data: {
+          equipmentClass,
+          applianceType,
+          testIntervalMonths: intervalMonths,
+        },
+      });
+    }
+  }
+
+  return serialize(model);
 }
 
 export async function archiveModel(id: string) {

@@ -18,9 +18,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateCategory } from "./quick-create-category";
 import { SpecificationsEditor } from "./specifications-editor";
+
+const equipmentClassOptions = [
+  { value: "CLASS_I", label: "Class I" },
+  { value: "CLASS_II", label: "Class II" },
+  { value: "CLASS_II_DOUBLE_INSULATED", label: "Class II (Double Insulated)" },
+  { value: "LEAD_CORD_ASSEMBLY", label: "Lead / Cord Assembly" },
+];
+
+const applianceTypeOptions = [
+  { value: "APPLIANCE", label: "Appliance" },
+  { value: "CORD_SET", label: "Cord Set" },
+  { value: "EXTENSION_LEAD", label: "Extension Lead" },
+  { value: "POWER_BOARD", label: "Power Board" },
+  { value: "RCD_PORTABLE", label: "RCD (Portable)" },
+  { value: "RCD_FIXED", label: "RCD (Fixed)" },
+  { value: "THREE_PHASE", label: "Three Phase" },
+  { value: "OTHER", label: "Other" },
+];
 
 interface ModelFormProps {
   initialData?: ModelFormValues & { id: string };
@@ -161,15 +186,50 @@ export function ModelForm({ initialData }: ModelFormProps) {
             <div className="flex items-center gap-2">
               <Checkbox
                 id="requiresTestAndTag"
-                checked={form.watch("requiresTestAndTag")}
+                checked={!!form.watch("requiresTestAndTag")}
                 onCheckedChange={(v) => form.setValue("requiresTestAndTag", !!v)}
               />
               <Label htmlFor="requiresTestAndTag">Requires Test & Tag</Label>
             </div>
             {form.watch("requiresTestAndTag") && (
-              <div className="space-y-2 max-w-xs">
-                <Label htmlFor="testAndTagIntervalDays">Test & Tag Interval (days)</Label>
-                <Input id="testAndTagIntervalDays" type="number" {...form.register("testAndTagIntervalDays")} placeholder="e.g. 90" />
+              <div className="grid gap-4 sm:grid-cols-3 pl-6 border-l-2 border-primary/20">
+                <div className="space-y-2">
+                  <Label>Equipment Class</Label>
+                  <Select
+                    value={form.watch("defaultEquipmentClass") || "CLASS_I"}
+                    onValueChange={(v) => v && form.setValue("defaultEquipmentClass", v as ModelFormValues["defaultEquipmentClass"])}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {equipmentClassOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Appliance Type</Label>
+                  <Select
+                    value={form.watch("defaultApplianceType") || "APPLIANCE"}
+                    onValueChange={(v) => v && form.setValue("defaultApplianceType", v as ModelFormValues["defaultApplianceType"])}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {applianceTypeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="testAndTagIntervalDays">Test Validity (days)</Label>
+                  <Input id="testAndTagIntervalDays" type="number" min={1} {...form.register("testAndTagIntervalDays")} placeholder="Use org default" />
+                  <p className="text-xs text-muted-foreground">Leave blank to use org T&T settings</p>
+                </div>
               </div>
             )}
           </div>

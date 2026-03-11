@@ -15,7 +15,6 @@ export const assetSchema = z.object({
   notes: z.string().max(2000).optional(),
   locationId: z.string().optional(),
   customFieldValues: z.record(z.string(), z.string()).optional(),
-  lastTestAndTagDate: z.union([z.literal(""), z.coerce.date()]).optional().transform(v => v === "" ? undefined : v),
   barcode: z.string().max(100).optional(),
   images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),

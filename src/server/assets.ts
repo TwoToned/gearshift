@@ -5,7 +5,8 @@ import { getOrgContext } from "@/lib/org-context";
 import { assetSchema, type AssetFormValues } from "@/lib/validations/asset";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
-import { reserveAssetTags } from "@/server/settings";
+import { reserveAssetTags, getOrgTestTagSettings } from "@/server/settings";
+import { backfillTestTagAssets } from "@/server/test-tag-assets";
 
 export type AssetWithRelations = Prisma.AssetGetPayload<{
   include: {
@@ -119,6 +120,16 @@ export async function getAsset(id: string) {
         take: 20,
         include: { project: true },
       },
+      testTagAsset: {
+        select: {
+          id: true,
+          testTagId: true,
+          status: true,
+          lastTestDate: true,
+          nextDueDate: true,
+          testIntervalMonths: true,
+        },
+      },
     },
   }));
 }
@@ -127,15 +138,8 @@ export async function createAsset(data: AssetFormValues) {
   const { organizationId } = await getOrgContext();
   const parsed = assetSchema.parse(data);
 
-  // Calculate next test and tag date if applicable
-  let nextTestAndTagDate: Date | undefined;
-  if (parsed.lastTestAndTagDate) {
-    const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
-    if (model?.testAndTagIntervalDays) {
-      nextTestAndTagDate = new Date(parsed.lastTestAndTagDate);
-      nextTestAndTagDate.setDate(nextTestAndTagDate.getDate() + model.testAndTagIntervalDays);
-    }
-  }
+  // Fetch the model to check T&T requirements
+  const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
 
   try {
     const result = await prisma.asset.create({
@@ -155,8 +159,6 @@ export async function createAsset(data: AssetFormValues) {
         notes: parsed.notes,
         locationId: parsed.locationId || null,
         customFieldValues: parsed.customFieldValues ?? undefined,
-        lastTestAndTagDate: parsed.lastTestAndTagDate,
-        nextTestAndTagDate,
         barcode: parsed.barcode || parsed.assetTag,
         qrCode: parsed.assetTag,
         images: parsed.images,
@@ -165,6 +167,30 @@ export async function createAsset(data: AssetFormValues) {
     });
     // Advance the counter now that the asset is actually created
     await reserveAssetTags(1);
+
+    // Auto-register in T&T registry if model requires it
+    if (model?.requiresTestAndTag) {
+      const orgTT = await getOrgTestTagSettings();
+      const intervalMonths = model.testAndTagIntervalDays
+        ? Math.max(1, Math.round(model.testAndTagIntervalDays / 30))
+        : (orgTT.defaultIntervalMonths || 3);
+      await prisma.testTagAsset.create({
+        data: {
+          organizationId,
+          testTagId: parsed.assetTag,
+          description: `${model.manufacturer ? model.manufacturer + " " : ""}${model.name} (${parsed.assetTag})`,
+          equipmentClass: model.defaultEquipmentClass || "CLASS_I",
+          applianceType: model.defaultApplianceType || "APPLIANCE",
+          make: model.manufacturer || null,
+          modelName: model.modelNumber || null,
+          serialNumber: parsed.serialNumber || null,
+          testIntervalMonths: intervalMonths,
+          status: "NOT_YET_TESTED",
+          assetId: result.id,
+        },
+      });
+    }
+
     return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
@@ -181,14 +207,7 @@ export async function createAssets(
   const { organizationId } = await getOrgContext();
   const parsed = assetSchema.parse(data);
 
-  let nextTestAndTagDate: Date | undefined;
-  if (parsed.lastTestAndTagDate) {
-    const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
-    if (model?.testAndTagIntervalDays) {
-      nextTestAndTagDate = new Date(parsed.lastTestAndTagDate);
-      nextTestAndTagDate.setDate(nextTestAndTagDate.getDate() + model.testAndTagIntervalDays);
-    }
-  }
+  const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
 
   const results = await prisma.$transaction(
     assets.map(({ tag, serialNumber }) =>
@@ -209,8 +228,6 @@ export async function createAssets(
           notes: parsed.notes,
           locationId: parsed.locationId || null,
           customFieldValues: parsed.customFieldValues ?? undefined,
-          lastTestAndTagDate: parsed.lastTestAndTagDate,
-          nextTestAndTagDate,
           barcode: parsed.barcode || tag,
           qrCode: tag,
           images: parsed.images,
@@ -223,6 +240,33 @@ export async function createAssets(
   // Advance the counter now that assets are actually created
   await reserveAssetTags(assets.length);
 
+  // Auto-register in T&T registry if model requires it
+  if (model?.requiresTestAndTag) {
+    const orgTT = await getOrgTestTagSettings();
+    const intervalMonths = model.testAndTagIntervalDays
+      ? Math.max(1, Math.round(model.testAndTagIntervalDays / 30))
+      : (orgTT.defaultIntervalMonths || 3);
+    await prisma.$transaction(
+      results.map((asset) =>
+        prisma.testTagAsset.create({
+          data: {
+            organizationId,
+            testTagId: asset.assetTag,
+            description: `${model.manufacturer ? model.manufacturer + " " : ""}${model.name} (${asset.assetTag})`,
+            equipmentClass: model.defaultEquipmentClass || "CLASS_I",
+            applianceType: model.defaultApplianceType || "APPLIANCE",
+            make: model.manufacturer || null,
+            modelName: model.modelNumber || null,
+            serialNumber: asset.serialNumber || null,
+            testIntervalMonths: intervalMonths,
+            status: "NOT_YET_TESTED",
+            assetId: asset.id,
+          },
+        })
+      )
+    );
+  }
+
   return serialize(results);
 }
 
@@ -230,16 +274,7 @@ export async function updateAsset(id: string, data: AssetFormValues) {
   const { organizationId } = await getOrgContext();
   const parsed = assetSchema.parse(data);
 
-  let nextTestAndTagDate: Date | undefined;
-  if (parsed.lastTestAndTagDate) {
-    const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
-    if (model?.testAndTagIntervalDays) {
-      nextTestAndTagDate = new Date(parsed.lastTestAndTagDate);
-      nextTestAndTagDate.setDate(nextTestAndTagDate.getDate() + model.testAndTagIntervalDays);
-    }
-  }
-
-  return serialize(await prisma.asset.update({
+  const updated = await prisma.asset.update({
     where: { id, organizationId },
     data: {
       modelId: parsed.modelId,
@@ -256,13 +291,19 @@ export async function updateAsset(id: string, data: AssetFormValues) {
       notes: parsed.notes,
       locationId: parsed.locationId || null,
       customFieldValues: parsed.customFieldValues ?? undefined,
-      lastTestAndTagDate: parsed.lastTestAndTagDate,
-      nextTestAndTagDate,
       barcode: parsed.barcode || parsed.assetTag,
       images: parsed.images,
       isActive: parsed.isActive,
     },
-  }));
+  });
+
+  // Register in T&T if model requires it and not already registered
+  const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
+  if (model?.requiresTestAndTag) {
+    await backfillTestTagAssets();
+  }
+
+  return serialize(updated);
 }
 
 export async function bulkUpdateAssets(
@@ -310,6 +351,17 @@ export async function deleteAsset(id: string) {
     throw new Error("Cannot delete — this asset is part of a kit. Remove it from the kit first.");
   }
 
+  // Retire linked T&T entry if one exists
+  const linkedTT = await prisma.testTagAsset.findFirst({
+    where: { assetId: id, organizationId },
+  });
+  if (linkedTT) {
+    await prisma.testTagAsset.update({
+      where: { id: linkedTT.id },
+      data: { status: "RETIRED", isActive: false, assetId: null },
+    });
+  }
+
   await prisma.asset.delete({ where: { id, organizationId } });
   return { id };
 }
@@ -324,6 +376,13 @@ export async function updateAssetNotes(id: string, notes: string) {
 
 export async function archiveAsset(id: string) {
   const { organizationId } = await getOrgContext();
+
+  // Retire linked T&T entry if one exists
+  await prisma.testTagAsset.updateMany({
+    where: { assetId: id, organizationId },
+    data: { status: "RETIRED", isActive: false },
+  });
+
   return serialize(await prisma.asset.update({
     where: { id, organizationId },
     data: { isActive: false, status: "RETIRED" },
