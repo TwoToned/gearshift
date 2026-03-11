@@ -3,6 +3,7 @@ import { DM_Sans, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { getPlatformName } from "@/lib/platform";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -15,11 +16,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "GearFlow — Asset & Rental Management",
-  description:
-    "Professional asset and rental management for AV and theatre production companies.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const platformName = await getPlatformName();
+  return {
+    title: `${platformName} — Asset & Rental Management`,
+    description:
+      "Professional asset and rental management for AV and theatre production companies.",
+  };
+}
 
 export default function RootLayout({
   children,

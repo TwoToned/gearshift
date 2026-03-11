@@ -8,6 +8,7 @@ import { Search, Plus } from "lucide-react";
 import { getClients } from "@/server/clients";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
+import { CanDo } from "@/components/auth/permission-gate";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
@@ -79,10 +80,12 @@ export function ClientTable() {
           <option value="VENUE">Venue</option>
           <option value="PRODUCTION_COMPANY">Production Company</option>
         </select>
-        <Button render={<Link href="/clients/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Client
-        </Button>
+        <CanDo resource="client" action="create">
+          <Button render={<Link href="/clients/new" />}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Client
+          </Button>
+        </CanDo>
       </div>
 
       {/* Table */}

@@ -8,6 +8,7 @@ import { Search, Plus } from "lucide-react";
 import { getProjects } from "@/server/projects";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
+import { CanDo } from "@/components/auth/permission-gate";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
@@ -167,10 +168,12 @@ export function ProjectTable() {
           <option value="CONFERENCE">Conference</option>
           <option value="OTHER">Other</option>
         </select>
-        <Button render={<Link href="/projects/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <CanDo resource="project" action="create">
+          <Button render={<Link href="/projects/new" />}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </CanDo>
       </div>
 
       {/* Table */}

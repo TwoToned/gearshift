@@ -62,6 +62,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -882,6 +883,7 @@ export default function WarehouseProjectPage({
   if (!project) return <div className="text-muted-foreground">Project not found.</div>;
 
   return (
+    <RequirePermission resource="warehouse" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1565,5 +1567,6 @@ export default function WarehouseProjectPage({
         </DialogContent>
       </Dialog>
     </div>
+    </RequirePermission>
   );
 }

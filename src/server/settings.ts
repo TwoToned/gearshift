@@ -239,14 +239,25 @@ export async function getNextAssetTag(): Promise<string> {
   return tags[0];
 }
 
-const VALID_ROLES = ["admin", "manager", "staff", "warehouse"] as const;
-type MemberRole = (typeof VALID_ROLES)[number];
+const VALID_BUILT_IN_ROLES = ["admin", "manager", "member", "staff", "warehouse", "viewer"] as const;
 
-export async function addMemberByEmail(email: string, role: MemberRole) {
+export async function addMemberByEmail(email: string, role: string) {
   const { organizationId } = await getOrgContext();
 
-  if (!VALID_ROLES.includes(role)) {
+  // Validate: either a built-in role or a custom role belonging to this org
+  const isBuiltIn = (VALID_BUILT_IN_ROLES as readonly string[]).includes(role);
+  const isCustom = role.startsWith("custom:");
+
+  if (!isBuiltIn && !isCustom) {
     throw new Error("Invalid role");
+  }
+
+  if (isCustom) {
+    const customRoleId = role.slice("custom:".length);
+    const customRole = await prisma.customRole.findFirst({
+      where: { id: customRoleId, organizationId },
+    });
+    if (!customRole) throw new Error("Custom role not found in this organization.");
   }
 
   // Find user by email

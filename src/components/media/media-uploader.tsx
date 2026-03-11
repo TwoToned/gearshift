@@ -32,6 +32,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import { MediaLightbox, useLightbox } from "@/components/media/media-lightbox";
+import { useIsViewer } from "@/lib/use-permissions";
 
 export interface MediaItem {
   id: string;
@@ -285,10 +286,72 @@ export function MediaUploader({
     queryClient.invalidateQueries({ queryKey });
   };
 
+  const isViewer = useIsViewer();
   const showPrimary = accept.includes("image");
   const { lightboxState, openLightbox, closeLightbox } = useLightbox();
 
   const imageMedia = existingMedia.filter((m) => m.file.mimeType.startsWith("image/"));
+
+  if (isViewer) {
+    return (
+      <div className="space-y-3">
+        {existingMedia.length === 0 && (
+          <p className="text-sm text-muted-foreground">No files.</p>
+        )}
+        {existingMedia.map((item) => {
+          const isImage = item.file.mimeType.startsWith("image/");
+          return (
+            <div
+              key={item.id}
+              className="flex items-center gap-2 rounded-lg border bg-card p-2"
+            >
+              {isImage ? (
+                <div
+                  className="h-16 w-16 flex-shrink-0 cursor-pointer overflow-hidden rounded-md bg-muted"
+                  onClick={() => {
+                    const idx = imageMedia.findIndex((m) => m.id === item.id);
+                    openLightbox(
+                      imageMedia.map((m) => ({ url: m.file.url, alt: m.displayName || m.file.fileName })),
+                      idx >= 0 ? idx : 0,
+                    );
+                  }}
+                >
+                  <img
+                    src={item.file.thumbnailUrl || item.file.url}
+                    alt={item.displayName || item.file.fileName}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {item.displayName || item.file.fileName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatFileSize(item.file.fileSize)}
+                </p>
+                {item.isPrimary && showPrimary && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                    <Star className="h-3 w-3 fill-current" /> Primary
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <MediaLightbox
+          images={lightboxState.images}
+          initialIndex={lightboxState.index}
+          open={lightboxState.open}
+          onClose={closeLightbox}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

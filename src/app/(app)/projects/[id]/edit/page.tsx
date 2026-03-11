@@ -4,6 +4,8 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProject } from "@/server/projects";
 import { ProjectForm } from "@/components/projects/project-form";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import type { ProjectFormValues } from "@/lib/validations/project";
 
 function toDateOrUndefined(
@@ -75,14 +77,18 @@ export default function EditProjectPage({
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Edit Project</h1>
-        <p className="text-muted-foreground">
-          {project.projectNumber} &middot; {project.name}
-        </p>
+    <RequirePermission resource="project" action="update">
+    <CanDo resource="project" action="update" fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Edit Project</h1>
+          <p className="text-muted-foreground">
+            {project.projectNumber} &middot; {project.name}
+          </p>
+        </div>
+        <ProjectForm initialData={initialData} />
       </div>
-      <ProjectForm initialData={initialData} />
-    </div>
+    </CanDo>
+    </RequirePermission>
   );
 }

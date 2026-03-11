@@ -53,6 +53,8 @@ import {
 import { addProjectMedia, removeProjectMedia, getProjectMedia } from "@/server/project-media";
 import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
 import { NotesEditor } from "@/components/ui/notes-editor";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import type { ProjectMediaType } from "@/generated/prisma/client";
 
 const statusColors: Record<string, string> = {
@@ -182,6 +184,7 @@ export default function ProjectDetailPage({
   const currentStatus = project.status;
 
   return (
+    <RequirePermission resource="project" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -249,38 +252,40 @@ export default function ProjectDetailPage({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="outline"
-            render={<Link href={`/projects/${id}/edit`} />}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          {project.status === "CANCELLED" ? (
+          <CanDo resource="project" action="update">
             <Button
               variant="outline"
-              className="text-destructive"
-              onClick={() => {
-                if (confirm("Permanently delete this project? This cannot be undone.")) deleteMutation.mutate();
-              }}
-              disabled={deleteMutation.isPending}
+              render={<Link href={`/projects/${id}/edit`} />}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
             </Button>
-          ) : (
-            <Button
-              variant="outline"
-              className="text-destructive"
-              onClick={() => {
-                if (confirm("Cancel this project?")) archiveMutation.mutate();
-              }}
-              disabled={archiveMutation.isPending}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-          )}
+            {project.status === "CANCELLED" ? (
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => {
+                  if (confirm("Permanently delete this project? This cannot be undone.")) deleteMutation.mutate();
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => {
+                  if (confirm("Cancel this project?")) archiveMutation.mutate();
+                }}
+                disabled={archiveMutation.isPending}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+            )}
+          </CanDo>
         </div>
       </div>
 
@@ -301,18 +306,24 @@ export default function ProjectDetailPage({
                 <span className="text-sm font-medium text-muted-foreground">
                   Status:
                 </span>
-                <select
-                  value={currentStatus}
-                  onChange={(e) => statusMutation.mutate(e.target.value)}
-                  disabled={statusMutation.isPending}
-                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {allStatuses.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabels[s] || s}
-                    </option>
-                  ))}
-                </select>
+                <CanDo resource="project" action="update" fallback={
+                  <Badge variant="outline" className={statusColors[currentStatus] || ""}>
+                    {statusLabels[currentStatus] || currentStatus}
+                  </Badge>
+                }>
+                  <select
+                    value={currentStatus}
+                    onChange={(e) => statusMutation.mutate(e.target.value)}
+                    disabled={statusMutation.isPending}
+                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {allStatuses.map((s) => (
+                      <option key={s} value={s}>
+                        {statusLabels[s] || s}
+                      </option>
+                    ))}
+                  </select>
+                </CanDo>
               </CardContent>
             </Card>
 
@@ -648,5 +659,6 @@ export default function ProjectDetailPage({
         </TabsContent>
       </Tabs>
     </div>
+    </RequirePermission>
   );
 }

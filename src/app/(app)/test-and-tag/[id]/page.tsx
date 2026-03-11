@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Zap, Pencil, ArchiveX, Trash2, Loader2 } from "lucide-react";
 
 import { getTestTagAsset, retireTestTagAsset, deleteTestTagAsset } from "@/server/test-tag-assets";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,6 +116,7 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
+    <RequirePermission resource="testTag" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -125,44 +128,46 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-muted-foreground">{item.description}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            render={<Link href={`/test-and-tag/quick-test?id=${item.testTagId}`} />}
-          >
-            <Zap className="mr-2 h-4 w-4" />
-            Record Test
-          </Button>
-          <Button variant="outline" disabled>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          {item.status !== "RETIRED" && (
+          <CanDo resource="testTag" action="update">
             <Button
-              variant="outline"
-              onClick={() => {
-                if (confirm("Are you sure you want to retire this test tag asset?")) {
-                  retireMutation.mutate();
-                }
-              }}
-              disabled={retireMutation.isPending}
+              render={<Link href={`/test-and-tag/quick-test?id=${item.testTagId}`} />}
             >
-              <ArchiveX className="mr-2 h-4 w-4" />
-              {retireMutation.isPending ? "Retiring..." : "Retire"}
+              <Zap className="mr-2 h-4 w-4" />
+              Record Test
             </Button>
-          )}
-          {item.status === "RETIRED" && (
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirm("Permanently delete this test tag asset and all its test records? This cannot be undone.")) {
-                  deleteMutation.mutate();
-                }
-              }}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            <Button variant="outline" disabled>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
             </Button>
-          )}
+            {item.status !== "RETIRED" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (confirm("Are you sure you want to retire this test tag asset?")) {
+                    retireMutation.mutate();
+                  }
+                }}
+                disabled={retireMutation.isPending}
+              >
+                <ArchiveX className="mr-2 h-4 w-4" />
+                {retireMutation.isPending ? "Retiring..." : "Retire"}
+              </Button>
+            )}
+            {item.status === "RETIRED" && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (confirm("Permanently delete this test tag asset and all its test records? This cannot be undone.")) {
+                    deleteMutation.mutate();
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            )}
+          </CanDo>
         </div>
       </div>
 
@@ -300,5 +305,6 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
         </CardContent>
       </Card>
     </div>
+    </RequirePermission>
   );
 }

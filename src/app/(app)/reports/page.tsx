@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getReportsSummary } from "@/server/reports";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const assetStatusLabels: Record<string, string> = {
   AVAILABLE: "Available",
@@ -58,6 +59,7 @@ export default function ReportsPage() {
   const maintenanceSummary = d.maintenanceSummary as Array<{ status: string; count: number }>;
 
   return (
+    <RequirePermission resource="reports" action="view">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
@@ -184,5 +186,6 @@ export default function ReportsPage() {
         </Card>
       </div>
     </div>
+    </RequirePermission>
   );
 }

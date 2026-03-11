@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { CanDo } from "@/components/auth/permission-gate";
 
 export function ModelTable() {
   const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
@@ -90,30 +91,32 @@ export function ModelTable() {
           <option value="SERIALIZED">Serialized</option>
           <option value="BULK">Bulk</option>
         </select>
-        <Button
-          variant="outline"
-          onClick={async () => {
-            const csv = await exportModelsCSV();
-            const blob = new Blob([csv], { type: "text/csv" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "models.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
-        <Button variant="outline" onClick={() => setImportOpen(true)}>
-          <Upload className="mr-2 h-4 w-4" />
-          Import
-        </Button>
-        <Button render={<Link href="/assets/models/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Model
-        </Button>
+        <CanDo resource="model" action="create">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const csv = await exportModelsCSV();
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "models.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button render={<Link href="/assets/models/new" />}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Model
+          </Button>
+        </CanDo>
       </div>
 
       {/* Table */}

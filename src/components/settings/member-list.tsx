@@ -5,17 +5,66 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
+import { NotViewer } from "@/components/auth/permission-gate";
 import { toast } from "sonner";
-import { getMembers, removeMember } from "@/server/settings";
+import { getMembers } from "@/server/settings";
+import { changeMemberRole, removeOrgMember } from "@/server/org-members";
+import { getCustomRoles } from "@/server/custom-roles";
+import { ROLE_COLORS } from "./role-editor-dialog";
+import type { PermissionMap } from "@/lib/permissions";
 
 const roleColors: Record<string, string> = {
   owner: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   admin: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   manager: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  member: "bg-green-500/10 text-green-500 border-green-500/20",
   staff: "bg-green-500/10 text-green-500 border-green-500/20",
   warehouse: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+  viewer: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
+
+const builtInAssignableRoles = [
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "member", label: "Member" },
+  { value: "viewer", label: "Viewer" },
+];
+
+interface CustomRoleData {
+  id: string;
+  name: string;
+  color: string | null;
+  permissions: PermissionMap;
+}
+
+function getCustomRoleColorClasses(color: string | null): string {
+  const entry = ROLE_COLORS.find((c) => c.value === color);
+  return entry?.classes ?? "bg-gray-500/10 text-gray-500 border-gray-500/20";
+}
+
+function getRoleDisplay(role: string, customRolesMap: Map<string, CustomRoleData>) {
+  if (role.startsWith("custom:")) {
+    const id = role.slice("custom:".length);
+    const cr = customRolesMap.get(id);
+    return {
+      label: cr?.name ?? "Unknown Role",
+      colorClass: cr ? getCustomRoleColorClasses(cr.color) : roleColors.viewer,
+    };
+  }
+  return {
+    label: role.charAt(0).toUpperCase() + role.slice(1),
+    colorClass: roleColors[role] || "",
+  };
+}
 
 export function MemberList() {
   const queryClient = useQueryClient();
@@ -25,14 +74,47 @@ export function MemberList() {
     queryFn: getMembers,
   });
 
+  const { data: customRoles } = useQuery({
+    queryKey: ["custom-roles"],
+    queryFn: getCustomRoles,
+  });
+
+  const changeRoleMut = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: string; role: string }) =>
+      changeMemberRole(memberId, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-members"] });
+      queryClient.invalidateQueries({ queryKey: ["current-role"] });
+      toast.success("Role updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const removeMut = useMutation({
-    mutationFn: removeMember,
+    mutationFn: removeOrgMember,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-members"] });
       toast.success("Member removed");
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // Build custom roles lookup map
+  const customRolesMap = new Map<string, CustomRoleData>();
+  if (customRoles) {
+    for (const cr of customRoles as CustomRoleData[]) {
+      customRolesMap.set(cr.id, cr);
+    }
+  }
+
+  // Build assignable roles list (built-in + custom)
+  const allAssignableRoles = [
+    ...builtInAssignableRoles,
+    ...((customRoles || []) as CustomRoleData[]).map((cr) => ({
+      value: `custom:${cr.id}`,
+      label: cr.name,
+    })),
+  ];
 
   if (isLoading) {
     return (
@@ -64,6 +146,8 @@ export function MemberList() {
     );
   }
 
+  const hasCustomRoles = ((customRoles || []) as CustomRoleData[]).length > 0;
+
   return (
     <div className="space-y-3">
       {items.map((member) => {
@@ -73,6 +157,8 @@ export function MemberList() {
           .join("")
           .toUpperCase()
           .slice(0, 2);
+
+        const display = getRoleDisplay(member.role, customRolesMap);
 
         return (
           <div
@@ -92,26 +178,71 @@ export function MemberList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className={roleColors[member.role] || ""}
-              >
-                {member.role}
-              </Badge>
-              {member.role !== "owner" && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => {
-                    if (confirm(`Remove ${member.user.name || member.user.email} from the organization?`)) {
-                      removeMut.mutate(member.id);
-                    }
-                  }}
+              {member.role === "owner" ? (
+                <Badge
+                  variant="outline"
+                  className={display.colorClass}
                 >
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
+                  {display.label}
+                </Badge>
+              ) : (
+                <NotViewer fallback={
+                  <Badge variant="outline" className={display.colorClass}>
+                    {display.label}
+                  </Badge>
+                }>
+                  <Select
+                    value={member.role}
+                    onValueChange={(v) => {
+                      if (v && v !== member.role) {
+                        changeRoleMut.mutate({ memberId: member.id, role: v });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue>
+                        {display.label}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {builtInAssignableRoles.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                      {hasCustomRoles && (
+                        <>
+                          <Separator className="my-1" />
+                          <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                            Custom Roles
+                          </div>
+                          {((customRoles || []) as CustomRoleData[]).map((cr) => (
+                            <SelectItem key={`custom:${cr.id}`} value={`custom:${cr.id}`}>
+                              {cr.name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </NotViewer>
               )}
+              <NotViewer>
+                {member.role !== "owner" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      if (confirm(`Remove ${member.user.name || member.user.email} from the organization?`)) {
+                        removeMut.mutate(member.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                )}
+              </NotViewer>
             </div>
           </div>
         );

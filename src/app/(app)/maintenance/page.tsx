@@ -32,6 +32,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import {
   Table,
   TableBody,
@@ -128,6 +130,7 @@ export default function MaintenancePage() {
   }).length;
 
   return (
+    <RequirePermission resource="maintenance" action="read">
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -136,12 +139,14 @@ export default function MaintenancePage() {
             Track repairs, test &amp; tag, and preventative maintenance.
           </p>
         </div>
-        <Link href="/maintenance/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Record
-          </Button>
-        </Link>
+        <CanDo resource="maintenance" action="create">
+          <Link href="/maintenance/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Record
+            </Button>
+          </Link>
+        </CanDo>
       </div>
 
       {overdueMaintenance > 0 && (
@@ -302,15 +307,17 @@ export default function MaintenancePage() {
                     </TableCell>
                     <TableCell>
                       {record.status === "CANCELLED" && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() =>
-                            deleteMutation.mutate(record.id as string)
-                          }
-                        >
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <CanDo resource="maintenance" action="delete">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() =>
+                              deleteMutation.mutate(record.id as string)
+                            }
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </CanDo>
                       )}
                     </TableCell>
                   </TableRow>
@@ -349,5 +356,6 @@ export default function MaintenancePage() {
         </div>
       </div>
     </div>
+    </RequirePermission>
   );
 }

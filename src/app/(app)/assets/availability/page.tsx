@@ -26,6 +26,7 @@ import { getCalendarData, type CalendarProject } from "@/server/availability";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-400",
@@ -130,6 +131,7 @@ export default function AvailabilityPage() {
     : [];
 
   return (
+    <RequirePermission resource="asset" action="read">
     <div className="space-y-4">
       {/* Header */}
       <div>
@@ -366,5 +368,6 @@ export default function AvailabilityPage() {
         </Card>
       </div>
     </div>
+    </RequirePermission>
   );
 }

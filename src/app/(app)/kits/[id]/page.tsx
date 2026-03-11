@@ -32,6 +32,8 @@ import { MediaUploader, type MediaItem } from "@/components/media/media-uploader
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveKitPhotoUrl } from "@/lib/media-utils";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
 import {
   Dialog,
   DialogContent,
@@ -188,6 +190,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
   const kitPhotoUrl = resolveKitPhotoUrl(kit, false);
 
   return (
+    <RequirePermission resource="kit" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -201,18 +204,24 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{kit.assetTag}</h1>
-            <select
-              value={kit.status}
-              onChange={(e) => statusMutation.mutate(e.target.value)}
-              disabled={statusMutation.isPending}
-              className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
-              <option value="IN_MAINTENANCE">In Maintenance</option>
-              <option value="RETIRED">Retired</option>
-              <option value="INCOMPLETE">Incomplete</option>
-            </select>
+            <CanDo resource="kit" action="update" fallback={
+              <Badge variant="outline" className={statusColors[kit.status] || ""}>
+                {kit.status.replace("_", " ")}
+              </Badge>
+            }>
+              <select
+                value={kit.status}
+                onChange={(e) => statusMutation.mutate(e.target.value)}
+                disabled={statusMutation.isPending}
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="CHECKED_OUT">Checked Out</option>
+                <option value="IN_MAINTENANCE">In Maintenance</option>
+                <option value="RETIRED">Retired</option>
+                <option value="INCOMPLETE">Incomplete</option>
+              </select>
+            </CanDo>
             <Badge variant="outline" className={conditionColors[kit.condition] || ""}>
               {kit.condition}
             </Badge>
@@ -226,10 +235,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           </p>
           </div>
         </div>
-        <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit
-        </Button>
+        <CanDo resource="kit" action="update">
+          <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+        </CanDo>
       </div>
 
       {/* Kit Info Card */}
@@ -291,10 +302,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Serialized Items</h3>
-              <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                Add Item
-              </Button>
+              <CanDo resource="kit" action="update">
+                <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Item
+                </Button>
+              </CanDo>
             </div>
             {kit.serializedItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -333,18 +346,20 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            onClick={() => {
-                              if (confirm("Remove this item from the kit?")) {
-                                removeItemMutation.mutate(item.assetId);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <CanDo resource="kit" action="update">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("Remove this item from the kit?")) {
+                                  removeItemMutation.mutate(item.assetId);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </CanDo>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -358,10 +373,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Bulk Items</h3>
-              <Button size="sm" variant="outline" onClick={() => setShowAddBulkItem(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                Add Bulk Item
-              </Button>
+              <CanDo resource="kit" action="update">
+                <Button size="sm" variant="outline" onClick={() => setShowAddBulkItem(true)}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Bulk Item
+                </Button>
+              </CanDo>
             </div>
             {kit.bulkItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -389,18 +406,20 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           {item.position || "—"}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            onClick={() => {
-                              if (confirm("Remove this bulk item from the kit?")) {
-                                removeBulkMutation.mutate(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <CanDo resource="kit" action="update">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("Remove this bulk item from the kit?")) {
+                                  removeBulkMutation.mutate(item.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </CanDo>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -646,6 +665,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
         </DialogContent>
       </Dialog>
     </div>
+    </RequirePermission>
   );
 }
 

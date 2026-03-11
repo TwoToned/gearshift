@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TestTagTable } from "@/components/test-tag/test-tag-table";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 export default function TestTagRegistryPage() {
   const queryClient = useQueryClient();
@@ -29,6 +30,7 @@ export default function TestTagRegistryPage() {
   });
 
   return (
+    <RequirePermission resource="testTag" action="read">
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
@@ -58,5 +60,6 @@ export default function TestTagRegistryPage() {
       </div>
       <TestTagTable />
     </div>
+    </RequirePermission>
   );
 }

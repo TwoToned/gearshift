@@ -1,9 +1,11 @@
 "use client";
 
 import { ModelTable } from "@/components/assets/model-table";
+import { RequirePermission } from "@/components/auth/require-permission";
 
 export default function ModelsPage() {
   return (
+    <RequirePermission resource="model" action="read">
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Equipment Models</h1>
@@ -13,5 +15,6 @@ export default function ModelsPage() {
       </div>
       <ModelTable />
     </div>
+    </RequirePermission>
   );
 }

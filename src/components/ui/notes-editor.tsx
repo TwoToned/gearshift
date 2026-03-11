@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useIsViewer } from "@/lib/use-permissions";
 
 interface NotesEditorProps {
   title?: string;
@@ -25,6 +26,7 @@ export function NotesEditor({
   placeholder = "Add notes...",
   rows = 6,
 }: NotesEditorProps) {
+  const isViewer = useIsViewer();
   const [notes, setNotes] = useState(initialNotes);
   const queryClient = useQueryClient();
   const hasChanges = notes !== initialNotes;
@@ -41,6 +43,21 @@ export function NotesEditor({
     },
     onError: (e) => toast.error(e.message),
   });
+
+  if (isViewer) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+            {initialNotes || "No notes."}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
