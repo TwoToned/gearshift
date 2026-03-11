@@ -18,6 +18,7 @@ export const maintenanceSchema = z.object({
     .default("SCHEDULED"),
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().max(5000).optional(),
+  reportedById: z.string().optional(),
   assignedToId: z.string().optional(),
   scheduledDate: z
     .union([z.literal(""), z.coerce.date()])

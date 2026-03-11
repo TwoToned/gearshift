@@ -106,8 +106,9 @@ export async function getAsset(id: string) {
         include: { file: true },
         orderBy: { sortOrder: "asc" },
       },
-      maintenanceRecords: {
-        orderBy: { createdAt: "desc" },
+      maintenanceLinks: {
+        include: { maintenanceRecord: true },
+        orderBy: { maintenanceRecord: { createdAt: "desc" } },
         take: 20,
       },
       scanLogs: {
@@ -338,7 +339,7 @@ export async function deleteAsset(id: string) {
   const asset = await prisma.asset.findUnique({
     where: { id, organizationId },
     include: {
-      _count: { select: { lineItems: true, maintenanceRecords: true } },
+      _count: { select: { lineItems: true, maintenanceLinks: true } },
       kitItem: true,
     },
   });

@@ -165,14 +165,18 @@ export default function DashboardPage() {
             {(() => {
               const logs = (activity as Record<string, unknown> | undefined)?.logs as Record<string, unknown>[] | undefined;
               const testRecords = (activity as Record<string, unknown> | undefined)?.testRecords as Record<string, unknown>[] | undefined;
+              const maintRecords = (activity as Record<string, unknown> | undefined)?.maintenanceRecords as Record<string, unknown>[] | undefined;
 
               // Merge into a unified timeline
-              const items: { type: "scan" | "test"; time: Date; data: Record<string, unknown> }[] = [];
+              const items: { type: "scan" | "test" | "maintenance"; time: Date; data: Record<string, unknown> }[] = [];
               for (const log of logs || []) {
                 items.push({ type: "scan", time: new Date(log.scannedAt as string), data: log });
               }
               for (const rec of testRecords || []) {
                 items.push({ type: "test", time: new Date(rec.testDate as string), data: rec });
+              }
+              for (const mr of maintRecords || []) {
+                items.push({ type: "maintenance", time: new Date(mr.updatedAt as string), data: mr });
               }
               items.sort((a, b) => b.time.getTime() - a.time.getTime());
               const displayed = items.slice(0, 12);
@@ -242,36 +246,91 @@ export default function DashboardPage() {
                       );
                     }
 
-                    // Test & tag record
-                    const rec = item.data;
-                    const ttAsset = rec.testTagAsset as Record<string, unknown> | null;
-                    const tester = rec.testedBy as Record<string, unknown> | null;
-                    const result = rec.result as string;
-                    const resultColor = result === "PASS"
+                    if (item.type === "test") {
+                      // Test & tag record
+                      const rec = item.data;
+                      const ttAsset = rec.testTagAsset as Record<string, unknown> | null;
+                      const tester = rec.testedBy as Record<string, unknown> | null;
+                      const result = rec.result as string;
+                      const resultColor = result === "PASS"
+                        ? "text-green-500"
+                        : result === "FAIL"
+                          ? "text-red-500"
+                          : "text-amber-500";
+
+                      return (
+                        <div key={`test-${rec.id}`} className="flex items-start gap-3">
+                          <div className="mt-0.5 rounded-full p-1.5 bg-blue-500/10 text-blue-500">
+                            <Zap className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">
+                              <span className="font-medium">
+                                {ttAsset?.description as string || ttAsset?.testTagId as string || "Item"}
+                              </span>
+                              {" "}
+                              <span className="text-muted-foreground">tested —</span>
+                              {" "}
+                              <span className={`font-medium ${resultColor}`}>
+                                {result}
+                              </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {tester?.name as string || "Unknown"} &middot;{" "}
+                              {formatDistanceToNow(item.time, { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Maintenance record
+                    const mr = item.data;
+                    const mrAssets = (mr.assets as Record<string, unknown>[]) || [];
+                    const firstAsset = mrAssets[0]?.asset as Record<string, unknown> | undefined;
+                    const firstModel = firstAsset?.model as Record<string, unknown> | undefined;
+                    const reporter = mr.reportedBy as Record<string, unknown> | null;
+                    const mrStatus = mr.status as string;
+                    const mrStatusColor = mrStatus === "COMPLETED"
                       ? "text-green-500"
-                      : result === "FAIL"
-                        ? "text-red-500"
-                        : "text-amber-500";
+                      : mrStatus === "IN_PROGRESS"
+                        ? "text-amber-500"
+                        : "text-blue-500";
+                    const mrStatusLabel: Record<string, string> = {
+                      SCHEDULED: "scheduled",
+                      IN_PROGRESS: "in progress",
+                      COMPLETED: "completed",
+                      CANCELLED: "cancelled",
+                    };
 
                     return (
-                      <div key={`test-${rec.id}`} className="flex items-start gap-3">
-                        <div className="mt-0.5 rounded-full p-1.5 bg-blue-500/10 text-blue-500">
-                          <Zap className="h-3.5 w-3.5" />
+                      <div key={`maint-${mr.id}`} className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full p-1.5 bg-amber-500/10 text-amber-500">
+                          <Wrench className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm">
-                            <span className="font-medium">
-                              {ttAsset?.description as string || ttAsset?.testTagId as string || "Item"}
-                            </span>
+                            <Link
+                              href={`/maintenance/${mr.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {mr.title as string}
+                            </Link>
                             {" "}
-                            <span className="text-muted-foreground">tested —</span>
+                            <span className="text-muted-foreground">—</span>
                             {" "}
-                            <span className={`font-medium ${resultColor}`}>
-                              {result}
+                            <span className={`font-medium ${mrStatusColor}`}>
+                              {mrStatusLabel[mrStatus] || mrStatus}
                             </span>
                           </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {firstModel
+                              ? `${firstAsset?.assetTag as string} ${firstModel.name as string}`
+                              : ""}
+                            {mrAssets.length > 1 ? ` + ${mrAssets.length - 1} more` : ""}
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            {tester?.name as string || "Unknown"} &middot;{" "}
+                            {reporter?.name as string || "Unknown"} &middot;{" "}
                             {formatDistanceToNow(item.time, { addSuffix: true })}
                           </p>
                         </div>

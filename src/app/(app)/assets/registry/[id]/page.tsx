@@ -279,7 +279,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="history">History ({asset.lineItems.length})</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance ({asset.maintenanceRecords.length})</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance ({asset.maintenanceLinks.length})</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="documents">Model Documents</TabsTrigger>
@@ -426,7 +426,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </TabsContent>
 
         <TabsContent value="maintenance" className="mt-4">
-          {asset.maintenanceRecords.length === 0 ? (
+          {asset.maintenanceLinks.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No maintenance records for this asset.
@@ -445,27 +445,30 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {asset.maintenanceRecords.map((mr) => (
-                    <TableRow key={mr.id}>
-                      <TableCell className="font-medium">{mr.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{mr.type.replace("_", " ")}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{mr.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {formatDate(mr.completedDate || mr.scheduledDate)}
-                      </TableCell>
-                      <TableCell>
-                        {mr.result ? (
-                          <Badge variant={mr.result === "PASS" ? "default" : "destructive"}>
-                            {mr.result}
-                          </Badge>
-                        ) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {asset.maintenanceLinks.map((link) => {
+                    const mr = link.maintenanceRecord;
+                    return (
+                      <TableRow key={mr.id}>
+                        <TableCell className="font-medium">{mr.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{mr.type.replace("_", " ")}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{mr.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {formatDate(mr.completedDate || mr.scheduledDate)}
+                        </TableCell>
+                        <TableCell>
+                          {mr.result ? (
+                            <Badge variant={mr.result === "PASS" ? "default" : "destructive"}>
+                              {mr.result}
+                            </Badge>
+                          ) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -86,7 +86,7 @@ export async function getUpcomingProjects() {
 export async function getRecentActivity() {
   const { organizationId } = await getOrgContext();
 
-  const [logs, testRecords] = await Promise.all([
+  const [logs, testRecords, maintenanceRecords] = await Promise.all([
     prisma.assetScanLog.findMany({
       where: { organizationId },
       include: {
@@ -107,7 +107,19 @@ export async function getRecentActivity() {
       orderBy: { testDate: "desc" },
       take: 10,
     }),
+    prisma.maintenanceRecord.findMany({
+      where: { organizationId },
+      include: {
+        assets: {
+          include: { asset: { include: { model: true } } },
+          take: 3,
+        },
+        reportedBy: { select: { id: true, name: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 10,
+    }),
   ]);
 
-  return serialize({ logs, testRecords });
+  return serialize({ logs, testRecords, maintenanceRecords });
 }

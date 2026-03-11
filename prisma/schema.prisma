@@ -608,7 +608,7 @@ model Asset {
   kit                Kit?           @relation(fields: [kitId], references: [id])
   kitItem            KitSerializedItem?
 
-  maintenanceRecords MaintenanceRecord[]
+  maintenanceLinks   MaintenanceRecordAsset[]
   lineItems          ProjectLineItem[]
   scanLogs           AssetScanLog[]
   media              AssetMedia[]
@@ -693,8 +693,6 @@ model MaintenanceRecord {
   id             String            @id @default(cuid())
   organizationId String
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assetId        String?
-  asset          Asset?            @relation(fields: [assetId], references: [id], onDelete: Cascade)
   kitId          String?
   kit            Kit?              @relation(fields: [kitId], references: [id], onDelete: Cascade)
   type           MaintenanceType
@@ -715,11 +713,24 @@ model MaintenanceRecord {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
+  assets MaintenanceRecordAsset[]
+
   @@index([organizationId])
-  @@index([assetId])
   @@index([status])
   @@index([scheduledDate])
   @@map("maintenance_record")
+}
+
+model MaintenanceRecordAsset {
+  id                  String            @id @default(cuid())
+  maintenanceRecordId String
+  maintenanceRecord   MaintenanceRecord @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
+  assetId             String
+  asset               Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([maintenanceRecordId, assetId])
+  @@index([assetId])
+  @@map("maintenance_record_asset")
 }
 
 // ─── Client ──────────────────────────────────────────────────────────────────

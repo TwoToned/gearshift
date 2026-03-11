@@ -27,13 +27,17 @@ export async function getNotifications(): Promise<AppNotification[]> {
       status: { in: ["SCHEDULED", "IN_PROGRESS"] },
       scheduledDate: { lt: now },
     },
-    include: { asset: { include: { model: true } } },
+    include: { assets: { include: { asset: { include: { model: true } } } } },
     take: 10,
   });
 
   for (const m of overdueMaintenance) {
-    const desc = m.asset
-      ? `${m.asset.assetTag} — ${m.asset.model.name} is overdue`
+    const firstAsset = m.assets[0]?.asset;
+    const assetCount = m.assets.length;
+    const desc = firstAsset
+      ? assetCount > 1
+        ? `${firstAsset.assetTag} — ${firstAsset.model.name} + ${assetCount - 1} more overdue`
+        : `${firstAsset.assetTag} — ${firstAsset.model.name} is overdue`
       : `${m.title} is overdue`;
     notifications.push({
       id: `maint-${m.id}`,

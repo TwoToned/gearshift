@@ -1,9 +1,13 @@
 "use client";
 
 import { use } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getMaintenanceRecord } from "@/server/maintenance";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { getMaintenanceRecord, deleteMaintenanceRecord } from "@/server/maintenance";
 import { MaintenanceForm } from "@/components/maintenance/maintenance-form";
+import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import type { MaintenanceFormValues } from "@/lib/validations/maintenance";
@@ -14,19 +18,33 @@ export default function MaintenanceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const { data: record, isLoading } = useQuery({
     queryKey: ["maintenance", id],
     queryFn: () => getMaintenanceRecord(id),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteMaintenanceRecord(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+      toast.success("Record deleted");
+      router.push("/maintenance");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
   if (!record) return <div className="text-muted-foreground">Record not found.</div>;
 
   const r = record as Record<string, unknown>;
+  const assetLinks = (r.assets as Array<{ assetId: string }>) || [];
   const initialData: MaintenanceFormValues & { id: string } = {
     id: r.id as string,
-    assetId: r.assetId as string,
+    assetIds: assetLinks.map((a) => a.assetId),
+    reportedById: (r.reportedById as string) || undefined,
     type: r.type as MaintenanceFormValues["type"],
     status: r.status as MaintenanceFormValues["status"],
     title: r.title as string,
@@ -50,9 +68,27 @@ export default function MaintenanceDetailPage({
     <RequirePermission resource="maintenance" action="read">
     <CanDo resource="maintenance" action="update" fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Edit Maintenance Record</h1>
-          <p className="text-muted-foreground">{r.title as string}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Edit Maintenance Record</h1>
+            <p className="text-muted-foreground">{r.title as string}</p>
+          </div>
+          <CanDo resource="maintenance" action="delete">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (confirm("Delete this maintenance record? This cannot be undone.")) {
+                  deleteMutation.mutate();
+                }
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </CanDo>
         </div>
         <MaintenanceForm initialData={initialData} />
       </div>

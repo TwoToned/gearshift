@@ -10,6 +10,7 @@ import {
   CalendarClock,
   CheckCircle2,
   XCircle,
+  Trash2,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -221,8 +222,10 @@ export default function MaintenancePage() {
               <SortableTableHead sortKey="title" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Title</SortableTableHead>
               <SortableTableHead sortKey="asset" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset</SortableTableHead>
               <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
+              <SortableTableHead sortKey="reportedBy" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Reported By</SortableTableHead>
               <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
               <SortableTableHead sortKey="scheduledDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Scheduled</SortableTableHead>
+              <SortableTableHead sortKey="completedDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Completed</SortableTableHead>
               <SortableTableHead sortKey="result" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Result</SortableTableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -230,20 +233,19 @@ export default function MaintenancePage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : records.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No maintenance records found.
                 </TableCell>
               </TableRow>
             ) : (
               records.map((record) => {
-                const asset = record.asset as Record<string, unknown> | null;
-                const model = asset?.model as Record<string, unknown> | null;
+                const assets = (record.assets as Record<string, unknown>[]) || [];
                 const status = statusConfig[record.status as string];
                 const isOverdue =
                   (record.status === "SCHEDULED" || record.status === "IN_PROGRESS") &&
@@ -261,14 +263,27 @@ export default function MaintenancePage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {asset && (
-                        <div>
-                          <span className="font-mono text-xs">
-                            {asset.assetTag as string}
-                          </span>
-                          <span className="text-muted-foreground text-xs ml-2">
-                            {model?.name as string}
-                          </span>
+                      {assets.length > 0 && (
+                        <div className="space-y-0.5">
+                          {assets.slice(0, 2).map((link) => {
+                            const asset = link.asset as Record<string, unknown>;
+                            const model = asset?.model as Record<string, unknown> | null;
+                            return (
+                              <div key={link.id as string}>
+                                <span className="font-mono text-xs">
+                                  {asset.assetTag as string}
+                                </span>
+                                <span className="text-muted-foreground text-xs ml-2">
+                                  {model?.name as string}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {assets.length > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{assets.length - 2} more
+                            </span>
+                          )}
                         </div>
                       )}
                     </TableCell>
@@ -276,6 +291,9 @@ export default function MaintenancePage() {
                       <span className="text-sm">
                         {typeLabels[record.type as string] || (record.type as string)}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {(record.reportedBy as Record<string, unknown>)?.name as string || "—"}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -291,6 +309,11 @@ export default function MaintenancePage() {
                         ? format(new Date(record.scheduledDate as string), "MMM d, yyyy")
                         : "—"}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {record.completedDate
+                        ? format(new Date(record.completedDate as string), "MMM d, yyyy")
+                        : "—"}
+                    </TableCell>
                     <TableCell>
                       {record.result ? (
                         <Badge
@@ -304,19 +327,19 @@ export default function MaintenancePage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {record.status === "CANCELLED" && (
-                        <CanDo resource="maintenance" action="delete">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() =>
-                              deleteMutation.mutate(record.id as string)
+                      <CanDo resource="maintenance" action="delete">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => {
+                            if (confirm("Delete this maintenance record?")) {
+                              deleteMutation.mutate(record.id as string);
                             }
-                          >
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </CanDo>
-                      )}
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </CanDo>
                     </TableCell>
                   </TableRow>
                 );

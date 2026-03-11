@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +23,21 @@ import {
 import { getNotifications, type AppNotification } from "@/server/notifications";
 import { formatDistanceToNow } from "date-fns";
 
+const DISMISSED_KEY = "gearflow-dismissed-notifications";
+
+function getDismissedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedIds(ids: Set<string>) {
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+}
+
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   overdue_maintenance: Wrench,
   overdue_return: PackageX,
@@ -37,13 +53,47 @@ const severityColors: Record<string, string> = {
 
 export function Notifications() {
   const router = useRouter();
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setDismissed(getDismissedIds());
+  }, []);
+
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: getNotifications,
-    refetchInterval: 60_000, // refresh every minute
+    refetchInterval: 60_000,
   });
 
-  const count = notifications?.length || 0;
+  // Prune dismissed IDs that no longer exist in the current notification list
+  useEffect(() => {
+    if (!notifications || notifications.length === 0) return;
+    const currentIds = new Set(notifications.map((n) => n.id));
+    const stored = getDismissedIds();
+    let changed = false;
+    for (const id of stored) {
+      if (!currentIds.has(id)) {
+        stored.delete(id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      saveDismissedIds(stored);
+      setDismissed(new Set(stored));
+    }
+  }, [notifications]);
+
+  const dismiss = useCallback((id: string) => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      saveDismissedIds(next);
+      return next;
+    });
+  }, []);
+
+  const visible = (notifications || []).filter((n) => !dismissed.has(n.id)).slice(0, 10);
+  const count = visible.length;
 
   return (
     <DropdownMenu>
@@ -64,12 +114,15 @@ export function Notifications() {
               All clear — no notifications.
             </div>
           ) : (
-            (notifications as AppNotification[]).slice(0, 10).map((n) => {
+            visible.map((n) => {
               const Icon = typeIcons[n.type] || Bell;
               return (
                 <DropdownMenuItem
                   key={n.id}
-                  onClick={() => router.push(n.href)}
+                  onClick={() => {
+                    dismiss(n.id);
+                    router.push(n.href);
+                  }}
                   className="flex items-start gap-3 py-2.5"
                 >
                   <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${severityColors[n.severity] || ""}`} />

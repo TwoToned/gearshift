@@ -9,6 +9,13 @@ import {
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 
+const assetInclude = {
+  assets: {
+    include: { asset: { include: { model: true } } },
+    orderBy: { asset: { assetTag: "asc" as const } },
+  },
+};
+
 export async function getMaintenanceRecords(params?: {
   search?: string;
   status?: string;
@@ -26,13 +33,13 @@ export async function getMaintenanceRecords(params?: {
     organizationId,
     ...(status && { status: status as Prisma.EnumMaintenanceStatusFilter }),
     ...(type && { type: type as Prisma.EnumMaintenanceTypeFilter }),
-    ...(assetId && { assetId }),
+    ...(assetId && { assets: { some: { assetId } } }),
     ...(search && {
       OR: [
         { title: { contains: search, mode: "insensitive" } },
         { description: { contains: search, mode: "insensitive" } },
-        { asset: { assetTag: { contains: search, mode: "insensitive" } } },
-        { asset: { model: { name: { contains: search, mode: "insensitive" } } } },
+        { assets: { some: { asset: { assetTag: { contains: search, mode: "insensitive" } } } } },
+        { assets: { some: { asset: { model: { name: { contains: search, mode: "insensitive" } } } } } },
       ],
     }),
   };
@@ -41,12 +48,12 @@ export async function getMaintenanceRecords(params?: {
     prisma.maintenanceRecord.findMany({
       where,
       include: {
-        asset: { include: { model: true } },
+        ...assetInclude,
         assignedTo: true,
         reportedBy: true,
       },
       orderBy: sortBy
-        ? (sortBy === "asset" ? { asset: { assetTag: sortOrder || "asc" } } : { [sortBy]: sortOrder || "asc" })
+        ? { [sortBy]: sortOrder || "asc" }
         : [{ status: "asc" }, { scheduledDate: "asc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -70,7 +77,7 @@ export async function getMaintenanceRecord(id: string) {
     await prisma.maintenanceRecord.findUnique({
       where: { id, organizationId },
       include: {
-        asset: { include: { model: true } },
+        ...assetInclude,
         assignedTo: true,
         reportedBy: true,
       },
@@ -82,7 +89,6 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
   const { organizationId, userId } = await getOrgContext();
   const parsed = maintenanceSchema.parse(data);
 
-  // Support both single assetId and multiple assetIds
   const assetIds = parsed.assetIds?.length
     ? parsed.assetIds
     : parsed.assetId
@@ -91,31 +97,29 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
 
   if (assetIds.length === 0) throw new Error("At least one asset is required");
 
-  const records = await prisma.$transaction(
-    assetIds.map((assetId) =>
-      prisma.maintenanceRecord.create({
-        data: {
-          organizationId,
-          assetId,
-          type: parsed.type,
-          status: parsed.status,
-          title: parsed.title,
-          description: parsed.description || null,
-          reportedById: userId,
-          assignedToId: parsed.assignedToId || null,
-          scheduledDate: parsed.scheduledDate ?? null,
-          completedDate: parsed.completedDate ?? null,
-          cost: parsed.cost ?? null,
-          partsUsed: parsed.partsUsed || null,
-          result: parsed.result ?? null,
-          nextDueDate: parsed.nextDueDate ?? null,
-        },
-        include: {
-          asset: { include: { model: true } },
-        },
-      })
-    )
-  );
+  const record = await prisma.maintenanceRecord.create({
+    data: {
+      organizationId,
+      type: parsed.type,
+      status: parsed.status,
+      title: parsed.title,
+      description: parsed.description || null,
+      reportedById: parsed.reportedById || userId,
+      assignedToId: parsed.assignedToId || null,
+      scheduledDate: parsed.scheduledDate ?? null,
+      completedDate: parsed.completedDate ?? null,
+      cost: parsed.cost ?? null,
+      partsUsed: parsed.partsUsed || null,
+      result: parsed.result ?? null,
+      nextDueDate: parsed.nextDueDate ?? null,
+      assets: {
+        create: assetIds.map((assetId) => ({ assetId })),
+      },
+    },
+    include: {
+      ...assetInclude,
+    },
+  });
 
   // Update asset statuses
   if (parsed.status === "IN_PROGRESS") {
@@ -134,7 +138,7 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
     });
   }
 
-  return serialize(records.length === 1 ? records[0] : records);
+  return serialize(record);
 }
 
 export async function updateMaintenanceRecord(
@@ -146,9 +150,22 @@ export async function updateMaintenanceRecord(
 
   const existing = await prisma.maintenanceRecord.findUnique({
     where: { id, organizationId },
+    include: { assets: true },
   });
 
   if (!existing) throw new Error("Maintenance record not found");
+
+  const existingAssetIds = existing.assets.map((a) => a.assetId);
+
+  // Determine new asset list (edit mode may update assets)
+  const newAssetIds = parsed.assetIds?.length
+    ? parsed.assetIds
+    : parsed.assetId
+      ? [parsed.assetId]
+      : existingAssetIds;
+
+  const toAdd = newAssetIds.filter((id) => !existingAssetIds.includes(id));
+  const toRemove = existingAssetIds.filter((id) => !newAssetIds.includes(id));
 
   const record = await prisma.maintenanceRecord.update({
     where: { id, organizationId },
@@ -157,6 +174,7 @@ export async function updateMaintenanceRecord(
       status: parsed.status,
       title: parsed.title,
       description: parsed.description || null,
+      reportedById: parsed.reportedById || undefined,
       assignedToId: parsed.assignedToId || null,
       scheduledDate: parsed.scheduledDate ?? null,
       completedDate: parsed.completedDate ?? null,
@@ -164,24 +182,28 @@ export async function updateMaintenanceRecord(
       partsUsed: parsed.partsUsed || null,
       result: parsed.result ?? null,
       nextDueDate: parsed.nextDueDate ?? null,
+      assets: {
+        deleteMany: toRemove.length > 0 ? { assetId: { in: toRemove } } : undefined,
+        create: toAdd.map((assetId) => ({ assetId })),
+      },
     },
     include: {
-      asset: { include: { model: true } },
+      ...assetInclude,
     },
   });
 
-  // Handle status transitions (use the existing record's assetId)
-  if (existing.assetId) {
+  // Handle status transitions for all linked assets
+  if (newAssetIds.length > 0) {
     if (parsed.status === "IN_PROGRESS" && existing.status !== "IN_PROGRESS") {
-      await prisma.asset.update({
-        where: { id: existing.assetId },
+      await prisma.asset.updateMany({
+        where: { id: { in: newAssetIds } },
         data: { status: "IN_MAINTENANCE" },
       });
     }
 
     if (parsed.status === "COMPLETED" && existing.status !== "COMPLETED") {
-      await prisma.asset.update({
-        where: { id: existing.assetId },
+      await prisma.asset.updateMany({
+        where: { id: { in: newAssetIds } },
         data: {
           status: parsed.result === "FAIL" ? "IN_MAINTENANCE" : "AVAILABLE",
         },
@@ -189,8 +211,8 @@ export async function updateMaintenanceRecord(
     }
 
     if (parsed.status === "CANCELLED" && existing.status === "IN_PROGRESS") {
-      await prisma.asset.update({
-        where: { id: existing.assetId },
+      await prisma.asset.updateMany({
+        where: { id: { in: newAssetIds } },
         data: { status: "AVAILABLE" },
       });
     }
@@ -204,14 +226,15 @@ export async function deleteMaintenanceRecord(id: string) {
 
   const record = await prisma.maintenanceRecord.findUnique({
     where: { id, organizationId },
+    include: { assets: true },
   });
 
   if (!record) throw new Error("Record not found");
 
-  // If the record was keeping the asset in maintenance, release it
-  if (record.status === "IN_PROGRESS" && record.assetId) {
-    await prisma.asset.update({
-      where: { id: record.assetId },
+  // If the record was keeping assets in maintenance, release them
+  if (record.status === "IN_PROGRESS" && record.assets.length > 0) {
+    await prisma.asset.updateMany({
+      where: { id: { in: record.assets.map((a) => a.assetId) } },
       data: { status: "AVAILABLE" },
     });
   }
