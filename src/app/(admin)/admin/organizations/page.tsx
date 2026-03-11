@@ -16,7 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, Trash2, Building2 } from "lucide-react";
+import { Search, Trash2, Building2, Eye } from "lucide-react";
+import Link from "next/link";
 import {
   getAllOrganizations,
   adminDeleteOrganization,
@@ -108,10 +109,13 @@ export default function AdminOrganizationsPage() {
                       (org: any) => (
                         <tr key={org.id} className="border-b hover:bg-muted/30">
                           <td className="p-3">
-                            <div className="flex items-center gap-2">
+                            <Link
+                              href={`/admin/organizations/${org.id}`}
+                              className="flex items-center gap-2 hover:underline"
+                            >
                               <Building2 className="h-4 w-4 text-muted-foreground" />
                               <span className="font-medium">{org.name}</span>
-                            </div>
+                            </Link>
                           </td>
                           <td className="p-3 text-muted-foreground font-mono text-xs">
                             {org.slug}
@@ -126,16 +130,26 @@ export default function AdminOrganizationsPage() {
                             {new Date(org.createdAt).toLocaleDateString()}
                           </td>
                           <td className="p-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() =>
-                                setDeleteTarget({ id: org.id, name: org.name })
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Manage organization"
+                                render={<Link href={`/admin/organizations/${org.id}`} />}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() =>
+                                  setDeleteTarget({ id: org.id, name: org.name })
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ),

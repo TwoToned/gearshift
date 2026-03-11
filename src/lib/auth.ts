@@ -102,6 +102,23 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        before: async () => {
+          // Enforce registration policy
+          const settings = await prisma.siteSettings.findFirst();
+          const policy = settings?.registrationPolicy ?? "OPEN";
+          if (policy === "DISABLED" || policy === "INVITE_ONLY") {
+            // Allow if this is the very first user (bootstrap)
+            const count = await prisma.user.count();
+            if (count > 0) {
+              throw new Error(
+                policy === "DISABLED"
+                  ? "Registration is currently disabled."
+                  : "Registration is invite-only. Contact an administrator.",
+              );
+            }
+          }
+          return undefined;
+        },
         after: async (user) => {
           // Auto-promote first user to site admin
           const count = await prisma.user.count();

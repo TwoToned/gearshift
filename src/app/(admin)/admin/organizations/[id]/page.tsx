@@ -1,0 +1,599 @@
+"use client";
+
+import { use, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import Link from "next/link";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectSeparator,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Crown,
+  Package,
+  Boxes,
+  FolderKanban,
+  BoxIcon,
+  UserPlus,
+  Trash2,
+  Shield,
+} from "lucide-react";
+import {
+  adminGetOrganizationDetails,
+  adminGetOrgCustomRoles,
+  adminAddMemberToOrg,
+  adminRemoveMemberFromOrg,
+  adminChangeMemberRole,
+  adminTransferOwnership,
+} from "@/server/site-admin";
+
+const BUILT_IN_ROLES = [
+  { value: "owner", label: "Owner" },
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "member", label: "Member" },
+  { value: "staff", label: "Staff" },
+  { value: "warehouse", label: "Warehouse" },
+  { value: "viewer", label: "Viewer" },
+];
+
+const ASSIGNABLE_BUILT_IN_ROLES = BUILT_IN_ROLES.filter(
+  (r) => r.value !== "owner",
+);
+
+function getRoleLabel(
+  role: string,
+  customRoles: Array<{ id: string; name: string; color?: string | null }>,
+) {
+  if (role.startsWith("custom:")) {
+    const id = role.slice("custom:".length);
+    const cr = customRoles.find((r) => r.id === id);
+    return cr?.name ?? "Custom Role";
+  }
+  return BUILT_IN_ROLES.find((r) => r.value === role)?.label ?? role;
+}
+
+function getRoleBadgeColor(
+  role: string,
+  customRoles: Array<{ id: string; color?: string | null }>,
+) {
+  if (role.startsWith("custom:")) {
+    const id = role.slice("custom:".length);
+    const cr = customRoles.find((r) => r.id === id);
+    return cr?.color ?? undefined;
+  }
+  return undefined;
+}
+
+export default function AdminOrgDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id: orgId } = use(params);
+  const queryClient = useQueryClient();
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [addEmail, setAddEmail] = useState("");
+  const [addRole, setAddRole] = useState("member");
+
+  const [removeTarget, setRemoveTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [transferTarget, setTransferTarget] = useState<{
+    memberId: string;
+    userId: string;
+    name: string;
+  } | null>(null);
+
+  const { data: org, isLoading } = useQuery({
+    queryKey: ["admin-org-detail", orgId],
+    queryFn: () => adminGetOrganizationDetails(orgId),
+  });
+
+  const { data: customRoles = [] } = useQuery({
+    queryKey: ["admin-org-custom-roles", orgId],
+    queryFn: () => adminGetOrgCustomRoles(orgId),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () => adminAddMemberToOrg(orgId, addEmail, addRole),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-org-detail", orgId] });
+      toast.success("Member added");
+      setAddOpen(false);
+      setAddEmail("");
+      setAddRole("member");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (memberId: string) =>
+      adminRemoveMemberFromOrg(orgId, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-org-detail", orgId] });
+      toast.success("Member removed");
+      setRemoveTarget(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const roleChangeMutation = useMutation({
+    mutationFn: ({
+      memberId,
+      newRole,
+    }: {
+      memberId: string;
+      newRole: string;
+    }) => adminChangeMemberRole(orgId, memberId, newRole),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-org-detail", orgId] });
+      toast.success("Role updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: (newOwnerId: string) =>
+      adminTransferOwnership(orgId, newOwnerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-org-detail", orgId] });
+      toast.success("Ownership transferred");
+      setTransferTarget(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const members: any[] = org?.members ?? [];
+  const counts = org?._count ?? {
+    assets: 0,
+    bulkAssets: 0,
+    projects: 0,
+    kits: 0,
+  };
+
+  return (
+    <AdminShell>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" render={<Link href="/admin/organizations" />}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {isLoading ? "Loading..." : org?.name}
+            </h1>
+            {org && (
+              <p className="text-muted-foreground text-sm font-mono">
+                {org.slug}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        {org && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Package className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-2xl font-bold">{counts.assets}</p>
+                  <p className="text-xs text-muted-foreground">Assets</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Boxes className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-2xl font-bold">{counts.bulkAssets}</p>
+                  <p className="text-xs text-muted-foreground">Bulk Assets</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <FolderKanban className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-2xl font-bold">{counts.projects}</p>
+                  <p className="text-xs text-muted-foreground">Projects</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <BoxIcon className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-2xl font-bold">{counts.kits}</p>
+                  <p className="text-xs text-muted-foreground">Kits</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Members */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Members ({members.length})</CardTitle>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Member
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="p-3 text-left font-medium">User</th>
+                    <th className="p-3 text-left font-medium">Email</th>
+                    <th className="p-3 text-left font-medium">Role</th>
+                    <th className="p-3 text-left font-medium">Joined</th>
+                    <th className="p-3 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : members.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        No members.
+                      </td>
+                    </tr>
+                  ) : (
+                    members.map((m: any) => {
+                      const isOwner = m.role === "owner";
+                      const badgeColor = getRoleBadgeColor(
+                        m.role,
+                        customRoles,
+                      );
+
+                      return (
+                        <tr
+                          key={m.id}
+                          className="border-b hover:bg-muted/30"
+                        >
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              {m.user.image ? (
+                                <img
+                                  src={m.user.image}
+                                  alt=""
+                                  className="h-7 w-7 rounded-full"
+                                />
+                              ) : (
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                  {(m.user.name || "?")[0].toUpperCase()}
+                                </div>
+                              )}
+                              <span className="font-medium">
+                                {m.user.name || "Unnamed"}
+                              </span>
+                              {isOwner && (
+                                <Crown className="h-3.5 w-3.5 text-yellow-500" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            {m.user.email}
+                          </td>
+                          <td className="p-3">
+                            {isOwner ? (
+                              <Badge variant="outline">Owner</Badge>
+                            ) : (
+                              <Select
+                                value={m.role}
+                                onValueChange={(newRole) =>
+                                  roleChangeMutation.mutate({
+                                    memberId: m.id,
+                                    newRole,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-[160px]">
+                                  <SelectValue>
+                                    <Badge
+                                      variant="secondary"
+                                      style={
+                                        badgeColor
+                                          ? { backgroundColor: badgeColor, color: "#fff" }
+                                          : undefined
+                                      }
+                                    >
+                                      {getRoleLabel(m.role, customRoles)}
+                                    </Badge>
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ASSIGNABLE_BUILT_IN_ROLES.map((r) => (
+                                    <SelectItem key={r.value} value={r.value}>
+                                      {r.label}
+                                    </SelectItem>
+                                  ))}
+                                  {customRoles.length > 0 && (
+                                    <>
+                                      <SelectSeparator />
+                                      {customRoles.map((cr: any) => (
+                                        <SelectItem
+                                          key={cr.id}
+                                          value={`custom:${cr.id}`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            {cr.color && (
+                                              <span
+                                                className="inline-block h-2.5 w-2.5 rounded-full"
+                                                style={{
+                                                  backgroundColor: cr.color,
+                                                }}
+                                              />
+                                            )}
+                                            {cr.name}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            {new Date(m.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {!isOwner && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Transfer ownership"
+                                    onClick={() =>
+                                      setTransferTarget({
+                                        memberId: m.id,
+                                        userId: m.userId,
+                                        name: m.user.name || m.user.email,
+                                      })
+                                    }
+                                  >
+                                    <Crown className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    title="Remove member"
+                                    onClick={() =>
+                                      setRemoveTarget({
+                                        id: m.id,
+                                        name: m.user.name || m.user.email,
+                                      })
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Custom Roles Info */}
+        {customRoles.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Custom Roles ({customRoles.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {customRoles.map((cr: any) => (
+                  <Badge
+                    key={cr.id}
+                    variant="secondary"
+                    style={
+                      cr.color
+                        ? { backgroundColor: cr.color, color: "#fff" }
+                        : undefined
+                    }
+                  >
+                    {cr.name}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Add Member Dialog */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddOpen(false);
+            setAddEmail("");
+            setAddRole("member");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Member to Organization</DialogTitle>
+            <DialogDescription>
+              Add an existing user to this organization by email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                placeholder="user@example.com"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role</label>
+              <Select value={addRole} onValueChange={(v) => { if (v) setAddRole(v); }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_BUILT_IN_ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                  {customRoles.length > 0 && (
+                    <>
+                      <SelectSeparator />
+                      {customRoles.map((cr: any) => (
+                        <SelectItem key={cr.id} value={`custom:${cr.id}`}>
+                          <div className="flex items-center gap-2">
+                            {cr.color && (
+                              <span
+                                className="inline-block h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: cr.color }}
+                              />
+                            )}
+                            {cr.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!addEmail.trim() || addMutation.isPending}
+              onClick={() => addMutation.mutate()}
+            >
+              {addMutation.isPending ? "Adding..." : "Add Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Member Dialog */}
+      <Dialog
+        open={!!removeTarget}
+        onOpenChange={(open) => {
+          if (!open) setRemoveTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Member</DialogTitle>
+            <DialogDescription>
+              Remove <strong>{removeTarget?.name}</strong> from this
+              organization? They will lose access to all org data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={removeMutation.isPending}
+              onClick={() =>
+                removeTarget && removeMutation.mutate(removeTarget.id)
+              }
+            >
+              {removeMutation.isPending ? "Removing..." : "Remove Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Ownership Dialog */}
+      <Dialog
+        open={!!transferTarget}
+        onOpenChange={(open) => {
+          if (!open) setTransferTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transfer Ownership</DialogTitle>
+            <DialogDescription>
+              Transfer ownership of this organization to{" "}
+              <strong>{transferTarget?.name}</strong>? The current owner will be
+              demoted to admin.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={transferMutation.isPending}
+              onClick={() =>
+                transferTarget &&
+                transferMutation.mutate(transferTarget.userId)
+              }
+            >
+              {transferMutation.isPending
+                ? "Transferring..."
+                : "Transfer Ownership"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminShell>
+  );
+}

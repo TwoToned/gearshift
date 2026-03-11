@@ -314,6 +314,92 @@ export async function adminTransferOwnership(orgId: string, newOwnerId: string) 
   });
 }
 
+// ─── Org Member Management (Site Admin) ───────────────────────────────────
+
+export async function adminGetOrgCustomRoles(orgId: string) {
+  await requireSiteAdmin();
+
+  const roles = await prisma.customRole.findMany({
+    where: { organizationId: orgId },
+    orderBy: { name: "asc" },
+  });
+
+  return serialize(
+    roles.map((r) => ({
+      ...r,
+      permissions: JSON.parse(r.permissions),
+    })),
+  );
+}
+
+export async function adminAddMemberToOrg(orgId: string, email: string, role: string) {
+  await requireSiteAdmin();
+
+  const user = await prisma.user.findFirst({
+    where: { email: email.toLowerCase().trim() },
+  });
+  if (!user) throw new Error("No account found with that email.");
+
+  const existing = await prisma.member.findFirst({
+    where: { organizationId: orgId, userId: user.id },
+  });
+  if (existing) throw new Error("User is already a member of this organization.");
+
+  // Validate custom role belongs to this org
+  if (role.startsWith("custom:")) {
+    const customRoleId = role.slice("custom:".length);
+    const customRole = await prisma.customRole.findFirst({
+      where: { id: customRoleId, organizationId: orgId },
+    });
+    if (!customRole) throw new Error("Custom role not found in this organization.");
+  }
+
+  await prisma.member.create({
+    data: { organizationId: orgId, userId: user.id, role },
+  });
+
+  return { success: true };
+}
+
+export async function adminRemoveMemberFromOrg(orgId: string, memberId: string) {
+  await requireSiteAdmin();
+
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, organizationId: orgId },
+  });
+  if (!member) throw new Error("Member not found.");
+  if (member.role === "owner") throw new Error("Cannot remove the owner. Transfer ownership first.");
+
+  await prisma.member.delete({ where: { id: memberId } });
+  return { success: true };
+}
+
+export async function adminChangeMemberRole(orgId: string, memberId: string, newRole: string) {
+  await requireSiteAdmin();
+
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, organizationId: orgId },
+  });
+  if (!member) throw new Error("Member not found.");
+  if (member.role === "owner") throw new Error("Cannot change the owner's role. Transfer ownership instead.");
+
+  // Validate custom role belongs to this org
+  if (newRole.startsWith("custom:")) {
+    const customRoleId = newRole.slice("custom:".length);
+    const customRole = await prisma.customRole.findFirst({
+      where: { id: customRoleId, organizationId: orgId },
+    });
+    if (!customRole) throw new Error("Custom role not found in this organization.");
+  }
+
+  await prisma.member.update({
+    where: { id: memberId },
+    data: { role: newRole },
+  });
+
+  return { success: true };
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────────────
 
 export async function getAdminDashboardStats() {

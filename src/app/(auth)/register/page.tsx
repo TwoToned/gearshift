@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signUp } from "@/lib/auth-client";
@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldX } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,6 +27,14 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [policy, setPolicy] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/registration-policy", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setPolicy(d.policy))
+      .catch(() => setPolicy("OPEN"));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +56,64 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  if (policy === null) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (policy === "DISABLED") {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive text-destructive-foreground">
+            <ShieldX className="h-5 w-5" />
+          </div>
+          <CardTitle className="text-xl">Registration Disabled</CardTitle>
+          <CardDescription>
+            New account registration is currently disabled. Contact an administrator for access.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="justify-center">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  if (policy === "INVITE_ONLY") {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <ShieldX className="h-5 w-5" />
+          </div>
+          <CardTitle className="text-xl">Invite Only</CardTitle>
+          <CardDescription>
+            Registration is invite-only. Contact an administrator to get an invitation.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="justify-center">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card>
