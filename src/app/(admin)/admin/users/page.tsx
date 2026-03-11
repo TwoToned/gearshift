@@ -23,7 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, MoreHorizontal, Shield, ShieldOff, Ban, CheckCircle, Trash2, KeyRound } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Search, MoreHorizontal, Shield, ShieldOff, Ban, CheckCircle, Trash2, KeyRound, UserPlus, Loader2 } from "lucide-react";
 import {
   getAllUsers,
   promoteToSiteAdmin,
@@ -32,6 +33,7 @@ import {
   unbanUser,
   adminDeleteUser,
   forceDisable2FA,
+  adminInviteUser,
 } from "@/server/site-admin";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -42,6 +44,8 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users", search, page],
@@ -106,6 +110,17 @@ export default function AdminUsersPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const inviteMutation = useMutation({
+    mutationFn: adminInviteUser,
+    onSuccess: (_data) => {
+      invalidate();
+      toast.success(`Invitation sent to ${inviteEmail}`);
+      setInviteOpen(false);
+      setInviteEmail("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   return (
     <AdminShell>
       <div className="space-y-6">
@@ -129,6 +144,10 @@ export default function AdminUsersPage() {
               className="pl-9"
             />
           </div>
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Invite User
+          </Button>
         </div>
 
         <Card>
@@ -328,6 +347,63 @@ export default function AdminUsersPage() {
           </div>
         )}
       </div>
+
+      {/* Invite User Dialog */}
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInviteOpen(false);
+            setInviteEmail("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>
+              Send an invitation email to a new user. They will be able to create
+              an account even if registration is disabled.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              inviteMutation.mutate(inviteEmail);
+            }}
+          >
+            <div className="space-y-2 py-4">
+              <Label htmlFor="invite-email">Email address</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="user@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setInviteOpen(false);
+                  setInviteEmail("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={inviteMutation.isPending}>
+                {inviteMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Send Invitation
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation */}
       <Dialog

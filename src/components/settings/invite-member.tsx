@@ -44,9 +44,15 @@ export function InviteMember() {
 
   const addMutation = useMutation({
     mutationFn: () => addMemberByEmail(email, role),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["org-members"] });
-      toast.success(`${email} added to your organization`);
+      queryClient.invalidateQueries({ queryKey: ["pending-invitations"] });
+      const data = result as { invited?: boolean };
+      if (data.invited) {
+        toast.success(`Invitation sent to ${email}`);
+      } else {
+        toast.success(`${email} added to your organization`);
+      }
       setEmail("");
     },
     onError: (e) => toast.error(e.message),

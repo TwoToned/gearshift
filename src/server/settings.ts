@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
+import { sendEmail } from "@/lib/email";
+import { getPlatformName } from "@/lib/platform";
 
 export interface OrgBranding {
   primaryColor?: string;
@@ -242,7 +244,7 @@ export async function getNextAssetTag(): Promise<string> {
 const VALID_BUILT_IN_ROLES = ["admin", "manager", "member", "staff", "warehouse", "viewer"] as const;
 
 export async function addMemberByEmail(email: string, role: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId, userId } = await getOrgContext();
 
   // Validate: either a built-in role or a custom role belonging to this org
   const isBuiltIn = (VALID_BUILT_IN_ROLES as readonly string[]).includes(role);
@@ -260,34 +262,84 @@ export async function addMemberByEmail(email: string, role: string) {
     if (!customRole) throw new Error("Custom role not found in this organization.");
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Check for existing pending invitation
+  const existingInvite = await prisma.invitation.findFirst({
+    where: { organizationId, email: normalizedEmail, status: "pending" },
+  });
+  if (existingInvite) {
+    throw new Error("An invitation has already been sent to this email.");
+  }
+
   // Find user by email
   const user = await prisma.user.findFirst({
-    where: { email: email.toLowerCase().trim() },
+    where: { email: normalizedEmail },
   });
 
-  if (!user) {
-    throw new Error("No account found with that email. They need to register first.");
+  if (user) {
+    // Check if already a member
+    const existing = await prisma.member.findFirst({
+      where: { organizationId, userId: user.id },
+    });
+
+    if (existing) {
+      throw new Error("This person is already a member of your organization.");
+    }
+
+    // User exists — add directly as member
+    const member = await prisma.member.create({
+      data: {
+        organizationId,
+        userId: user.id,
+        role,
+      },
+      include: { user: true },
+    });
+
+    return serialize(member);
   }
 
-  // Check if already a member
-  const existing = await prisma.member.findFirst({
-    where: { organizationId, userId: user.id },
+  // User doesn't exist — create invitation and send registration email
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true },
   });
 
-  if (existing) {
-    throw new Error("This person is already a member of your organization.");
-  }
-
-  const member = await prisma.member.create({
+  const invitation = await prisma.invitation.create({
     data: {
       organizationId,
-      userId: user.id,
+      email: normalizedEmail,
       role,
+      status: "pending",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      inviterId: userId,
     },
-    include: { user: true },
   });
 
-  return serialize(member);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const registerUrl = `${baseUrl}/register?invite=${invitation.id}`;
+  const pName = await getPlatformName();
+
+  await sendEmail({
+    to: normalizedEmail,
+    subject: `You've been invited to ${org?.name || "an organization"} on ${pName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>You've been invited to join ${org?.name || "an organization"}</h2>
+        <p>You've been invited to join <strong>${org?.name}</strong> as a <strong>${role}</strong> on ${pName}.</p>
+        <p>Click the button below to create your account and accept the invitation.</p>
+        <p>
+          <a href="${registerUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0d9488; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+            Create Account &amp; Join
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">This invitation expires in 7 days.</p>
+      </div>
+    `,
+  });
+
+  return serialize({ id: invitation.id, invited: true, email: normalizedEmail });
 }
 
 export async function removeMember(memberId: string) {

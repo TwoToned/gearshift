@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signUp } from "@/lib/auth-client";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -20,8 +20,10 @@ import {
 import { toast } from "sonner";
 import { Loader2, ShieldX } from "lucide-react";
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteId = searchParams.get("invite");
   const { name: platformName, icon: platformIcon } = usePlatformBranding();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -48,7 +50,11 @@ export default function RegisterPage() {
       if (result.error) {
         toast.error(result.error.message || "Registration failed");
       } else {
-        router.push("/onboarding");
+        if (inviteId) {
+          router.push(`/invite/${inviteId}`);
+        } else {
+          router.push("/no-organization");
+        }
       }
     } catch {
       toast.error("Something went wrong");
@@ -67,7 +73,7 @@ export default function RegisterPage() {
     );
   }
 
-  if (policy === "DISABLED") {
+  if (policy === "DISABLED" && !inviteId) {
     return (
       <Card>
         <CardHeader className="text-center">
@@ -91,7 +97,7 @@ export default function RegisterPage() {
     );
   }
 
-  if (policy === "INVITE_ONLY") {
+  if (policy === "INVITE_ONLY" && !inviteId) {
     return (
       <Card>
         <CardHeader className="text-center">
@@ -181,5 +187,19 @@ export default function RegisterPage() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }

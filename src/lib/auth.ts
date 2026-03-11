@@ -55,7 +55,7 @@ export const auth = betterAuth({
   },
   plugins: [
     organization({
-      allowUserToCreateOrganization: true,
+      allowUserToCreateOrganization: false,
       organizationLimit: 5,
       creatorRole: "owner",
       memberRoleHierarchy: ["owner", "admin", "manager", "member", "staff", "warehouse", "viewer"],
@@ -102,7 +102,7 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: async () => {
+        before: async (user) => {
           // Enforce registration policy
           const settings = await prisma.siteSettings.findFirst();
           const policy = settings?.registrationPolicy ?? "OPEN";
@@ -110,11 +110,21 @@ export const auth = betterAuth({
             // Allow if this is the very first user (bootstrap)
             const count = await prisma.user.count();
             if (count > 0) {
-              throw new Error(
-                policy === "DISABLED"
-                  ? "Registration is currently disabled."
-                  : "Registration is invite-only. Contact an administrator.",
-              );
+              // Allow if this user has a pending invitation (invited by org admin or site admin)
+              const pendingInvite = await prisma.invitation.findFirst({
+                where: {
+                  email: (user as { email?: string }).email?.toLowerCase(),
+                  status: "pending",
+                  expiresAt: { gte: new Date() },
+                },
+              });
+              if (!pendingInvite) {
+                throw new Error(
+                  policy === "DISABLED"
+                    ? "Registration is currently disabled."
+                    : "Registration is invite-only. Contact an administrator.",
+                );
+              }
             }
           }
           return undefined;

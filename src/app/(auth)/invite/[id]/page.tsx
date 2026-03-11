@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authClient, organization } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,13 @@ export default function InviteAcceptPage({
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    authClient.getSession().then((session) => {
+      setIsAuthenticated(!!session.data?.user);
+    });
+  }, []);
 
   const handleAccept = async () => {
     setLoading(true);
@@ -37,14 +45,28 @@ export default function InviteAcceptPage({
       }
       setAccepted(true);
       toast.success("Invitation accepted!");
-      // Redirect after a moment
-      setTimeout(() => router.push("/dashboard"), 2000);
+      // Set the new org as active and redirect
+      const orgs = await fetch("/api/auth/organization/list", { credentials: "include" }).then(r => r.json());
+      if (orgs?.length > 0) {
+        await organization.setActive({ organizationId: orgs[orgs.length - 1].id });
+      }
+      setTimeout(() => router.push("/dashboard"), 1500);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (isAuthenticated === null) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (accepted) {
     return (
@@ -79,6 +101,37 @@ export default function InviteAcceptPage({
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+            GF
+          </div>
+          <CardTitle className="text-xl">Organization Invitation</CardTitle>
+          <CardDescription>
+            You need to sign in or create an account to accept this invitation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button
+            className="w-full"
+            onClick={() => router.push(`/login?callbackUrl=/invite/${id}`)}
+          >
+            Sign in
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            render={<Link href={`/register?invite=${id}`} />}
+          >
+            Create an account
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="text-center">
@@ -87,7 +140,7 @@ export default function InviteAcceptPage({
         </div>
         <CardTitle className="text-xl">Organization Invitation</CardTitle>
         <CardDescription>
-          You&apos;ve been invited to join an organization on GearFlow.
+          You&apos;ve been invited to join an organization.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -102,9 +155,9 @@ export default function InviteAcceptPage({
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => router.push("/login")}
+          onClick={() => router.push("/dashboard")}
         >
-          Go to Login
+          Go to Dashboard
         </Button>
       </CardContent>
     </Card>

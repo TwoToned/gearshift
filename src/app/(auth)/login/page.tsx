@@ -62,7 +62,7 @@ export default function LoginPage() {
       const orgs = await fetchUserOrgs();
 
       if (orgs.length === 0) {
-        router.push("/onboarding");
+        router.push("/no-organization");
         return;
       }
 

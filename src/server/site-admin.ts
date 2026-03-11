@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-server";
 import { serialize } from "@/lib/serialize";
 import { invalidatePlatformNameCache } from "@/lib/platform";
+import { sendEmail } from "@/lib/email";
+import { getPlatformName } from "@/lib/platform";
 
 /** Verify the current user is a site admin. Throws if not. */
 async function requireSiteAdmin() {
@@ -265,7 +267,25 @@ export async function adminDeleteUser(userId: string) {
   if (session.user.id === userId) {
     throw new Error("You cannot delete yourself.");
   }
-  await prisma.user.delete({ where: { id: userId } });
+
+  await prisma.$transaction(async (tx) => {
+    // Null out nullable User FK references
+    await tx.maintenanceRecord.updateMany({ where: { reportedById: userId }, data: { reportedById: null } });
+    await tx.maintenanceRecord.updateMany({ where: { assignedToId: userId }, data: { assignedToId: null } });
+    await tx.project.updateMany({ where: { projectManagerId: userId }, data: { projectManagerId: null } });
+    await tx.projectLineItem.updateMany({ where: { checkedOutById: userId }, data: { checkedOutById: null } });
+    await tx.projectLineItem.updateMany({ where: { returnedById: userId }, data: { returnedById: null } });
+
+    // Delete records with non-nullable User FKs
+    await tx.assetScanLog.deleteMany({ where: { scannedById: userId } });
+    await tx.kitSerializedItem.deleteMany({ where: { addedById: userId } });
+    await tx.kitBulkItem.deleteMany({ where: { addedById: userId } });
+    await tx.fileUpload.deleteMany({ where: { uploadedById: userId } });
+    await tx.testTagRecord.deleteMany({ where: { testedById: userId } });
+
+    await tx.user.delete({ where: { id: userId } });
+  });
+
   return { success: true };
 }
 
@@ -398,6 +418,81 @@ export async function adminChangeMemberRole(orgId: string, memberId: string, new
   });
 
   return { success: true };
+}
+
+// ─── Platform Invite (Site Admin) ─────────────────────────────────────────
+
+export async function adminInviteUser(email: string) {
+  await requireSiteAdmin();
+
+  const normalizedEmail = email.toLowerCase().trim();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    throw new Error("Please enter a valid email address.");
+  }
+
+  // Check if user already exists
+  const existingUser = await prisma.user.findFirst({
+    where: { email: normalizedEmail },
+  });
+  if (existingUser) {
+    throw new Error("A user with this email already exists.");
+  }
+
+  // Check for existing pending invitation (no org)
+  const existingInvite = await prisma.invitation.findFirst({
+    where: {
+      email: normalizedEmail,
+      status: "pending",
+      expiresAt: { gte: new Date() },
+    },
+  });
+  if (existingInvite) {
+    throw new Error("An invitation has already been sent to this email.");
+  }
+
+  // We need an organizationId for the invitation record (Better Auth requires it).
+  // Use the first available org as a placeholder — the user won't be auto-added to it.
+  const anyOrg = await prisma.organization.findFirst({ select: { id: true } });
+  if (!anyOrg) {
+    throw new Error("No organizations exist yet. Create one first.");
+  }
+
+  const session = await requireSession();
+
+  const invitation = await prisma.invitation.create({
+    data: {
+      organizationId: anyOrg.id,
+      email: normalizedEmail,
+      role: "member",
+      status: "pending",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      inviterId: session.user.id,
+    },
+  });
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const registerUrl = `${baseUrl}/register?invite=${invitation.id}`;
+  const pName = await getPlatformName();
+
+  await sendEmail({
+    to: normalizedEmail,
+    subject: `You've been invited to join ${pName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>You've been invited to join ${pName}</h2>
+        <p>A site administrator has invited you to create an account on ${pName}.</p>
+        <p>Click the button below to create your account.</p>
+        <p>
+          <a href="${registerUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0d9488; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+            Create Account
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">This invitation expires in 7 days.</p>
+      </div>
+    `,
+  });
+
+  return { success: true, email: normalizedEmail };
 }
 
 // ─── Dashboard Stats ───────────────────────────────────────────────────────
