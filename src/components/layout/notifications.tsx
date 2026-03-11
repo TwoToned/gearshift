@@ -9,6 +9,7 @@ import {
   CalendarClock,
   PackageX,
   Wrench,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   overdue_return: PackageX,
   upcoming_project: CalendarClock,
   low_stock: AlertTriangle,
+  pending_invitation: Mail,
 };
 
 const severityColors: Record<string, string> = {

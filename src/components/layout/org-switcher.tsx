@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Building2, Check, ChevronsUpDown } from "lucide-react";
 import {
   useActiveOrganization,
   useListOrganizations,
@@ -57,13 +57,6 @@ export function OrgSwitcher() {
               )}
             </DropdownMenuItem>
           ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push("/onboarding")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Organization
-          </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -6,7 +6,7 @@ import { serialize } from "@/lib/serialize";
 
 export interface AppNotification {
   id: string;
-  type: "overdue_maintenance" | "overdue_return" | "upcoming_project" | "low_stock";
+  type: "overdue_maintenance" | "overdue_return" | "upcoming_project" | "low_stock" | "pending_invitation";
   title: string;
   description: string;
   href: string;
@@ -15,7 +15,7 @@ export interface AppNotification {
 }
 
 export async function getNotifications(): Promise<AppNotification[]> {
-  const { organizationId } = await getOrgContext();
+  const { organizationId, userId } = await getOrgContext();
   const now = new Date();
   const soon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days
   const notifications: AppNotification[] = [];
@@ -120,6 +120,37 @@ export async function getNotifications(): Promise<AppNotification[]> {
       severity: "warning",
       timestamp: b.updatedAt.toISOString(),
     });
+  }
+
+  // 5. Pending invitations for the current user
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  if (user?.email) {
+    const pendingInvitations = await prisma.invitation.findMany({
+      where: {
+        email: user.email.toLowerCase(),
+        status: "pending",
+        expiresAt: { gte: now },
+      },
+      include: {
+        organization: { select: { name: true } },
+      },
+      take: 10,
+    });
+
+    for (const inv of pendingInvitations) {
+      notifications.push({
+        id: `invite-${inv.id}`,
+        type: "pending_invitation",
+        title: `Invitation to ${inv.organization.name}`,
+        description: `You've been invited to join ${inv.organization.name}${inv.role ? ` as ${inv.role}` : ""}`,
+        href: `/invite/${inv.id}`,
+        severity: "info",
+        timestamp: inv.createdAt.toISOString(),
+      });
+    }
   }
 
   // Sort by severity (errors first) then timestamp
