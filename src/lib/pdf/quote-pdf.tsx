@@ -18,6 +18,7 @@ interface LineItem {
   pricingMode?: string | null;
   notes: string | null;
   isOverbooked?: boolean;
+  overbookedInherited?: boolean;
   model: { name: string; modelNumber?: string | null } | null;
   kit?: { assetTag: string; name: string } | null;
   childLineItems?: LineItem[];
@@ -192,7 +193,7 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
                               <Text style={s.optionalBadge}>Optional</Text>
                             )}
                             {item.isOverbooked && (
-                              <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                              <Text style={{ fontSize: 6, color: item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
                             )}
                           </View>
                           {item.notes && (
@@ -217,9 +218,14 @@ export function QuotePDF({ org, project }: QuotePDFProps) {
                       {children.map((child) => (
                         <View key={child.id} style={s.tableRow}>
                           <View style={{ flex: 3, paddingLeft: 12 }}>
-                            <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
-                              {child.model?.name || child.description || "-"}
-                            </Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
+                                {child.model?.name || child.description || "-"}
+                              </Text>
+                              {child.isOverbooked && (
+                                <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                              )}
+                            </View>
                           </View>
                           <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.quantity}

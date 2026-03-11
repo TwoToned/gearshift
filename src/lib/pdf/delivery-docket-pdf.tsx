@@ -22,6 +22,7 @@ interface LineItem {
   kit?: { assetTag: string; name: string } | null;
   notes: string | null;
   isOverbooked?: boolean;
+  overbookedInherited?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -193,7 +194,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                                 {bulk ? `${item.checkedOutQuantity}x ${itemName}` : itemName}
                               </Text>
                               {item.isOverbooked && (
-                                <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                                <Text style={{ fontSize: 6, color: item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
                               )}
                             </View>
                             {item.notes && (
@@ -213,9 +214,16 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                         {children.map((child) => (
                           <View key={child.id} style={s.tableRow}>
                             <Text style={[s.td, { width: 24 }]}> </Text>
-                            <Text style={[s.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                              {child.model?.name || child.description || "-"}
-                            </Text>
+                            <View style={{ flex: 3, paddingLeft: 12 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
+                                  {child.model?.name || child.description || "-"}
+                                </Text>
+                                {child.isOverbooked && (
+                                  <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                                )}
+                              </View>
+                            </View>
                             <Text style={[s.td, { width: 40, textAlign: "center", fontSize: 8 }]}>
                               {child.quantity}
                             </Text>

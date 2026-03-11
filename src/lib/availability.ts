@@ -7,6 +7,8 @@ export interface OverbookedInfo {
   totalStock: number;
   /** Total booked across all overlapping projects */
   totalBooked: number;
+  /** True when a kit parent is overbooked only because its children are */
+  inherited?: boolean;
 }
 
 /**
@@ -132,7 +134,7 @@ export async function computeOverbookedStatus(
             totalBooked += info.totalBooked;
           }
         }
-        overbookedMap.set(li.id, { overBy: totalOver, totalStock, totalBooked });
+        overbookedMap.set(li.id, { overBy: totalOver, totalStock, totalBooked, inherited: true });
       }
     }
   }

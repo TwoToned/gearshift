@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
+import { computeOverbookedStatus } from "@/lib/availability";
 import type { Prisma } from "@/generated/prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -788,8 +789,18 @@ export async function getProjectPullSheet(projectId: string) {
         orderBy: { sortOrder: "asc" },
         include: {
           model: { include: { category: true } },
-          asset: true,
+          asset: { include: { location: true } },
           bulkAsset: true,
+          kit: true,
+          childLineItems: {
+            where: { status: { not: "CANCELLED" } },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              model: { include: { category: true } },
+              asset: { include: { location: true } },
+              bulkAsset: true,
+            },
+          },
         },
       },
     },
@@ -799,9 +810,33 @@ export async function getProjectPullSheet(projectId: string) {
     throw new Error("Project not found");
   }
 
+  // Compute overbooked status
+  const overbookedMap = await computeOverbookedStatus(
+    organizationId,
+    project.lineItems,
+    project.rentalStartDate,
+    project.rentalEndDate,
+    project.id,
+  );
+
+  const enrichedLineItems = project.lineItems
+    .filter((li) => !li.isKitChild) // Kit children render under their parent
+    .map((li) => {
+      const info = overbookedMap.get(li.id);
+      return {
+        ...li,
+        isOverbooked: !!info,
+        overbookedInfo: info ?? null,
+        childLineItems: li.childLineItems?.map((child) => {
+          const childInfo = overbookedMap.get(child.id);
+          return { ...child, isOverbooked: !!childInfo, overbookedInfo: childInfo ?? null };
+        }),
+      };
+    });
+
   // Group line items by groupName
-  const groups: Record<string, typeof project.lineItems> = {};
-  for (const item of project.lineItems) {
+  const groups: Record<string, typeof enrichedLineItems> = {};
+  for (const item of enrichedLineItems) {
     const key = item.groupName || "Ungrouped";
     if (!groups[key]) {
       groups[key] = [];

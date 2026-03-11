@@ -103,10 +103,21 @@ export async function GET(
     project.id,
   );
 
-  const enrichedLineItems = project.lineItems.map((li) => ({
-    ...li,
-    isOverbooked: overbookedMap.has(li.id),
-  }));
+  const enrichedLineItems = project.lineItems.map((li) => {
+    const info = overbookedMap.get(li.id);
+    return {
+      ...li,
+      isOverbooked: !!info,
+      overbookedInherited: info?.inherited ?? false,
+      childLineItems: (li as unknown as { childLineItems?: typeof project.lineItems }).childLineItems?.map((child) => {
+        const childInfo = overbookedMap.get(child.id);
+        return {
+          ...child,
+          isOverbooked: !!childInfo,
+        };
+      }),
+    };
+  });
 
   // Serialize Decimals to numbers
   const serializedProject = JSON.parse(

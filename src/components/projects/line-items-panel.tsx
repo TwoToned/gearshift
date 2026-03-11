@@ -110,8 +110,11 @@ function formatCurrency(value: number | null | undefined): string {
   return `$${Number(value).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
 }
 
-function OverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; totalBooked: number } | null }) {
+function OverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null }) {
   if (!info) return null;
+  const colorClass = info.inherited
+    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+    : "bg-red-500/10 text-red-600 border-red-500/20";
   return (
     <TooltipProvider>
       <Tooltip>
@@ -119,14 +122,16 @@ function OverbookedBadge({ info }: { info?: { overBy: number; totalStock: number
           render={
             <Badge
               variant="outline"
-              className="ml-1.5 cursor-help text-xs bg-red-500/10 text-red-600 border-red-500/20"
+              className={`ml-1.5 cursor-help text-xs ${colorClass}`}
             >
               Overbooked
             </Badge>
           }
         />
         <TooltipContent>
-          {info.overBy} over capacity ({info.totalBooked} booked / {info.totalStock} total)
+          {info.inherited
+            ? `Contains items that are ${info.overBy} over capacity`
+            : `${info.overBy} over capacity (${info.totalBooked} booked / ${info.totalStock} total)`}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -393,15 +398,13 @@ function SortableItemRow({
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
-            {!isKitParent && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onEdit(item)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onEdit(item)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon-sm"

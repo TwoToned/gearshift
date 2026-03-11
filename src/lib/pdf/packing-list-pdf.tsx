@@ -21,6 +21,7 @@ interface LineItem {
   kit?: { assetTag: string; name: string } | null;
   notes: string | null;
   isOverbooked?: boolean;
+  overbookedInherited?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -138,7 +139,7 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                                 : item.description || "-"}
                           </Text>
                           {item.isOverbooked && (
-                            <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                            <Text style={{ fontSize: 6, color: item.overbookedInherited ? "#d97706" : "#dc2626", backgroundColor: item.overbookedInherited ? "#fef3c7" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
                           )}
                         </View>
                         {item.notes && (
@@ -170,25 +171,47 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                         </View>
                       );
                     })()}
-                    {children.map((child) => (
-                      <View key={child.id} style={s.tableRow}>
-                        <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
-                          <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                    {children.map((child) => {
+                      const childName = child.model?.name || child.description || "-";
+                      return (
+                        <View key={child.id}>
+                          <View style={s.tableRow}>
+                            <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                              <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                            </View>
+                            <View style={{ flex: 3, paddingLeft: 12 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
+                                  {childName}
+                                </Text>
+                                {child.isOverbooked && (
+                                  <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                                )}
+                              </View>
+                            </View>
+                            <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                              {child.quantity}
+                            </Text>
+                            <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                              {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
+                            </Text>
+                            <Text style={[s.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
+                              {child.model?.category?.name || ""}
+                            </Text>
+                          </View>
+                          {child.quantity > 1 && (
+                            <View style={{ paddingLeft: 38, paddingRight: 6, paddingBottom: 4 }}>
+                              {Array.from({ length: child.quantity }).map((_, i) => (
+                                <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 1 }}>
+                                  <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                                  <Text style={{ fontSize: 7, color: "#666" }}>{childName} - {i + 1}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
                         </View>
-                        <Text style={[s.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                          {child.model?.name || child.description || "-"}
-                        </Text>
-                        <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
-                          {child.quantity}
-                        </Text>
-                        <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
-                          {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
-                        </Text>
-                        <Text style={[s.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
-                          {child.model?.category?.name || ""}
-                        </Text>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 );
               })}

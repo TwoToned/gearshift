@@ -1,13 +1,19 @@
 "use client";
 
-import { use } from "react";
+import React, { use } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, Square } from "lucide-react";
+import { ArrowLeft, Printer, Square, Container } from "lucide-react";
 
 import { getProjectPullSheet } from "@/server/warehouse";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -40,6 +46,34 @@ function formatDate(date: string | null | undefined): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function PullSheetOverbookedBadge({ info }: { info?: { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null }) {
+  if (!info) return null;
+  const colorClass = info.inherited
+    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+    : "bg-red-500/10 text-red-600 border-red-500/20";
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Badge
+              variant="outline"
+              className={`ml-1.5 cursor-help text-xs print:border-red-500 print:text-red-600 ${colorClass}`}
+            >
+              Overbooked
+            </Badge>
+          }
+        />
+        <TooltipContent>
+          {info.inherited
+            ? `Contains items that are ${info.overBy} over capacity`
+            : `${info.overBy} over capacity (${info.totalBooked} booked / ${info.totalStock} total)`}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export default function PullSheetPage({
@@ -150,32 +184,101 @@ export default function PullSheetPage({
                     const model = item.model as { name: string; modelNumber?: string | null } | null;
                     const asset = item.asset as { assetTag: string; location?: { name: string } | null } | null;
                     const bulkAsset = item.bulkAsset as { assetTag: string } | null;
+                    const kit = item.kit as { assetTag: string; name: string } | null;
                     const assetTag = asset?.assetTag || bulkAsset?.assetTag || null;
+                    const overbookedInfo = item.overbookedInfo as { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null;
+                    const isKit = !!(item.kitId) && !(item.isKitChild);
+                    const children = isKit ? ((item.childLineItems || []) as Array<Record<string, unknown>>) : [];
+                    const qty = item.quantity as number;
+                    const itemName = isKit
+                      ? (item.description as string) || kit?.name || "Kit"
+                      : model
+                        ? [model.name, model.modelNumber].filter(Boolean).join(" - ")
+                        : (item.description as string) || "Unnamed item";
 
                     return (
-                      <TableRow key={item.id as string}>
-                        <TableCell className="text-center">
-                          <Square className="h-4 w-4 text-muted-foreground print:text-black" />
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">
-                            {model
-                              ? [model.name, model.modelNumber]
-                                  .filter(Boolean)
-                                  .join(" - ")
-                              : (item.description as string) || "Unnamed item"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {item.quantity as number}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {assetTag || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {asset?.location?.name || "—"}
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={item.id as string}>
+                        <TableRow className={isKit ? "bg-muted/30" : ""}>
+                          <TableCell className="text-center">
+                            {isKit
+                              ? <Container className="h-4 w-4 text-muted-foreground print:text-black" />
+                              : <Square className="h-4 w-4 text-muted-foreground print:text-black" />}
+                          </TableCell>
+                          <TableCell>
+                            <span className={isKit ? "font-bold" : "font-medium"}>
+                              {isKit ? `[Kit] ${itemName}` : itemName}
+                            </span>
+                            {overbookedInfo && <PullSheetOverbookedBadge info={overbookedInfo} />}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {isKit ? children.length : qty}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">
+                            {isKit ? (kit?.assetTag || "—") : (assetTag || "—")}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {asset?.location?.name || "—"}
+                          </TableCell>
+                        </TableRow>
+                        {/* Kit children */}
+                        {children.map((child) => {
+                          const childModel = child.model as { name: string; modelNumber?: string | null } | null;
+                          const childAsset = child.asset as { assetTag: string; location?: { name: string } | null } | null;
+                          const childBulk = child.bulkAsset as { assetTag: string } | null;
+                          const childName = childModel?.name || (child.description as string) || "-";
+                          const childQty = child.quantity as number;
+                          const childOverbookedInfo = child.overbookedInfo as { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null;
+
+                          return (
+                            <React.Fragment key={child.id as string}>
+                              <TableRow>
+                                <TableCell className="text-center">
+                                  <Square className="h-3.5 w-3.5 text-muted-foreground print:text-black" />
+                                </TableCell>
+                                <TableCell className="pl-8">
+                                  <span className="text-sm text-muted-foreground">{childName}</span>
+                                  {childOverbookedInfo && <PullSheetOverbookedBadge info={childOverbookedInfo} />}
+                                </TableCell>
+                                <TableCell className="text-center text-sm">{childQty}</TableCell>
+                                <TableCell className="font-mono text-xs text-muted-foreground">
+                                  {childAsset?.assetTag || childBulk?.assetTag || "—"}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {childAsset?.location?.name || "—"}
+                                </TableCell>
+                              </TableRow>
+                              {/* Quantity expansion for kit children with qty > 1 */}
+                              {childQty > 1 && Array.from({ length: childQty }).map((_, i) => (
+                                <TableRow key={`${child.id}-${i}`}>
+                                  <TableCell className="text-center">
+                                    <Square className="h-3 w-3 text-muted-foreground/50 print:text-black" />
+                                  </TableCell>
+                                  <TableCell className="pl-12">
+                                    <span className="text-xs text-muted-foreground">{childName} - {i + 1}</span>
+                                  </TableCell>
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                </TableRow>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
+                        {/* Quantity expansion for non-kit items with qty > 1 */}
+                        {!isKit && qty > 1 && Array.from({ length: qty }).map((_, i) => (
+                          <TableRow key={`${item.id}-sub-${i}`}>
+                            <TableCell className="text-center">
+                              <Square className="h-3 w-3 text-muted-foreground/50 print:text-black" />
+                            </TableCell>
+                            <TableCell className="pl-8">
+                              <span className="text-xs text-muted-foreground">{itemName} - {i + 1}</span>
+                            </TableCell>
+                            <TableCell />
+                            <TableCell />
+                            <TableCell />
+                          </TableRow>
+                        ))}
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>

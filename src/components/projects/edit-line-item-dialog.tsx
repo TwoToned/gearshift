@@ -38,6 +38,7 @@ interface EditLineItemDialogProps {
     modelId: string | null;
     assetId: string | null;
     bulkAssetId: string | null;
+    kitId?: string | null;
     description: string | null;
     quantity: number;
     unitPrice: unknown;
@@ -191,7 +192,7 @@ export function EditLineItemDialog({
                 type="number"
                 min={1}
                 {...form.register("quantity")}
-                disabled={!!lineItem?.assetId}
+                disabled={!!lineItem?.assetId || !!lineItem?.kitId}
               />
             </div>
             <div className="space-y-2">
