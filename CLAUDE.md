@@ -14,6 +14,7 @@ npm run build        # Production build + type check
 npm run lint         # ESLint
 npx prisma generate  # Regenerate Prisma client (after schema changes)
 npx prisma migrate dev --name <name>  # Create and apply migration
+npx prisma migrate deploy             # Apply migrations non-interactively (production/CI)
 ```
 
 No test framework is configured.
@@ -23,14 +24,19 @@ No test framework is configured.
 ### Route Groups
 - `src/app/(auth)/` — public pages (login, register, onboarding). Centered card layout, no sidebar.
 - `src/app/(app)/` — protected pages. Sidebar + top bar layout via `SidebarProvider`.
+- `src/app/(admin)/admin/` — site admin panel. Layout checks `User.role === "admin"`.
 - `src/app/api/auth/[...all]/` — Better Auth catch-all handler.
 - `src/app/api/documents/[projectId]/` — PDF document generation endpoint.
+- `src/app/api/files/[...path]/` — S3 file proxy. Verifies `storageKey` starts with user's `activeOrganizationId`.
+- `src/app/api/admin/org-export/[orgId]/` — Organization export (site admin only).
+- `src/app/api/admin/org-import/` — Organization import (site admin only).
 
 ### Auth & Multi-Tenancy
 - **Better Auth** with Organization plugin. Server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
 - Middleware (`src/middleware.ts`) checks `better-auth.session_token` cookie; redirects unauthenticated users to `/login`.
 - Every session has `activeOrganizationId`. All data must be scoped to it.
 - `src/lib/auth-server.ts` — `getSession()`, `requireSession()`, `requireOrganization()`.
+- `src/lib/admin-auth.ts` — `requireSiteAdminApi()` for API route handlers (checks `User.role === "admin"`).
 - `src/lib/org-context.ts` — `getOrgContext()` returns `{ organizationId, userId }`, `orgWhere()` injects org scope into Prisma queries, `requireRole()` validates membership.
 - Roles: owner, admin, manager, staff, warehouse.
 
@@ -53,6 +59,16 @@ No test framework is configured.
 - Deep teal primary via oklch. Dark mode default.
 - Toast via Sonner. React Query with 60s stale time, no refetchOnWindowFocus.
 - Providers in root layout: ThemeProvider (next-themes), QueryProvider (React Query).
+- **Base UI SelectValue portal issue**: `SelectValue` can't resolve item text from portal-rendered items; pass explicit label text as children.
+
+### Media System
+- **Modern approach**: `ModelMedia`, `AssetMedia`, `KitMedia`, `ProjectMedia`, `ClientMedia`, `LocationMedia` join tables linking to `FileUpload`.
+- **Legacy fields**: `model.image`, `model.images`, `asset.images`, `kit.image`, `kit.images` — still exist but UI uses media tables.
+- **Display**: `MediaThumbnail` component renders images with fallback placeholder. Uses `thumbnailUrl || url` from `FileUpload`.
+- **Resolution**: `src/lib/media-utils.ts` — `resolveModelPhotoUrl()`, `resolveAssetPhotoUrl()` (cascading: asset photo → model photo).
+- **Uploads**: `MediaUploader` component for drag-to-reorder, primary marking, removal. Files uploaded via `src/app/api/uploads/route.ts`.
+- **File proxy**: `src/app/api/files/[...path]/route.ts` — serves S3 files, validates org prefix. Returns 403 if `storageKey` doesn't match active org.
+- **Storage**: `src/lib/storage.ts` — S3/MinIO client. `uploadToS3()`, `getFromS3()`, `deleteFromS3()`, `ensureBucket()`.
 
 ### PDF Documents (`src/lib/pdf/`)
 - `@react-pdf/renderer` with Helvetica font only. Unicode symbols don't render — use ASCII alternatives (`-` not `—`, `|` not `•`), `View` boxes with borders for checkboxes.
@@ -60,7 +76,7 @@ No test framework is configured.
 - Shared styles in `src/lib/pdf/styles.ts`.
 - All documents render kit contents as indented children under the kit parent row.
 - Line item notes shown as subtitles on all documents.
-- Overbooked items show a red "OVERBOOKED" badge.
+- Overbooked items show a red "OVERBOOKED" badge. Reduced stock items show purple "REDUCED STOCK" badge.
 - Pull slip shows per-unit checkboxes for quantity > 1 items (vertical layout with model name labels).
 
 ### Form & Validation Patterns
@@ -70,11 +86,12 @@ No test framework is configured.
 - Numeric fields: `z.coerce.number()`.
 
 ### Asset Types
-- **Serialized** (`Asset`): individually tracked with unique asset tags, have a `status` field (AVAILABLE, CHECKED_OUT, IN_MAINTENANCE, LOST).
+- **Serialized** (`Asset`): individually tracked with unique asset tags, have a `status` field (AVAILABLE, CHECKED_OUT, IN_MAINTENANCE, LOST, RESERVED, RETIRED).
 - **Bulk** (`BulkAsset`): quantity-tracked, no individual serial tracking.
 - **Kit** (`Kit`): container of serialized and bulk assets. Has its own asset tag, status, condition. Kit contents managed via `KitSerializedItem` / `KitBulkItem` join tables.
 - Bulk detection on line items: `!!lineItem.bulkAssetId || (!lineItem.assetId && lineItem.quantity > 1)`.
 - Kit detection on line items: `!!lineItem.kitId && !lineItem.isKitChild`. Children have `isKitChild: true` and `parentLineItemId`.
+- **Kit join tables use `addedAt`** (not `createdAt`). Fields: `position`, `sortOrder`, `addedAt`, `addedById`, `notes`.
 
 ### Kit System
 - Kit line items: parent row (`kitId` set, `isKitChild: false`) with child rows (`isKitChild: true`, `parentLineItemId` pointing to parent).
@@ -104,6 +121,25 @@ No test framework is configured.
 - `isOverbooked` is dynamically computed (not stored) via `computeOverbookedStatus()` in `src/lib/availability.ts`. Batches DB queries for efficiency.
 - Overbooked status is computed in `getProject()` and in the documents API route, then enriched onto line items.
 - Adding a duplicate model to a project merges into the existing line item (increments quantity) rather than creating a new row.
+- **Reduced stock**: Assets with status IN_MAINTENANCE or LOST reduce effective stock. Purple "Reduced Stock" badges shown on web UI and all 5 PDFs.
+- **Project issue badges**: Projects list shows AlertTriangle icons (red=overbooked, purple=reduced stock) with tooltips. Computed by `getProjectIssueFlags()`.
+
+### Maintenance
+- **Server actions**: `src/server/maintenance.ts` — CRUD with multi-asset support.
+- **Multi-asset records**: One `MaintenanceRecord` can link to multiple assets via `MaintenanceRecordAsset` join table (many-to-many).
+- **Fields**: `title`, `description`, `type` (MaintenanceType enum), `status` (MaintenanceStatus enum), `priority`, `scheduledDate`, `completedDate`, `cost`, `result` (MaintenanceResult enum), `reportedById`, `assignedToId`.
+- **Reported By**: User select field populated from org members. Falls back to current user.
+- **Delete**: Available on list page and detail page with confirmation dialog.
+- **Dashboard**: Maintenance records appear in recent activity feed with amber Wrench icon.
+- **Notifications**: Overdue maintenance generates notifications. Shows first asset + count for multi-asset records.
+- **Filter dropdowns**: Use explicit `SelectValue` children to avoid Base UI portal rendering issue with raw enum values.
+- Asset relation: `Asset.maintenanceLinks` → `MaintenanceRecordAsset[]` (not `maintenanceRecords`).
+
+### Notifications
+- Server: `src/server/notifications.ts` — generates notifications for upcoming/overdue events.
+- Client: `src/components/layout/notifications.tsx` — bell icon in top bar with dropdown.
+- **Dismiss on click**: localStorage-based. `getDismissedIds()`/`saveDismissedIds()` helpers. Auto-prunes stale IDs.
+- Click handler dismisses notification and navigates to `notification.href`.
 
 ### Line Items & Groups
 - Line items support `groupName` for visual grouping in the project UI. Groups are drag-and-drop reorderable.
@@ -123,6 +159,20 @@ No test framework is configured.
 - Custom CSV parser/escaper (no external deps). Flexible column name matching (camelCase, snake_case).
 - `CSVImportDialog` component (`src/components/assets/csv-import-dialog.tsx`) — reusable file upload dialog with progress and error display.
 
+### Organization Export/Import (Site Admin)
+- **Export** (`src/lib/org-export.ts`): Queries all 27 org-scoped tables, builds streaming zip via `archiver` with `manifest.json` + `files/{storageKey}` (S3 media). Concurrent S3 downloads limited to 5.
+- **Import** (`src/lib/org-import.ts`): Extracts zip via `unzipper`, creates new org with full ID remapping (`@paralleldrive/cuid2`).
+  - Topological sort (BFS) for hierarchical tables: Category, Location, ProjectLineItem (parentId).
+  - User FKs resolved by email matching — unmatched users are skipped.
+  - S3 files re-uploaded under new org prefix. `thumbnailUrl` cleared (not exported).
+  - `KitSerializedItem`/`KitBulkItem` use `addedAt` field (not `createdAt`).
+  - `safeDate()`/`safeDateOpt()` helpers handle invalid/missing date values gracefully.
+  - Image URL references (`model.image`, `model.images`, `kit.image`, etc.) updated post-upload via URL mapping.
+  - `ensureBucket()` called before S3 uploads to handle fresh MinIO instances.
+- **Type definitions**: `src/lib/org-transfer-types.ts` — `OrgExportManifest` interface, `MANIFEST_VERSION = 1`.
+- **API routes**: `src/app/api/admin/org-export/[orgId]/route.ts` (GET, streams zip), `src/app/api/admin/org-import/route.ts` (POST, FormData with file + optional name/slug).
+- **UI**: Export button on org detail page + per-row download button. Import button + dialog on org list page.
+
 ### Table Components
 - `SortableTableHead` and `PageSizeSelect` in `src/components/ui/sortable-table-head.tsx`.
 - `useTablePreferences` hook (`src/lib/use-table-preferences.ts`) persists sort, page size, and view mode to localStorage per table key.
@@ -141,14 +191,15 @@ No test framework is configured.
 - **Bulk asset linking**: New T&T item form shows bulk asset picker first; selecting one auto-populates description, make, equipment class, appliance type, test interval, and location from the bulk asset's model.
 - **Reports**: Full Register, Overdue/Non-Compliant, Test Session, Item History, Due Schedule, Class Summary, Tester Activity, Failed Items, Bulk Asset Summary, Compliance Certificate. Each has PDF; 8 have CSV export.
 - **Date serialization in API route**: Prisma `Date` objects must be JSON-serialized before passing to PDF components: `JSON.parse(JSON.stringify(data, (_key, value) => value instanceof Date ? value.toISOString() : value))`.
+- **Dashboard**: Test tag records appear in recent activity feed.
 
 ### User Management & Access Control
 - **Two-tier model**: Site admins (global) + organization roles (per-org).
-- **Site admin**: `User.role = "admin"`. First user auto-promoted. Additional admins via secret registration link (`/register/admin?token=...`).
+- **Site admin**: `User.role = "admin"`. First user auto-promoted. Additional admins via secret registration link (`/register/admin?token=...`). Requires env vars `SITE_ADMIN_REGISTRATION_ENABLED=true` and `SITE_ADMIN_SECRET_TOKEN`.
 - **Org roles** (hierarchy): `owner`, `admin`, `manager`, `member`, `viewer`. Legacy: `staff`, `warehouse` (mapped to member-level permissions).
 - **Permissions**: `src/lib/permissions.ts` defines `rolePermissions` map. Enforced via `requirePermission(resource, action)` in `src/lib/org-context.ts`.
 - **Server actions**: `src/server/site-admin.ts` (platform admin), `src/server/org-members.ts` (org member management), `src/server/user-profile.ts` (user account).
-- **Admin panel**: `src/app/(admin)/admin/` — dashboard, organizations, users, settings. Layout checks `User.role === "admin"`.
+- **Admin panel**: `src/app/(admin)/admin/` — dashboard, organizations (with export/import), users, settings.
 - **Account page**: `src/app/(app)/account/` — profile, password change, 2FA setup, organizations, active sessions.
 - **2FA**: Better Auth `twoFactor` plugin (TOTP). Setup in account page. Verification at `/two-factor`. Site admin can force-disable.
 - **Email**: Resend SDK (`src/lib/email.ts`). Used for invitations, password reset, email verification, role change notifications.
