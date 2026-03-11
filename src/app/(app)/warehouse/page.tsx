@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NotViewer } from "@/components/auth/permission-gate";
 
 const WAREHOUSE_STATUSES = [
   "CONFIRMED",
@@ -259,38 +260,40 @@ export default function WarehousePage() {
                     <WarehouseIcon className="mr-2 h-4 w-4" />
                     Open
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                      Actions
-                      <ChevronDown className="ml-1 h-3 w-3" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {project.status !== "CHECKED_OUT" && project.status !== "ON_SITE" && project.status !== "RETURNED" && project.status !== "COMPLETED" && (
-                        <DropdownMenuItem
-                          onClick={() => handleStatusAction(project, "CHECKED_OUT")}
-                        >
-                          <PackageOpen className="mr-2 h-4 w-4" />
-                          Mark Checked Out
-                        </DropdownMenuItem>
-                      )}
-                      {(project.status === "CHECKED_OUT" || project.status === "ON_SITE") && (
-                        <DropdownMenuItem
-                          onClick={() => handleStatusAction(project, "RETURNED")}
-                        >
-                          <PackageCheck className="mr-2 h-4 w-4" />
-                          Mark Returned
-                        </DropdownMenuItem>
-                      )}
-                      {(project.status === "RETURNED" || project.status === "CHECKED_OUT" || project.status === "ON_SITE") && (
-                        <DropdownMenuItem
-                          onClick={() => handleStatusAction(project, "COMPLETED")}
-                        >
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Mark Completed
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <NotViewer>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                        Actions
+                        <ChevronDown className="ml-1 h-3 w-3" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {project.status !== "CHECKED_OUT" && project.status !== "ON_SITE" && project.status !== "RETURNED" && project.status !== "COMPLETED" && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusAction(project, "CHECKED_OUT")}
+                          >
+                            <PackageOpen className="mr-2 h-4 w-4" />
+                            Mark Checked Out
+                          </DropdownMenuItem>
+                        )}
+                        {(project.status === "CHECKED_OUT" || project.status === "ON_SITE") && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusAction(project, "RETURNED")}
+                          >
+                            <PackageCheck className="mr-2 h-4 w-4" />
+                            Mark Returned
+                          </DropdownMenuItem>
+                        )}
+                        {(project.status === "RETURNED" || project.status === "CHECKED_OUT" || project.status === "ON_SITE") && (
+                          <DropdownMenuItem
+                            onClick={() => handleStatusAction(project, "COMPLETED")}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Mark Completed
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </NotViewer>
                 </div>
               </CardContent>
             </Card>

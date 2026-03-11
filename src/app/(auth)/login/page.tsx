@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn, organization, authClient } from "@/lib/auth-client";
+import { usePlatformBranding } from "@/lib/use-platform-name";
+import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +31,7 @@ async function fetchUserOrgs(): Promise<Array<{ id: string; name: string }>> {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { name: platformName, icon: platformIcon } = usePlatformBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -75,10 +78,14 @@ export default function LoginPage() {
     <Card>
       <CardHeader className="text-center">
         <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
-          GF
+          {platformIcon ? (
+            <DynamicIcon name={platformIcon} className="h-5 w-5" />
+          ) : (
+            platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+          )}
         </div>
         <CardTitle className="text-xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your GearFlow account</CardDescription>
+        <CardDescription>Sign in to your {platformName} account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

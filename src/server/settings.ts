@@ -239,7 +239,7 @@ export async function getNextAssetTag(): Promise<string> {
   return tags[0];
 }
 
-const VALID_ROLES = ["admin", "manager", "staff", "warehouse"] as const;
+const VALID_ROLES = ["admin", "manager", "member", "staff", "warehouse", "viewer"] as const;
 type MemberRole = (typeof VALID_ROLES)[number];
 
 export async function addMemberByEmail(email: string, role: MemberRole) {

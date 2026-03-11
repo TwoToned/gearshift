@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
+import { NotViewer } from "@/components/auth/permission-gate";
 import {
   Table,
   TableBody,
@@ -136,12 +137,14 @@ export default function MaintenancePage() {
             Track repairs, test &amp; tag, and preventative maintenance.
           </p>
         </div>
-        <Link href="/maintenance/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Record
-          </Button>
-        </Link>
+        <NotViewer>
+          <Link href="/maintenance/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Record
+            </Button>
+          </Link>
+        </NotViewer>
       </div>
 
       {overdueMaintenance > 0 && (
@@ -302,15 +305,17 @@ export default function MaintenancePage() {
                     </TableCell>
                     <TableCell>
                       {record.status === "CANCELLED" && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() =>
-                            deleteMutation.mutate(record.id as string)
-                          }
-                        >
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <NotViewer>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() =>
+                              deleteMutation.mutate(record.id as string)
+                            }
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </NotViewer>
                       )}
                     </TableCell>
                   </TableRow>

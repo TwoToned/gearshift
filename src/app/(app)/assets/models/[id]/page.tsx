@@ -29,6 +29,7 @@ import {
 import { MediaUploader, type MediaItem } from "@/components/media/media-uploader";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveModelPhotoUrl } from "@/lib/media-utils";
+import { NotViewer } from "@/components/auth/permission-gate";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -100,26 +101,28 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
           </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=${model.assetType === "SERIALIZED" ? "serialized" : "bulk"}`} />}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Asset
-          </Button>
-          <Button variant="outline" render={<Link href={`/assets/models/${id}/edit`} />}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          {model.isActive && (
-            <Button
-              variant="outline"
-              className="text-destructive"
-              onClick={() => { if (confirm("Archive this model?")) archiveMutation.mutate(); }}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              Archive
+        <NotViewer>
+          <div className="flex gap-2">
+            <Button variant="outline" render={<Link href={`/assets/registry/new?modelId=${model.id}&type=${model.assetType === "SERIALIZED" ? "serialized" : "bulk"}`} />}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Asset
             </Button>
-          )}
-        </div>
+            <Button variant="outline" render={<Link href={`/assets/models/${id}/edit`} />}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            {model.isActive && (
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => { if (confirm("Archive this model?")) archiveMutation.mutate(); }}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
+              </Button>
+            )}
+          </div>
+        </NotViewer>
       </div>
 
       <Tabs defaultValue="details">

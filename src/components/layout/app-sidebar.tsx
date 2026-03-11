@@ -17,6 +17,8 @@ import {
   Container,
   ShieldCheck,
 } from "lucide-react";
+import { usePlatformBranding } from "@/lib/use-platform-name";
+import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import {
   Sidebar,
   SidebarContent,
@@ -94,15 +96,21 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { name: platformName, icon: platformIcon } = usePlatformBranding();
+  const initials = platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
-            GF
+            {platformIcon ? (
+              <DynamicIcon name={platformIcon} className="h-4 w-4" />
+            ) : (
+              initials
+            )}
           </div>
-          <span className="font-semibold text-lg tracking-tight">GearFlow</span>
+          <span className="font-semibold text-lg tracking-tight">{platformName}</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>

@@ -16,8 +16,14 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  role          String    @default("user") // "user" or "admin" (site-level)
+  banned        Boolean?
+  banReason     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Better Auth 2FA fields
+  twoFactorEnabled Boolean?
 
   sessions Session[]
   accounts Account[]
@@ -34,6 +40,8 @@ model User {
   addedKitBulkItems       KitBulkItem[]      @relation("KitBulkItemAddedBy")
   uploads                 FileUpload[]
   testTagRecords          TestTagRecord[]
+  twoFactors              TwoFactor[]
+  backupCodes             BackupCode[]
 
   @@map("user")
 }
@@ -1124,4 +1132,44 @@ model TestTagRecord {
   @@index([organizationId, testTagAssetId])
   @@index([organizationId, testDate])
   @@map("test_tag_record")
+}
+
+// ─── Better Auth Two-Factor Tables ──────────────────────────────────────────
+
+model TwoFactor {
+  id            String   @id @default(cuid())
+  secret        String
+  backupCodes   String
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
+}
+
+model BackupCode {
+  id        String   @id @default(cuid())
+  code      String
+  used      Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("backup_code")
+}
+
+// ─── Site Settings ──────────────────────────────────────────────────────────
+
+model SiteSettings {
+  id                     String   @id @default(cuid())
+  platformName           String   @default("GearFlow")
+  platformIcon           String?  // Lucide icon name, e.g. "clapperboard", "zap"
+  platformLogo           String?
+  registrationPolicy     String   @default("OPEN") // OPEN, INVITE_ONLY, DISABLED
+  twoFactorGlobalPolicy  String   @default("OFF")  // OFF, RECOMMENDED, REQUIRED_SITE_ADMINS, REQUIRED_ALL
+  defaultCurrency        String   @default("AUD")
+  defaultTaxRate         Float    @default(10)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("site_settings")
 }

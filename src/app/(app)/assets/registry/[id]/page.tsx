@@ -32,6 +32,7 @@ import { MediaUploader, type MediaItem } from "@/components/media/media-uploader
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { resolveAssetPhotoUrl, isAssetPhotoCustom } from "@/lib/media-utils";
+import { NotViewer } from "@/components/auth/permission-gate";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -136,31 +137,33 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               {ba.model.category && <> &middot; {ba.model.category.name}</>}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit?type=bulk`} />}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-            {ba.isActive && (
+          <NotViewer>
+            <div className="flex gap-2">
+              <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit?type=bulk`} />}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              {ba.isActive && (
+                <Button
+                  variant="outline"
+                  className="text-destructive"
+                  onClick={() => { if (confirm("Archive this bulk asset?")) archiveMutation.mutate(); }}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="text-destructive"
-                onClick={() => { if (confirm("Archive this bulk asset?")) archiveMutation.mutate(); }}
+                onClick={() => { if (confirm("Permanently delete this bulk asset? This cannot be undone.")) deleteMutation.mutate(); }}
+                disabled={deleteMutation.isPending}
               >
-                <Archive className="mr-2 h-4 w-4" />
-                Archive
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
               </Button>
-            )}
-            <Button
-              variant="outline"
-              className="text-destructive"
-              onClick={() => { if (confirm("Permanently delete this bulk asset? This cannot be undone.")) deleteMutation.mutate(); }}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
-          </div>
+            </div>
+          </NotViewer>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -240,31 +243,33 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          {asset.isActive && (
+        <NotViewer>
+          <div className="flex gap-2">
+            <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            {asset.isActive && (
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => { if (confirm("Archive this asset?")) archiveMutation.mutate(); }}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
+              </Button>
+            )}
             <Button
               variant="outline"
               className="text-destructive"
-              onClick={() => { if (confirm("Archive this asset?")) archiveMutation.mutate(); }}
+              onClick={() => { if (confirm("Permanently delete this asset? This cannot be undone.")) deleteMutation.mutate(); }}
+              disabled={deleteMutation.isPending}
             >
-              <Archive className="mr-2 h-4 w-4" />
-              Archive
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </Button>
-          )}
-          <Button
-            variant="outline"
-            className="text-destructive"
-            onClick={() => { if (confirm("Permanently delete this asset? This cannot be undone.")) deleteMutation.mutate(); }}
-            disabled={deleteMutation.isPending}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
+          </div>
+        </NotViewer>
       </div>
 
       <Tabs defaultValue="details">

@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { NotViewer } from "@/components/auth/permission-gate";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -78,10 +79,12 @@ export default function KitsPage() {
             Manage pre-configured kits and cases.
           </p>
         </div>
-        <Button render={<Link href="/kits/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Kit
-        </Button>
+        <NotViewer>
+          <Button render={<Link href="/kits/new" />}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Kit
+          </Button>
+        </NotViewer>
       </div>
 
       {/* Filters */}

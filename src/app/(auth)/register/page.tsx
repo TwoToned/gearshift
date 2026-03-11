@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signUp } from "@/lib/auth-client";
+import { usePlatformBranding } from "@/lib/use-platform-name";
+import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,7 @@ import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { name: platformName, icon: platformIcon } = usePlatformBranding();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,11 +53,15 @@ export default function RegisterPage() {
     <Card>
       <CardHeader className="text-center">
         <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
-          GF
+          {platformIcon ? (
+            <DynamicIcon name={platformIcon} className="h-5 w-5" />
+          ) : (
+            platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+          )}
         </div>
         <CardTitle className="text-xl">Create your account</CardTitle>
         <CardDescription>
-          Get started with GearFlow for your AV business
+          Get started with {platformName} for your AV business
         </CardDescription>
       </CardHeader>
       <CardContent>

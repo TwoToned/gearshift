@@ -19,8 +19,8 @@ import { addMemberByEmail } from "@/server/settings";
 const roles = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
-  { value: "staff", label: "Staff" },
-  { value: "warehouse", label: "Warehouse" },
+  { value: "member", label: "Member" },
+  { value: "viewer", label: "Viewer" },
 ] as const;
 
 type Role = (typeof roles)[number]["value"];
@@ -28,7 +28,7 @@ type Role = (typeof roles)[number]["value"];
 export function InviteMember() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("staff");
+  const [role, setRole] = useState<Role>("member");
 
   const addMutation = useMutation({
     mutationFn: () => addMemberByEmail(email, role),
@@ -60,7 +60,7 @@ export function InviteMember() {
       </div>
       <div className="space-y-1.5">
         <Label>Role</Label>
-        <Select value={role} onValueChange={(v) => setRole((v ?? "staff") as Role)}>
+        <Select value={role} onValueChange={(v) => setRole((v ?? "member") as Role)}>
           <SelectTrigger className="w-full sm:w-[140px]">
             <SelectValue />
           </SelectTrigger>

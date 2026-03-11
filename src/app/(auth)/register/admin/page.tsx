@@ -1,0 +1,176 @@
+"use client";
+
+import { useState, useEffect, use } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { signUp } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Loader2, Shield } from "lucide-react";
+import { Suspense } from "react";
+
+function AdminRegisterForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    async function verifyToken() {
+      if (!token) {
+        setChecking(false);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/admin-register/verify?token=${token}`);
+        if (res.ok) {
+          setVerified(true);
+        }
+      } catch {
+        // Invalid token
+      }
+      setChecking(false);
+    }
+    verifyToken();
+  }, [token]);
+
+  if (checking) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!verified) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Page not found.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await signUp.email({ name, email, password });
+      if (result.error) {
+        toast.error(result.error.message || "Registration failed");
+        return;
+      }
+
+      // Promote to site admin via API
+      await fetch("/api/admin-register/promote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, email }),
+      });
+
+      toast.success("Account created as Site Admin");
+      router.push("/onboarding");
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive text-destructive-foreground">
+          <Shield className="h-5 w-5" />
+        </div>
+        <CardTitle className="text-xl">Site Admin Registration</CardTitle>
+        <CardDescription>
+          Create a site administrator account.
+        </CardDescription>
+        <Badge className="mx-auto mt-2 bg-red-500/10 text-red-500 border-red-500/20">
+          Site Admin Account
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Full name</Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="Jane Smith"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="admin@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="Min. 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create Admin Account
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function AdminRegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      }
+    >
+      <AdminRegisterForm />
+    </Suspense>
+  );
+}

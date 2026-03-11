@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { testTagAssetSchema, type TestTagAssetFormValues } from "@/lib/validations/test-tag";
+import { NotViewer } from "@/components/auth/permission-gate";
 import { createTestTagAsset, peekNextTestTagIds } from "@/server/test-tag-assets";
 import { getAssets } from "@/server/assets";
 import { getBulkAssets } from "@/server/bulk-assets";
@@ -175,6 +176,7 @@ function NewTestTagAssetInner() {
   });
 
   return (
+    <NotViewer fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">New Test & Tag Item</h1>
@@ -425,6 +427,7 @@ function NewTestTagAssetInner() {
         </div>
       </form>
     </div>
+    </NotViewer>
   );
 }
 

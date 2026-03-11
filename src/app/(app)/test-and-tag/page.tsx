@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Loader2, Zap, Plus, List, AlertTriangle, Clock, CheckCircle, XCircle, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { NotViewer } from "@/components/auth/permission-gate";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -70,14 +71,16 @@ export default function TestAndTagPage() {
           <p className="text-muted-foreground">Manage electrical testing and compliance</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button render={<Link href="/test-and-tag/quick-test" />}>
-            <Zap className="mr-2 h-4 w-4" />
-            Quick Test
-          </Button>
-          <Button variant="outline" render={<Link href="/test-and-tag/new" />}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          <NotViewer>
+            <Button render={<Link href="/test-and-tag/quick-test" />}>
+              <Zap className="mr-2 h-4 w-4" />
+              Quick Test
+            </Button>
+            <Button variant="outline" render={<Link href="/test-and-tag/new" />}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+          </NotViewer>
           <Button variant="outline" render={<Link href="/test-and-tag/registry" />}>
             <List className="mr-2 h-4 w-4" />
             Registry

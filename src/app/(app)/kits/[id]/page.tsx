@@ -32,6 +32,7 @@ import { MediaUploader, type MediaItem } from "@/components/media/media-uploader
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveKitPhotoUrl } from "@/lib/media-utils";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { NotViewer } from "@/components/auth/permission-gate";
 import {
   Dialog,
   DialogContent,
@@ -201,18 +202,24 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{kit.assetTag}</h1>
-            <select
-              value={kit.status}
-              onChange={(e) => statusMutation.mutate(e.target.value)}
-              disabled={statusMutation.isPending}
-              className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
-              <option value="IN_MAINTENANCE">In Maintenance</option>
-              <option value="RETIRED">Retired</option>
-              <option value="INCOMPLETE">Incomplete</option>
-            </select>
+            <NotViewer fallback={
+              <Badge variant="outline" className={statusColors[kit.status] || ""}>
+                {kit.status.replace("_", " ")}
+              </Badge>
+            }>
+              <select
+                value={kit.status}
+                onChange={(e) => statusMutation.mutate(e.target.value)}
+                disabled={statusMutation.isPending}
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="CHECKED_OUT">Checked Out</option>
+                <option value="IN_MAINTENANCE">In Maintenance</option>
+                <option value="RETIRED">Retired</option>
+                <option value="INCOMPLETE">Incomplete</option>
+              </select>
+            </NotViewer>
             <Badge variant="outline" className={conditionColors[kit.condition] || ""}>
               {kit.condition}
             </Badge>
@@ -226,10 +233,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           </p>
           </div>
         </div>
-        <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit
-        </Button>
+        <NotViewer>
+          <Button variant="outline" render={<Link href={`/kits/${id}/edit`} />}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+        </NotViewer>
       </div>
 
       {/* Kit Info Card */}
@@ -291,10 +300,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Serialized Items</h3>
-              <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                Add Item
-              </Button>
+              <NotViewer>
+                <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Item
+                </Button>
+              </NotViewer>
             </div>
             {kit.serializedItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -333,18 +344,20 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            onClick={() => {
-                              if (confirm("Remove this item from the kit?")) {
-                                removeItemMutation.mutate(item.assetId);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <NotViewer>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("Remove this item from the kit?")) {
+                                  removeItemMutation.mutate(item.assetId);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </NotViewer>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -358,10 +371,12 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium">Bulk Items</h3>
-              <Button size="sm" variant="outline" onClick={() => setShowAddBulkItem(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                Add Bulk Item
-              </Button>
+              <NotViewer>
+                <Button size="sm" variant="outline" onClick={() => setShowAddBulkItem(true)}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Bulk Item
+                </Button>
+              </NotViewer>
             </div>
             {kit.bulkItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -389,18 +404,20 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                           {item.position || "—"}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            onClick={() => {
-                              if (confirm("Remove this bulk item from the kit?")) {
-                                removeBulkMutation.mutate(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <NotViewer>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("Remove this bulk item from the kit?")) {
+                                  removeBulkMutation.mutate(item.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </NotViewer>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getLocation, deleteLocation, updateLocationNotes } from "@/server/locations";
+import { NotViewer } from "@/components/auth/permission-gate";
 import { addLocationMedia, removeLocationMedia } from "@/server/location-media";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { Button } from "@/components/ui/button";
@@ -106,20 +107,22 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
             {location.parent && <> &middot; Sub-location of {location.parent.name}</>}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<Link href={`/locations/${id}/edit`} />}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            className="text-destructive"
-            onClick={() => { if (confirm("Delete this location? This cannot be undone.")) deleteMutation.mutate(); }}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
+        <NotViewer>
+          <div className="flex gap-2">
+            <Button variant="outline" render={<Link href={`/locations/${id}/edit`} />}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              className="text-destructive"
+              onClick={() => { if (confirm("Delete this location? This cannot be undone.")) deleteMutation.mutate(); }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </div>
+        </NotViewer>
       </div>
 
       {/* Info Cards */}

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getClient, archiveClient, updateClientNotes } from "@/server/clients";
+import { NotViewer } from "@/components/auth/permission-gate";
 import { NotesEditor } from "@/components/ui/notes-editor";
 import { addClientMedia, removeClientMedia } from "@/server/client-media";
 import { Button } from "@/components/ui/button";
@@ -92,22 +93,24 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             {client.contactEmail && <> &middot; {client.contactEmail}</>}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<Link href={`/clients/${id}/edit`} />}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          {client.isActive && (
-            <Button
-              variant="outline"
-              className="text-destructive"
-              onClick={() => { if (confirm("Archive this client?")) archiveMutation.mutate(); }}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              Archive
+        <NotViewer>
+          <div className="flex gap-2">
+            <Button variant="outline" render={<Link href={`/clients/${id}/edit`} />}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
             </Button>
-          )}
-        </div>
+            {client.isActive && (
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => { if (confirm("Archive this client?")) archiveMutation.mutate(); }}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
+              </Button>
+            )}
+          </div>
+        </NotViewer>
       </div>
 
       {/* Info Cards */}

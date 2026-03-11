@@ -142,6 +142,21 @@ No test framework is configured.
 - **Reports**: Full Register, Overdue/Non-Compliant, Test Session, Item History, Due Schedule, Class Summary, Tester Activity, Failed Items, Bulk Asset Summary, Compliance Certificate. Each has PDF; 8 have CSV export.
 - **Date serialization in API route**: Prisma `Date` objects must be JSON-serialized before passing to PDF components: `JSON.parse(JSON.stringify(data, (_key, value) => value instanceof Date ? value.toISOString() : value))`.
 
+### User Management & Access Control
+- **Two-tier model**: Site admins (global) + organization roles (per-org).
+- **Site admin**: `User.role = "admin"`. First user auto-promoted. Additional admins via secret registration link (`/register/admin?token=...`).
+- **Org roles** (hierarchy): `owner`, `admin`, `manager`, `member`, `viewer`. Legacy: `staff`, `warehouse` (mapped to member-level permissions).
+- **Permissions**: `src/lib/permissions.ts` defines `rolePermissions` map. Enforced via `requirePermission(resource, action)` in `src/lib/org-context.ts`.
+- **Server actions**: `src/server/site-admin.ts` (platform admin), `src/server/org-members.ts` (org member management), `src/server/user-profile.ts` (user account).
+- **Admin panel**: `src/app/(admin)/admin/` — dashboard, organizations, users, settings. Layout checks `User.role === "admin"`.
+- **Account page**: `src/app/(app)/account/` — profile, password change, 2FA setup, organizations, active sessions.
+- **2FA**: Better Auth `twoFactor` plugin (TOTP). Setup in account page. Verification at `/two-factor`. Site admin can force-disable.
+- **Email**: Resend SDK (`src/lib/email.ts`). Used for invitations, password reset, email verification, role change notifications.
+- **Invitations**: Better Auth org invitations + email sending. Accept via `/invite/[id]`.
+- **SiteSettings model**: Single-row table for platform name, logo, registration policy, 2FA global policy, default currency/tax.
+- **Registration policies**: OPEN, INVITE_ONLY, DISABLED (configured in site admin settings).
+- **User banning**: `User.banned` field. Better Auth's `admin` plugin handles login blocking.
+
 ### Client Component Patterns
 - All hooks must be called unconditionally (before any early returns) to satisfy React's Rules of Hooks.
 - Query/mutation pattern: `useQuery` for data fetching, `useMutation` for writes, `queryClient.invalidateQueries()` on success.

@@ -20,6 +20,7 @@ import {
   updateOrganization,
   type OrgSettings,
 } from "@/server/settings";
+import { NotViewer } from "@/components/auth/permission-gate";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -192,14 +193,16 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Next tag: <span className="font-mono font-medium">{(settings.assetTagPrefix || "")}{String((settings.assetTagCounter ?? 0) + 1).padStart(settings.assetTagDigits ?? 4, "0")}</span>
             </p>
-            <div className="flex justify-end">
-              <Button
-                onClick={() => updateMutation.mutate()}
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
+            <NotViewer>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => updateMutation.mutate()}
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </NotViewer>
           </CardContent>
         </Card>
 
@@ -298,14 +301,16 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end">
-              <Button
-                onClick={() => updateMutation.mutate()}
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
+            <NotViewer>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => updateMutation.mutate()}
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </NotViewer>
           </CardContent>
         </Card>
 
@@ -323,39 +328,45 @@ export default function SettingsPage() {
         </Card>
 
         {/* Categories */}
-        <Card>
-          <CardContent className="pt-6">
-            <CategoryManager />
-          </CardContent>
-        </Card>
+        <NotViewer>
+          <Card>
+            <CardContent className="pt-6">
+              <CategoryManager />
+            </CardContent>
+          </Card>
+        </NotViewer>
 
         {/* Locations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Locations</CardTitle>
-            <CardDescription>
-              Manage warehouses, venues, and storage locations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" render={<Link href="/locations" />}>
-              Manage Locations
-            </Button>
-          </CardContent>
-        </Card>
+        <NotViewer>
+          <Card>
+            <CardHeader>
+              <CardTitle>Locations</CardTitle>
+              <CardDescription>
+                Manage warehouses, venues, and storage locations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" render={<Link href="/locations" />}>
+                Manage Locations
+              </Button>
+            </CardContent>
+          </Card>
+        </NotViewer>
 
         {/* Suppliers */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Suppliers</CardTitle>
-            <CardDescription>
-              Manage your equipment suppliers and vendors.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SupplierManager />
-          </CardContent>
-        </Card>
+        <NotViewer>
+          <Card>
+            <CardHeader>
+              <CardTitle>Suppliers</CardTitle>
+              <CardDescription>
+                Manage your equipment suppliers and vendors.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SupplierManager />
+            </CardContent>
+          </Card>
+        </NotViewer>
 
         {/* Team */}
         <Card>
@@ -366,8 +377,10 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <InviteMember />
-            <Separator />
+            <NotViewer>
+              <InviteMember />
+              <Separator />
+            </NotViewer>
             <MemberList />
           </CardContent>
         </Card>
