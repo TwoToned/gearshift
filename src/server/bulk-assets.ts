@@ -23,11 +23,14 @@ export async function getBulkAssets(params?: {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
   const {
     search, categoryId, status, locationId, modelId,
     isActive = true, page = 1, pageSize = 25,
+    sortBy = "assetTag", sortOrder = "asc",
   } = params || {};
 
   const where: Prisma.BulkAssetWhereInput = {
@@ -52,7 +55,9 @@ export async function getBulkAssets(params?: {
         model: { include: { category: true } },
         location: true,
       },
-      orderBy: { assetTag: "asc" },
+      orderBy: sortBy === "model" ? { model: { name: sortOrder } }
+        : sortBy === "location" ? { location: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -138,6 +143,28 @@ export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
       isActive: parsed.isActive,
     },
   }));
+}
+
+export async function deleteBulkAsset(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  const asset = await prisma.bulkAsset.findUnique({
+    where: { id, organizationId },
+    include: {
+      _count: { select: { lineItems: true, kitBulkItems: true } },
+    },
+  });
+  if (!asset) throw new Error("Bulk asset not found");
+
+  if (asset._count.lineItems > 0) {
+    throw new Error("Cannot delete — this bulk asset is referenced by project line items. Archive it instead.");
+  }
+  if (asset._count.kitBulkItems > 0) {
+    throw new Error("Cannot delete — this bulk asset is part of a kit. Remove it from the kit first.");
+  }
+
+  await prisma.bulkAsset.delete({ where: { id, organizationId } });
+  return { id };
 }
 
 export async function archiveBulkAsset(id: string) {

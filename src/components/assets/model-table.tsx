@@ -3,28 +3,33 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Download, Upload } from "lucide-react";
 
 import { getModels } from "@/server/models";
 import { getCategories } from "@/server/categories";
+import { exportModelsCSV } from "@/server/csv";
+import { CSVImportDialog } from "@/components/assets/csv-import-dialog";
+import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
 export function ModelTable() {
+  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
+    useTablePreferences("models", { sortBy: "name", sortOrder: "asc" });
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [assetType, setAssetType] = useState<"" | "SERIALIZED" | "BULK">("");
-  const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -32,18 +37,22 @@ export function ModelTable() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["models", { search, categoryId, assetType, page }],
+    queryKey: ["models", { search, categoryId, assetType, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getModels({
         search: search || undefined,
         categoryId: categoryId || undefined,
         assetType: assetType as "SERIALIZED" | "BULK" | undefined || undefined,
         page,
+        pageSize,
+        sortBy,
+        sortOrder,
       }),
   });
 
   const models = data?.models || [];
   const totalPages = data?.totalPages || 1;
+  const total = data?.total || 0;
 
   return (
     <div className="space-y-4">
@@ -80,6 +89,26 @@ export function ModelTable() {
           <option value="SERIALIZED">Serialized</option>
           <option value="BULK">Bulk</option>
         </select>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            const csv = await exportModelsCSV();
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "models.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
+        <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Import
+        </Button>
         <Button render={<Link href="/assets/models/new" />}>
           <Plus className="mr-2 h-4 w-4" />
           New Model
@@ -91,12 +120,12 @@ export function ModelTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Manufacturer</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Assets</TableHead>
-              <TableHead className="text-right">Rental $/day</TableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
+              <SortableTableHead sortKey="manufacturer" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Manufacturer</SortableTableHead>
+              <SortableTableHead sortKey="category" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Category</SortableTableHead>
+              <SortableTableHead sortKey="assetType" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Assets</SortableTableHead>
+              <SortableTableHead sortKey="defaultRentalPrice" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Rental $/day</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -153,21 +182,24 @@ export function ModelTable() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({data?.total} total)
+            Page {page} of {totalPages} ({total} total)
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
-          </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Previous
+          </Button>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
+
+      <CSVImportDialog type="models" open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

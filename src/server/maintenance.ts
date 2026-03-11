@@ -16,9 +16,11 @@ export async function getMaintenanceRecords(params?: {
   assetId?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
-  const { search, status, type, assetId, page = 1, pageSize = 25 } = params || {};
+  const { search, status, type, assetId, page = 1, pageSize = 25, sortBy, sortOrder } = params || {};
 
   const where: Prisma.MaintenanceRecordWhereInput = {
     organizationId,
@@ -43,7 +45,9 @@ export async function getMaintenanceRecords(params?: {
         assignedTo: true,
         reportedBy: true,
       },
-      orderBy: [{ status: "asc" }, { scheduledDate: "asc" }],
+      orderBy: sortBy
+        ? (sortBy === "asset" ? { asset: { assetTag: sortOrder || "asc" } } : { [sortBy]: sortOrder || "asc" })
+        : [{ status: "asc" }, { scheduledDate: "asc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

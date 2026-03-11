@@ -408,7 +408,7 @@ export function ProjectForm({ initialData }: ProjectFormProps) {
           <CardHeader>
             <CardTitle className="text-base">Financial</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="discountPercent">Discount (%)</Label>
               <Input
@@ -441,6 +441,17 @@ export function ProjectForm({ initialData }: ProjectFormProps) {
                 step="0.01"
                 min="0"
                 {...form.register("depositPaid")}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invoicedTotal">Invoiced Total ($)</Label>
+              <Input
+                id="invoicedTotal"
+                type="number"
+                step="0.01"
+                min="0"
+                {...form.register("invoicedTotal")}
                 placeholder="0.00"
               />
             </div>

@@ -23,6 +23,8 @@ interface ComboboxPickerProps {
   allowClear?: boolean
   className?: string
   disabled?: boolean
+  /** When true, allows typing a new value that doesn't exist in options */
+  creatable?: boolean
 }
 
 function ComboboxPicker({
@@ -37,6 +39,7 @@ function ComboboxPicker({
   allowClear = false,
   className,
   disabled = false,
+  creatable = false,
 }: ComboboxPickerProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -53,6 +56,8 @@ function ComboboxPicker({
   }, [options, search])
 
   const selectedOption = options.find((opt) => opt.value === value)
+  // For creatable mode, show the raw value even if it's not in options
+  const displayLabel = selectedOption?.label || (creatable && value ? value : null)
 
   function handleSelect(optionValue: string) {
     onChange(optionValue)
@@ -74,12 +79,12 @@ function ComboboxPicker({
           "flex h-9 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           className
         )}
-        data-placeholder={!selectedOption ? "" : undefined}
+        data-placeholder={!displayLabel ? "" : undefined}
       >
         <span className="flex flex-1 items-center gap-1.5 text-left line-clamp-1">
-          {selectedOption ? selectedOption.label : placeholder}
+          {displayLabel || placeholder}
         </span>
-        {allowClear && selectedOption ? (
+        {allowClear && displayLabel ? (
           <span
             role="button"
             className="pointer-events-auto size-4 text-muted-foreground hover:text-foreground"
@@ -117,6 +122,31 @@ function ComboboxPicker({
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setOpen(false)
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    const trimmed = search.trim()
+                    if (!trimmed) return
+                    // If there's an exact match (case-insensitive), select it
+                    const exactMatch = options.find(
+                      (opt) => opt.label.toLowerCase() === trimmed.toLowerCase()
+                    )
+                    if (exactMatch) {
+                      onChange(exactMatch.value)
+                      setOpen(false)
+                      return
+                    }
+                    // If creatable and no exact match, use the typed value
+                    if (creatable) {
+                      onChange(trimmed)
+                      setOpen(false)
+                      return
+                    }
+                    // If there's exactly one filtered result, select it
+                    if (filtered.length === 1) {
+                      onChange(filtered[0].value)
+                      setOpen(false)
+                    }
                   }
                 }}
               />
@@ -156,6 +186,27 @@ function ComboboxPicker({
                 ))
               )}
             </div>
+
+            {creatable && search.trim() && !options.some((opt) => opt.label.toLowerCase() === search.trim().toLowerCase()) && (
+              <>
+                <div className="pointer-events-none -mx-0 my-0 h-px bg-border" />
+                <div className="p-1">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onChange(search.trim())
+                      setOpen(false)
+                    }}
+                    className="flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <PlusIcon className="size-4" />
+                    <span>Use &ldquo;{search.trim()}&rdquo;</span>
+                  </button>
+                </div>
+              </>
+            )}
 
             {onCreateNew && (
               <>

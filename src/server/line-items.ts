@@ -8,12 +8,12 @@ import {
 } from "@/lib/validations/line-item";
 import { serialize } from "@/lib/serialize";
 
-export async function addLineItem(projectId: string, data: LineItemFormValues) {
+export async function addLineItem(projectId: string, data: LineItemFormValues, allowOverbook = false) {
   const { organizationId } = await getOrgContext();
   const parsed = lineItemSchema.parse(data);
 
   // Server-side availability enforcement for equipment
-  if (parsed.type === "EQUIPMENT" && parsed.modelId) {
+  if (parsed.type === "EQUIPMENT" && parsed.modelId && !allowOverbook) {
     const project = await prisma.project.findUnique({
       where: { id: projectId, organizationId },
       select: { rentalStartDate: true, rentalEndDate: true },
@@ -71,7 +71,6 @@ export async function addLineItem(projectId: string, data: LineItemFormValues) {
                 status: { notIn: ["CANCELLED", "RETURNED", "COMPLETED", "INVOICED"] },
                 rentalStartDate: { lte: project.rentalEndDate },
                 rentalEndDate: { gte: project.rentalStartDate },
-                id: { not: projectId },
               },
             },
           });
@@ -87,6 +86,52 @@ export async function addLineItem(projectId: string, data: LineItemFormValues) {
           }
         }
       }
+    }
+  }
+
+  // If adding by model (no specific asset), merge into existing line item for same model on this project
+  if (parsed.type === "EQUIPMENT" && parsed.modelId && !parsed.assetId) {
+    const existing = await prisma.projectLineItem.findFirst({
+      where: {
+        projectId,
+        organizationId,
+        modelId: parsed.modelId,
+        assetId: null,
+        isKitChild: false,
+        status: { not: "CANCELLED" },
+      },
+    });
+
+    if (existing) {
+      const newQuantity = existing.quantity + parsed.quantity;
+      const newLineTotal = calculateLineTotal(
+        parsed.unitPrice ?? (existing.unitPrice ? Number(existing.unitPrice) : undefined),
+        newQuantity,
+        parsed.duration || existing.duration,
+        parsed.discount ?? (existing.discount ? Number(existing.discount) : undefined),
+      );
+
+      const result = await prisma.projectLineItem.update({
+        where: { id: existing.id },
+        data: {
+          quantity: newQuantity,
+          unitPrice: parsed.unitPrice ?? existing.unitPrice,
+          pricingType: parsed.pricingType || existing.pricingType,
+          duration: parsed.duration || existing.duration,
+          discount: parsed.discount ?? existing.discount,
+          lineTotal: newLineTotal,
+          groupName: parsed.groupName || existing.groupName,
+          notes: parsed.notes
+            ? existing.notes
+              ? `${existing.notes}; ${parsed.notes}`
+              : parsed.notes
+            : existing.notes,
+        },
+        include: { model: true, asset: true, bulkAsset: true },
+      });
+
+      await recalculateProjectTotals(projectId);
+      return serialize(result);
     }
   }
 
@@ -135,7 +180,7 @@ export async function addLineItem(projectId: string, data: LineItemFormValues) {
   return serialize(result);
 }
 
-export async function updateLineItem(id: string, data: LineItemFormValues) {
+export async function updateLineItem(id: string, data: LineItemFormValues, allowOverbook = false) {
   const { organizationId } = await getOrgContext();
   const parsed = lineItemSchema.parse(data);
 
@@ -180,7 +225,8 @@ export async function addKitLineItem(
   projectId: string,
   kitId: string,
   pricingMode: "KIT_PRICE" | "ITEMIZED" = "KIT_PRICE",
-  unitPrice?: number
+  unitPrice?: number,
+  groupName?: string,
 ) {
   const { organizationId } = await getOrgContext();
 
@@ -218,9 +264,10 @@ export async function addKitLineItem(
     const parentItem = await tx.projectLineItem.create({
       data: {
         organizationId, projectId, type: "EQUIPMENT", kitId,
-        description: `${kit.assetTag} — ${kit.name}`,
+        description: `${kit.assetTag} - ${kit.name}`,
         quantity: 1, unitPrice: unitPrice ?? null, pricingType: "PER_DAY", duration: 1,
         lineTotal: unitPrice ?? null, sortOrder: nextSort++, pricingMode,
+        groupName: groupName || null,
       },
     });
 
@@ -287,17 +334,32 @@ export async function removeLineItem(id: string) {
   return serialize({ success: true });
 }
 
-export async function reorderLineItems(projectId: string, itemIds: string[]) {
+export async function reorderLineItems(
+  projectId: string,
+  itemIds: string[],
+  groupUpdates?: { id: string; groupName: string | null }[],
+) {
   const { organizationId } = await getOrgContext();
 
-  await prisma.$transaction(
-    itemIds.map((id, index) =>
-      prisma.projectLineItem.update({
-        where: { id, organizationId },
-        data: { sortOrder: index },
-      })
-    )
+  const updates = itemIds.map((id, index) =>
+    prisma.projectLineItem.update({
+      where: { id, organizationId },
+      data: { sortOrder: index },
+    })
   );
+
+  if (groupUpdates?.length) {
+    for (const { id, groupName } of groupUpdates) {
+      updates.push(
+        prisma.projectLineItem.update({
+          where: { id, organizationId },
+          data: { groupName: groupName || null },
+        })
+      );
+    }
+  }
+
+  await prisma.$transaction(updates);
 
   return serialize({ success: true });
 }
@@ -324,7 +386,7 @@ export async function checkAvailability(
   });
 
   if (!model) {
-    return serialize({ totalStock: 0, booked: 0, available: 0, conflicts: [] });
+    return serialize({ totalStock: 0, booked: 0, available: 0, bookedOnThisProject: 0, conflicts: [] });
   }
 
   // Find overlapping projects (where the project rental period overlaps with the given dates)
@@ -337,7 +399,6 @@ export async function checkAvailability(
         status: { notIn: ["CANCELLED", "RETURNED", "COMPLETED", "INVOICED"] },
         rentalStartDate: { lte: endDate },
         rentalEndDate: { gte: startDate },
-        ...(excludeProjectId ? { id: { not: excludeProjectId } } : {}),
       },
     },
     include: {
@@ -345,12 +406,20 @@ export async function checkAvailability(
     },
   });
 
+  const bookedOnThisProject = excludeProjectId
+    ? overlappingLineItems
+        .filter((li) => li.project.id === excludeProjectId)
+        .reduce((sum, li) => sum + li.quantity, 0)
+    : 0;
+
   const conflicts = [
     ...new Map(
-      overlappingLineItems.map((li) => [
-        li.project.id,
-        `${li.project.projectNumber} - ${li.project.name}`,
-      ])
+      overlappingLineItems
+        .filter((li) => !excludeProjectId || li.project.id !== excludeProjectId)
+        .map((li) => [
+          li.project.id,
+          `${li.project.projectNumber} - ${li.project.name}`,
+        ])
     ).values(),
   ];
 
@@ -362,7 +431,7 @@ export async function checkAvailability(
     );
     const available = Math.max(0, totalStock - booked);
 
-    return serialize({ totalStock, booked, available, conflicts });
+    return serialize({ totalStock, booked, available, bookedOnThisProject, conflicts });
   } else {
     // BULK: sum up total quantity across all bulk assets
     const totalStock = model.bulkAssets.reduce(
@@ -375,7 +444,7 @@ export async function checkAvailability(
     );
     const available = Math.max(0, totalStock - booked);
 
-    return serialize({ totalStock, booked, available, conflicts });
+    return serialize({ totalStock, booked, available, bookedOnThisProject, conflicts });
   }
 }
 

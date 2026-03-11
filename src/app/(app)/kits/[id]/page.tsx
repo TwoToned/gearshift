@@ -1,15 +1,15 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2, X, ScanBarcode } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   getKit,
   updateKit,
-  addSerializedItemToKit,
+  addSerializedItemsToKit,
   removeSerializedItemFromKit,
   addBulkItemToKit,
   removeBulkItemFromKit,
@@ -70,8 +70,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
   // Dialog states – must be declared before any early returns
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddBulkItem, setShowAddBulkItem] = useState(false);
-  const [addItemAssetId, setAddItemAssetId] = useState("");
-  const [addItemPosition, setAddItemPosition] = useState("");
+  const [stagedItems, setStagedItems] = useState<Array<{ assetId: string; assetTag: string; modelName: string }>>([]);
   const [addBulkAssetId, setAddBulkAssetId] = useState("");
   const [addBulkQuantity, setAddBulkQuantity] = useState(1);
   const [addBulkPosition, setAddBulkPosition] = useState("");
@@ -119,19 +118,18 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
     onError: (e) => toast.error(e.message),
   });
 
-  const addItemMutation = useMutation({
+  const addItemsMutation = useMutation({
     mutationFn: () =>
-      addSerializedItemToKit(id, {
-        assetId: addItemAssetId,
-        position: addItemPosition || undefined,
-      }),
+      addSerializedItemsToKit(
+        id,
+        stagedItems.map((item) => ({ assetId: item.assetId })),
+      ),
     onSuccess: () => {
-      toast.success("Item added to kit");
+      toast.success(`${stagedItems.length} item${stagedItems.length > 1 ? "s" : ""} added to kit`);
       queryClient.invalidateQueries({ queryKey: ["kit", id] });
       queryClient.invalidateQueries({ queryKey: ["available-assets-for-kit"] });
       setShowAddItem(false);
-      setAddItemAssetId("");
-      setAddItemPosition("");
+      setStagedItems([]);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -490,44 +488,60 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
         </Card>
       )}
 
-      {/* Add Serialized Item Dialog */}
-      <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
-        <DialogContent className="sm:max-w-md">
+      {/* Add Serialized Items Dialog */}
+      <Dialog
+        open={showAddItem}
+        onOpenChange={(open) => {
+          setShowAddItem(open);
+          if (!open) setStagedItems([]);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Serialized Item</DialogTitle>
+            <DialogTitle>Add Items to Kit</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-2">
-              <Label>Asset</Label>
-              <ComboboxPicker
-                value={addItemAssetId}
-                onChange={setAddItemAssetId}
-                options={availableAssets.map((a) => ({
-                  value: a.id,
-                  label: a.assetTag,
-                  description: a.model.name,
-                }))}
-                placeholder="Select an asset..."
-                searchPlaceholder="Search available assets..."
-              />
+          <p className="text-sm text-muted-foreground">
+            Scan a barcode or search for an asset to add it to the list. Repeat for multiple items.
+          </p>
+          <ScanInput
+            availableAssets={availableAssets}
+            stagedIds={new Set(stagedItems.map((i) => i.assetId))}
+            onAdd={(asset) => {
+              setStagedItems((prev) => [
+                ...prev,
+                { assetId: asset.id, assetTag: asset.assetTag, modelName: asset.model.name },
+              ]);
+            }}
+          />
+          {stagedItems.length > 0 && (
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {stagedItems.map((item, i) => (
+                <div key={item.assetId} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
+                  <div>
+                    <span className="font-mono font-medium">{item.assetTag}</span>
+                    <span className="text-muted-foreground ml-2">{item.modelName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStagedItems((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-item-position">Position (optional)</Label>
-              <Input
-                id="add-item-position"
-                value={addItemPosition}
-                onChange={(e) => setAddItemPosition(e.target.value)}
-                placeholder="e.g. Slot 1, Top layer"
-              />
-            </div>
-          </div>
+          )}
           <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddItem(false); setStagedItems([]); }}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => addItemMutation.mutate()}
-              disabled={!addItemAssetId || addItemMutation.isPending}
+              onClick={() => addItemsMutation.mutate()}
+              disabled={stagedItems.length === 0 || addItemsMutation.isPending}
             >
-              {addItemMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Item
+              {addItemsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add {stagedItems.length} Item{stagedItems.length !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -585,6 +599,117 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Scan / Search Input for adding items ────────────────────────────────────
+
+interface AvailableAsset {
+  id: string;
+  assetTag: string;
+  model: { name: string };
+}
+
+function ScanInput({
+  availableAssets,
+  stagedIds,
+  onAdd,
+}: {
+  availableAssets: AvailableAsset[];
+  stagedIds: Set<string>;
+  onAdd: (asset: AvailableAsset) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Filter out already-staged assets
+  const filtered = useMemo(() => {
+    const remaining = availableAssets.filter((a) => !stagedIds.has(a.id));
+    if (!search) return remaining.slice(0, 20);
+    const lower = search.toLowerCase();
+    return remaining.filter(
+      (a) =>
+        a.assetTag.toLowerCase().includes(lower) ||
+        a.model.name.toLowerCase().includes(lower),
+    );
+  }, [availableAssets, stagedIds, search]);
+
+  const handleSelect = useCallback(
+    (asset: AvailableAsset) => {
+      onAdd(asset);
+      setSearch("");
+      setShowResults(false);
+      // Refocus input for next scan
+      setTimeout(() => inputRef.current?.focus(), 0);
+    },
+    [onAdd],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && search) {
+        e.preventDefault();
+        // Try exact match on asset tag first, then first filtered result
+        const exact = filtered.find(
+          (a) => a.assetTag.toLowerCase() === search.toLowerCase(),
+        );
+        const match = exact || filtered[0];
+        if (match) {
+          handleSelect(match);
+        } else {
+          toast.error("No matching asset found");
+        }
+      }
+    },
+    [search, filtered, handleSelect],
+  );
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <ScanBarcode className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setShowResults(true);
+          }}
+          onFocus={() => setShowResults(true)}
+          onBlur={() => {
+            // Delay to allow click on result
+            setTimeout(() => setShowResults(false), 200);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Scan barcode or search by tag / model..."
+          className="pl-9"
+          autoFocus
+        />
+      </div>
+      {showResults && search && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+              No matching available assets.
+            </div>
+          ) : (
+            filtered.map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(asset)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground text-left"
+              >
+                <span className="font-mono font-medium">{asset.assetTag}</span>
+                <span className="text-muted-foreground">{asset.model.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

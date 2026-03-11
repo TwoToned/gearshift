@@ -15,6 +15,8 @@ interface LineItem {
   isKitChild?: boolean;
   kitId?: string | null;
   pricingMode?: string | null;
+  notes: string | null;
+  isOverbooked?: boolean;
   model: { name: string; modelNumber?: string | null } | null;
   kit?: { assetTag: string; name: string } | null;
   childLineItems?: LineItem[];
@@ -118,7 +120,7 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                 )}
               </View>
             ) : (
-              <Text style={styles.value}>—</Text>
+              <Text style={styles.value}>-</Text>
             )}
           </View>
           <View style={styles.col}>
@@ -129,7 +131,7 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                 <Text style={styles.label}>Rental Period</Text>
                 <Text style={styles.value}>
                   {formatDate(project.rentalStartDate)}
-                  {project.rentalEndDate ? ` — ${formatDate(project.rentalEndDate)}` : ""}
+                  {project.rentalEndDate ? ` - ${formatDate(project.rentalEndDate)}` : ""}
                 </Text>
               </View>
             )}
@@ -161,38 +163,48 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                   return (
                     <View key={item.id}>
                       <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                        <Text style={[styles.td, { flex: 3 }]}>
-                          {isKit
-                            ? (item.description || item.kit?.name || "Kit")
-                            : item.model
-                              ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
-                              : item.description || "—"}
-                        </Text>
+                        <View style={{ flex: 3 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Text style={styles.td}>
+                              {isKit
+                                ? (item.description || item.kit?.name || "Kit")
+                                : item.model
+                                  ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
+                                  : item.description || "-"}
+                            </Text>
+                            {item.isOverbooked && (
+                              <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                            )}
+                          </View>
+                          {item.notes && (
+                            <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
+                          )}
+                        </View>
                         <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
                           {item.quantity}
                         </Text>
                         <Text style={[styles.tdRight, { width: 60 }]}>
-                          {isItemized ? "—" : item.unitPrice != null
+                          {isItemized ? "-" : item.unitPrice != null
                             ? `${formatCurrency(item.unitPrice)}${pricingLabels[item.pricingType] || ""}`
-                            : "—"}
+                            : "-"}
                         </Text>
                         <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
                           {item.duration}
                         </Text>
                         <Text style={[styles.tdRight, { width: 60 }]}>
-                          {isItemized ? "—" : formatCurrency(item.lineTotal)}
+                          {isItemized ? "-" : formatCurrency(item.lineTotal)}
                         </Text>
                       </View>
                       {children.map((child) => (
                         <View key={child.id} style={styles.tableRow}>
                           <Text style={[styles.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                            {child.model?.name || child.description || "—"}
+                            {child.model?.name || child.description || "-"}
                           </Text>
                           <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.quantity}
                           </Text>
                           <Text style={[styles.tdRight, { width: 60, fontSize: 8 }]}>
-                            {child.unitPrice != null ? formatCurrency(child.unitPrice) : "—"}
+                            {child.unitPrice != null ? formatCurrency(child.unitPrice) : "-"}
                           </Text>
                           <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                             {child.duration}
@@ -254,7 +266,7 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          {org.name} • {org.email || ""} • {org.phone || ""}
+          {org.name} | {org.email || ""} | {org.phone || ""}
           {"\n"}Thank you for your business.
         </Text>
       </Page>

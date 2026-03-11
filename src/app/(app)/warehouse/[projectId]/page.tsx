@@ -436,8 +436,10 @@ export default function WarehouseProjectPage({
           setScanValue("");
           return;
         }
+        const detail = "detail" in result ? (result.detail as string) : "";
         const messages: Record<string, string> = {
-          already_checked_out: "Already checked out",
+          already_checked_out: "Already checked out on this project",
+          asset_checked_out_elsewhere: `Already checked out${detail}`,
           not_on_project: "Asset not assigned to this project",
           not_checked_out: "Asset is not checked out on this project",
           already_returned: "All units already returned",
@@ -896,9 +898,9 @@ export default function WarehouseProjectPage({
           <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
           {project.client && <p className="text-muted-foreground">{project.client.name}</p>}
         </div>
-        <Button variant="outline" render={<Link href={`/warehouse/${projectId}/pull-sheet`} />}>
+        <Button variant="outline" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
           <Printer className="mr-2 h-4 w-4" />
-          Pull Sheet
+          Pull Slip
         </Button>
       </div>
 

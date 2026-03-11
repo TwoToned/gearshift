@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   lineItemSchema,
   type LineItemFormValues,
 } from "@/lib/validations/line-item";
-import { updateLineItem } from "@/server/line-items";
+import { updateLineItem, checkAvailability } from "@/server/line-items";
 import {
   Dialog,
   DialogContent,
@@ -24,9 +24,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ComboboxPicker } from "@/components/ui/combobox-picker";
 
 interface EditLineItemDialogProps {
   projectId: string;
+  existingGroups?: string[];
+  onGroupCreated?: (group: string) => void;
+  rentalStartDate?: Date;
+  rentalEndDate?: Date;
   lineItem: {
     id: string;
     type: string;
@@ -50,6 +55,10 @@ interface EditLineItemDialogProps {
 
 export function EditLineItemDialog({
   projectId,
+  existingGroups = [],
+  onGroupCreated,
+  rentalStartDate,
+  rentalEndDate,
   lineItem,
   open,
   onOpenChange,
@@ -81,13 +90,51 @@ export function EditLineItemDialog({
     }
   }, [lineItem, open, form]);
 
+  const [overbookConfirmed, setOverbookConfirmed] = useState(false);
+  const requestedQty = Number(form.watch("quantity")) || 1;
+
+  // Availability check for equipment items with a model
+  const { data: availability } = useQuery({
+    queryKey: [
+      "availability",
+      lineItem?.modelId,
+      rentalStartDate?.toISOString(),
+      rentalEndDate?.toISOString(),
+      projectId,
+    ],
+    queryFn: () =>
+      checkAvailability(
+        lineItem!.modelId!,
+        rentalStartDate!,
+        rentalEndDate!,
+        projectId,
+      ),
+    enabled: open && !!lineItem?.modelId && !!rentalStartDate && !!rentalEndDate,
+  });
+
+  // Available for this edit = total stock minus all other bookings (excluding this item's current qty)
+  const availableForEdit = availability
+    ? availability.totalStock - (availability.booked - lineItem!.quantity)
+    : null;
+  const isOverbooked = availableForEdit != null && requestedQty > availableForEdit;
+
+  // Reset overbook confirmation when quantity changes
+  useEffect(() => {
+    setOverbookConfirmed(false);
+  }, [requestedQty]);
+
   const mutation = useMutation({
     mutationFn: (data: LineItemFormValues) =>
-      updateLineItem(lineItem!.id, data),
-    onSuccess: () => {
+      updateLineItem(lineItem!.id, data, overbookConfirmed),
+    onSuccess: (_result, variables) => {
+      if (variables.groupName && onGroupCreated) {
+        onGroupCreated(variables.groupName);
+      }
       toast.success("Line item updated");
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["availability"] });
       onOpenChange(false);
+      setOverbookConfirmed(false);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -197,11 +244,22 @@ export function EditLineItemDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-groupName">Group Name</Label>
-            <Input
-              id="edit-groupName"
-              {...form.register("groupName")}
-              placeholder="e.g. Audio, Lighting"
+            <Label>Group Name</Label>
+            <Controller
+              control={form.control}
+              name="groupName"
+              render={({ field }) => (
+                <ComboboxPicker
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                  options={existingGroups.map((g) => ({ value: g, label: g }))}
+                  placeholder="e.g. Audio, Lighting"
+                  searchPlaceholder="Search or type new group..."
+                  emptyMessage="Type to create a new group."
+                  allowClear
+                  creatable
+                />
+              )}
             />
           </div>
 
@@ -232,6 +290,24 @@ export function EditLineItemDialog({
             </Label>
           </div>
 
+          {isOverbooked && (
+            <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3 space-y-2">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                <AlertTriangle className="inline-block mr-1.5 h-3.5 w-3.5" />
+                This will overbook {requestedQty} units with only {availableForEdit ?? 0} available
+              </p>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overbookConfirmed}
+                  onChange={(e) => setOverbookConfirmed(e.target.checked)}
+                  className="accent-red-500"
+                />
+                <span className="text-red-600 dark:text-red-400">I understand, overbook anyway</span>
+              </label>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
@@ -240,7 +316,7 @@ export function EditLineItemDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || (isOverbooked && !overbookConfirmed)}>
               {mutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}

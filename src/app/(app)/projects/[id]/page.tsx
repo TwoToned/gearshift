@@ -228,9 +228,9 @@ export default function ProjectDetailPage({
                 Invoice
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=packing-list`, "_blank")}
+                onClick={() => window.open(`/api/documents/${id}?type=pull-slip`, "_blank")}
               >
-                Packing List
+                Pull Slip
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => window.open(`/api/documents/${id}?type=delivery-docket`, "_blank")}
@@ -455,7 +455,7 @@ export default function ProjectDetailPage({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6 text-sm">
+                  <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-7 text-sm">
                     <div>
                       <span className="text-muted-foreground">Subtotal</span>
                       <p className="font-medium">
@@ -482,6 +482,14 @@ export default function ProjectDetailPage({
                       <span className="text-muted-foreground">Total</span>
                       <p className="font-semibold text-base">
                         {formatCurrency(project.total as number | null)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Invoiced Total</span>
+                      <p className="font-semibold text-base">
+                        {project.invoicedTotal != null
+                          ? formatCurrency(project.invoicedTotal as unknown as number)
+                          : "—"}
                       </p>
                     </div>
                     <div>

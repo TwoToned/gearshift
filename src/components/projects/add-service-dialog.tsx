@@ -23,15 +23,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ComboboxPicker } from "@/components/ui/combobox-picker";
 
 interface AddServiceDialogProps {
   projectId: string;
+  existingGroups?: string[];
+  onGroupCreated?: (group: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function AddServiceDialog({
   projectId,
+  existingGroups = [],
+  onGroupCreated,
   open,
   onOpenChange,
 }: AddServiceDialogProps) {
@@ -50,7 +55,10 @@ export function AddServiceDialog({
 
   const mutation = useMutation({
     mutationFn: (data: LineItemFormValues) => addLineItem(projectId, data),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
+      if (variables.groupName && onGroupCreated) {
+        onGroupCreated(variables.groupName);
+      }
       toast.success("Item added");
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
       onOpenChange(false);
@@ -152,11 +160,22 @@ export function AddServiceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="svc-groupName">Group Name</Label>
-            <Input
-              id="svc-groupName"
-              {...form.register("groupName")}
-              placeholder="e.g. Crew, Transport"
+            <Label>Group Name</Label>
+            <Controller
+              control={form.control}
+              name="groupName"
+              render={({ field }) => (
+                <ComboboxPicker
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                  options={existingGroups.map((g) => ({ value: g, label: g }))}
+                  placeholder="e.g. Crew, Transport"
+                  searchPlaceholder="Search or type new group..."
+                  emptyMessage="Type to create a new group."
+                  allowClear
+                  creatable
+                />
+              )}
             />
           </div>
 

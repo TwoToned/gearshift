@@ -178,6 +178,32 @@ export async function lookupAssetForScan(
     if (lineItem.status === "CHECKED_OUT") {
       return serialize({ found: true as const, type: "serialized" as const, lineItemId: null, assetId: null, assetName, reason: "already_checked_out" as const });
     }
+    // Check if the physical asset is already checked out on another project
+    if (asset && asset.status === "CHECKED_OUT") {
+      // Find which project has it
+      const otherLineItem = await prisma.projectLineItem.findFirst({
+        where: {
+          organizationId,
+          assetId: asset.id,
+          status: "CHECKED_OUT",
+          projectId: { not: projectId },
+        },
+        include: { project: { select: { name: true, projectNumber: true } } },
+      });
+      const otherProject = otherLineItem?.project;
+      const detail = otherProject
+        ? ` on ${otherProject.name}${otherProject.projectNumber ? ` (${otherProject.projectNumber})` : ""}`
+        : "";
+      return serialize({
+        found: true as const,
+        type: "serialized" as const,
+        lineItemId: null,
+        assetId: null,
+        assetName,
+        reason: "asset_checked_out_elsewhere" as const,
+        detail,
+      });
+    }
   } else {
     if (lineItem.status !== "CHECKED_OUT") {
       return serialize({ found: true as const, type: "serialized" as const, lineItemId: null, assetId: null, assetName, reason: "not_checked_out" as const });
@@ -266,6 +292,18 @@ export async function checkOutItems(
           checkedOutAt: new Date(),
           checkedOutBy: { connect: { id: userId } },
         };
+
+        // Verify the asset isn't already checked out on another project
+        const assetIdToCheck = item.assetId || lineItem.assetId;
+        if (assetIdToCheck) {
+          const assetRecord = await tx.asset.findUnique({
+            where: { id: assetIdToCheck },
+            select: { status: true, assetTag: true },
+          });
+          if (assetRecord && assetRecord.status === "CHECKED_OUT") {
+            throw new Error(`Asset ${assetRecord.assetTag} is already checked out`);
+          }
+        }
 
         // Assign or reassign the specific asset to this line item
         if (item.assetId) {

@@ -13,6 +13,8 @@ interface LineItem {
   asset: { assetTag: string } | null;
   bulkAsset: { assetTag: string } | null;
   kit?: { assetTag: string; name: string } | null;
+  notes: string | null;
+  isOverbooked?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -101,18 +103,28 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
                   <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                     <Checkbox />
                   </View>
-                  <Text style={[styles.td, { flex: 2 }]}>
-                    {isKit
-                      ? (item.description || item.kit?.name || "Kit")
-                      : item.model
-                        ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
-                        : item.description || "—"}
-                  </Text>
+                  <View style={{ flex: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Text style={styles.td}>
+                        {isKit
+                          ? (item.description || item.kit?.name || "Kit")
+                          : item.model
+                            ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
+                            : item.description || "-"}
+                      </Text>
+                      {item.isOverbooked && (
+                        <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                      )}
+                    </View>
+                    {item.notes && (
+                      <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
+                    )}
+                  </View>
                   <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
                     {isKit ? children.length : item.quantity}
                   </Text>
                   <Text style={[styles.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
-                    {isKit ? (item.kit?.assetTag || "—") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "—")}
+                    {isKit ? (item.kit?.assetTag || "-") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "-")}
                   </Text>
                   <View style={[styles.td, { width: 80, justifyContent: "center" }]}>
                     <ConditionCheckboxes />
@@ -125,13 +137,13 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
                       <Checkbox size={6} />
                     </View>
                     <Text style={[styles.td, { flex: 2, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                      {child.model?.name || child.description || "—"}
+                      {child.model?.name || child.description || "-"}
                     </Text>
                     <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                       {child.quantity}
                     </Text>
                     <Text style={[styles.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
-                      {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+                      {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
                     </Text>
                     <View style={[styles.td, { width: 80, justifyContent: "center" }]}>
                       <ConditionCheckboxes fontSize={6} />
@@ -166,7 +178,7 @@ export function ReturnSheetPDF({ org, project }: ReturnSheetPDFProps) {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          {org.name} • {project.projectNumber} • Printed {formatDate(new Date().toISOString())}
+          {org.name} | {project.projectNumber} | Printed {formatDate(new Date().toISOString())}
         </Text>
       </Page>
     </Document>

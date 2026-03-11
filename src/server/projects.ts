@@ -8,6 +8,7 @@ import {
 } from "@/lib/validations/project";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
+import { computeOverbookedStatus } from "@/lib/availability";
 
 export async function getProjects(params?: {
   search?: string;
@@ -19,6 +20,8 @@ export async function getProjects(params?: {
   page?: number;
   pageSize?: number;
   includeLineItems?: boolean;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
   const {
@@ -31,6 +34,8 @@ export async function getProjects(params?: {
     page = 1,
     pageSize = 25,
     includeLineItems = false,
+    sortBy = "createdAt",
+    sortOrder = "desc",
   } = params || {};
 
   const where: Prisma.ProjectWhereInput = {
@@ -70,7 +75,8 @@ export async function getProjects(params?: {
           },
         }),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: sortBy === "client" ? { client: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -88,28 +94,42 @@ export async function getProjects(params?: {
 
 export async function getProject(id: string) {
   const { organizationId } = await getOrgContext();
-  return serialize(
-    await prisma.project.findUnique({
-      where: { id, organizationId },
-      include: {
-        client: true,
-        location: true,
-        lineItems: {
-          include: {
-            model: true,
-            asset: true,
-            bulkAsset: true,
-            kit: true,
-            childLineItems: {
-              include: { model: true, asset: true, bulkAsset: true },
-              orderBy: { sortOrder: "asc" },
-            },
+  const project = await prisma.project.findUnique({
+    where: { id, organizationId },
+    include: {
+      client: true,
+      location: true,
+      lineItems: {
+        include: {
+          model: true,
+          asset: true,
+          bulkAsset: true,
+          kit: true,
+          childLineItems: {
+            include: { model: true, asset: true, bulkAsset: true },
+            orderBy: { sortOrder: "asc" },
           },
-          orderBy: { sortOrder: "asc" },
         },
+        orderBy: { sortOrder: "asc" },
       },
-    })
+    },
+  });
+  if (!project) return null;
+
+  const overbookedIds = await computeOverbookedStatus(
+    organizationId,
+    project.lineItems,
+    project.rentalStartDate,
+    project.rentalEndDate,
+    project.id,
   );
+
+  const enrichedLineItems = project.lineItems.map((li) => ({
+    ...li,
+    isOverbooked: overbookedIds.has(li.id),
+  }));
+
+  return serialize({ ...project, lineItems: enrichedLineItems });
 }
 
 export async function createProject(data: ProjectFormValues) {
@@ -147,6 +167,7 @@ export async function createProject(data: ProjectFormValues) {
         discountPercent: parsed.discountPercent ?? null,
         depositPercent: parsed.depositPercent ?? null,
         depositPaid: parsed.depositPaid ?? null,
+        invoicedTotal: parsed.invoicedTotal ?? null,
         tags: parsed.tags,
       },
     })
@@ -193,6 +214,7 @@ export async function updateProject(id: string, data: ProjectFormValues) {
         discountPercent: parsed.discountPercent ?? null,
         depositPercent: parsed.depositPercent ?? null,
         depositPaid: parsed.depositPaid ?? null,
+        invoicedTotal: parsed.invoicedTotal ?? null,
         tags: parsed.tags,
       },
     })

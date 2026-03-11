@@ -6,14 +6,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Plus } from "lucide-react";
 
 import { getProjects } from "@/server/projects";
+import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -86,19 +87,23 @@ function formatDateRange(
 }
 
 export function ProjectTable() {
+  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
+    useTablePreferences("projects", { sortBy: "createdAt", sortOrder: "desc" });
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
-  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["projects", { search, status, type, page }],
+    queryKey: ["projects", { search, status, type, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getProjects({
         search: search || undefined,
         status: status || undefined,
         type: type || undefined,
         page,
+        pageSize,
+        sortBy,
+        sortOrder,
       }),
   });
 
@@ -173,13 +178,13 @@ export function ProjectTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Project #</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Dates</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <SortableTableHead sortKey="projectNumber" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Project #</SortableTableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
+              <SortableTableHead sortKey="client" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Client</SortableTableHead>
+              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
+              <SortableTableHead sortKey="rentalStartDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Dates</SortableTableHead>
+              <SortableTableHead sortKey="total" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Total</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -258,31 +263,32 @@ export function ProjectTable() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <p className="text-sm text-muted-foreground">
             Page {page} of {totalPages} ({total} total)
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

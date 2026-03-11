@@ -13,16 +13,17 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 
 import {
   getMaintenanceRecords,
   deleteMaintenanceRecord,
 } from "@/server/maintenance";
+import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Table,
   TableBody,
@@ -85,19 +87,23 @@ const resultConfig: Record<string, { label: string; color: string }> = {
 
 export default function MaintenancePage() {
   const queryClient = useQueryClient();
+  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
+    useTablePreferences("maintenance", { sortBy: "", sortOrder: "asc" });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["maintenance", search, statusFilter, typeFilter, page],
+    queryKey: ["maintenance", search, statusFilter, typeFilter, page, pageSize, sortBy, sortOrder],
     queryFn: () =>
       getMaintenanceRecords({
         search: search || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         type: typeFilter !== "all" ? typeFilter : undefined,
         page,
+        pageSize,
+        sortBy: sortBy || undefined,
+        sortOrder: sortBy ? sortOrder : undefined,
       }),
   });
 
@@ -111,6 +117,8 @@ export default function MaintenancePage() {
   });
 
   const records = (data?.records || []) as Record<string, unknown>[];
+  const totalPages = data?.totalPages || 1;
+  const total = data?.total || 0;
   const now = new Date();
 
   // Summary counts
@@ -207,12 +215,12 @@ export default function MaintenancePage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Asset</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Scheduled</TableHead>
-              <TableHead>Result</TableHead>
+              <SortableTableHead sortKey="title" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Title</SortableTableHead>
+              <SortableTableHead sortKey="asset" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset</SortableTableHead>
+              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
+              <SortableTableHead sortKey="scheduledDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Scheduled</SortableTableHead>
+              <SortableTableHead sortKey="result" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Result</SortableTableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -314,32 +322,32 @@ export default function MaintenancePage() {
       </div>
 
       {/* Pagination */}
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * 25 + 1}–{Math.min(page * 25, data.total)} of{" "}
-            {data.total}
+            Page {page} of {totalPages} ({total} total)
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= data.totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

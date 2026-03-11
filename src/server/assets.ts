@@ -24,11 +24,14 @@ export async function getAssets(params?: {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
   const {
     search, categoryId, status, condition, locationId, modelId,
     isActive = true, page = 1, pageSize = 25,
+    sortBy = "assetTag", sortOrder = "asc",
   } = params || {};
 
   const where: Prisma.AssetWhereInput = {
@@ -56,7 +59,9 @@ export async function getAssets(params?: {
         model: { include: { category: true } },
         location: true,
       },
-      orderBy: { assetTag: "asc" },
+      orderBy: sortBy === "model" ? { model: { name: sortOrder } }
+        : sortBy === "location" ? { location: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -232,6 +237,55 @@ export async function updateAsset(id: string, data: AssetFormValues) {
       isActive: parsed.isActive,
     },
   }));
+}
+
+export async function bulkUpdateAssets(
+  ids: string[],
+  data: {
+    status?: string;
+    condition?: string;
+    locationId?: string | null;
+  },
+) {
+  const { organizationId } = await getOrgContext();
+  if (ids.length === 0) throw new Error("No assets selected");
+
+  const updateData: Record<string, unknown> = {};
+  if (data.status) updateData.status = data.status;
+  if (data.condition) updateData.condition = data.condition;
+  if (data.locationId !== undefined) updateData.locationId = data.locationId || null;
+
+  if (Object.keys(updateData).length === 0) throw new Error("No changes specified");
+
+  const result = await prisma.asset.updateMany({
+    where: { id: { in: ids }, organizationId },
+    data: updateData,
+  });
+
+  return { count: result.count };
+}
+
+export async function deleteAsset(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  const asset = await prisma.asset.findUnique({
+    where: { id, organizationId },
+    include: {
+      _count: { select: { lineItems: true, maintenanceRecords: true } },
+      kitItem: true,
+    },
+  });
+  if (!asset) throw new Error("Asset not found");
+
+  if (asset._count.lineItems > 0) {
+    throw new Error("Cannot delete — this asset is referenced by project line items. Archive it instead.");
+  }
+  if (asset.kitItem) {
+    throw new Error("Cannot delete — this asset is part of a kit. Remove it from the kit first.");
+  }
+
+  await prisma.asset.delete({ where: { id, organizationId } });
+  return { id };
 }
 
 export async function archiveAsset(id: string) {

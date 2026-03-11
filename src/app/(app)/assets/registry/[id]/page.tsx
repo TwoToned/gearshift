@@ -4,12 +4,12 @@ import { use, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Archive } from "lucide-react";
+import { Archive, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getAsset, archiveAsset } from "@/server/assets";
-import { getBulkAsset, archiveBulkAsset } from "@/server/bulk-assets";
+import { getAsset, archiveAsset, deleteAsset } from "@/server/assets";
+import { getBulkAsset, archiveBulkAsset, deleteBulkAsset } from "@/server/bulk-assets";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +90,17 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => { isBulk ? await deleteBulkAsset(id) : await deleteAsset(id); },
+    onSuccess: () => {
+      toast.success("Asset deleted");
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["bulk-assets"] });
+      router.push("/assets/registry");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const isLoading = isBulk ? bulkQuery.isLoading : assetQuery.isLoading;
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
 
@@ -117,6 +128,10 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit?type=bulk`} />}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
             {ba.isActive && (
               <Button
                 variant="outline"
@@ -127,6 +142,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 Archive
               </Button>
             )}
+            <Button
+              variant="outline"
+              className="text-destructive"
+              onClick={() => { if (confirm("Permanently delete this bulk asset? This cannot be undone.")) deleteMutation.mutate(); }}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
           </div>
         </div>
 
@@ -200,6 +224,10 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
           {asset.isActive && (
             <Button
               variant="outline"
@@ -210,6 +238,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               Archive
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="text-destructive"
+            onClick={() => { if (confirm("Permanently delete this asset? This cannot be undone.")) deleteMutation.mutate(); }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
         </div>
       </div>
 

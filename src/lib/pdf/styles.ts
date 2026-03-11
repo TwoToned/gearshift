@@ -198,7 +198,7 @@ export function formatCurrency(amount: number | null | undefined): string {
 }
 
 export function formatDate(date: string | Date | null | undefined): string {
-  if (!date) return "—";
+  if (!date) return "-";
   const d = new Date(date);
   return d.toLocaleDateString("en-AU", {
     day: "numeric",

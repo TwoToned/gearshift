@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Package,
@@ -11,18 +11,42 @@ import {
   Plus,
   Trash2,
   Pencil,
-  Star,
   Container,
   ChevronRight,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { getProject } from "@/server/projects";
-import { removeLineItem, addKitLineItem, checkKitAvailability } from "@/server/line-items";
+import {
+  removeLineItem,
+  addKitLineItem,
+  checkKitAvailability,
+  reorderLineItems,
+} from "@/server/line-items";
 import { getKits } from "@/server/kits";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -59,14 +83,6 @@ const typeIcons: Record<string, React.ElementType> = {
   MISC: MoreHorizontal,
 };
 
-const typeLabels: Record<string, string> = {
-  EQUIPMENT: "Equipment",
-  SERVICE: "Service",
-  LABOUR: "Labour",
-  TRANSPORT: "Transport",
-  MISC: "Misc",
-};
-
 const pricingLabels: Record<string, string> = {
   PER_DAY: "/day",
   PER_WEEK: "/week",
@@ -88,6 +104,437 @@ function formatCurrency(value: number | null | undefined): string {
   return `$${Number(value).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
 }
 
+// ---------------------------------------------------------------------------
+// Types for the flat sortable list
+// ---------------------------------------------------------------------------
+type LineItem = NonNullable<
+  Awaited<ReturnType<typeof getProject>>
+>["lineItems"][number];
+
+interface SortableRow {
+  id: string;
+  type: "group-header" | "item";
+  groupName: string | null;
+  /** Only for type === "item" */
+  item?: LineItem;
+  /** Only for type === "group-header" — ids of items in this group */
+  itemIds?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Build the flat sortable list from top-level items
+// ---------------------------------------------------------------------------
+function buildSortableRows(topLevelItems: LineItem[]): SortableRow[] {
+  // First, consolidate items: group members should be contiguous.
+  // Collect items by group, preserving the order of first appearance.
+  const ungrouped: LineItem[] = [];
+  const groupOrder: string[] = [];
+  const groupMap = new Map<string, LineItem[]>();
+
+  for (const item of topLevelItems) {
+    const group = item.groupName || null;
+    if (!group) {
+      ungrouped.push(item);
+    } else {
+      if (!groupMap.has(group)) {
+        groupOrder.push(group);
+        groupMap.set(group, []);
+      }
+      groupMap.get(group)!.push(item);
+    }
+  }
+
+  // Build the flat list: ungrouped items first (in their original order),
+  // then each group with header + items (in order of first appearance).
+  // But we need to respect the relative ordering between ungrouped items
+  // and groups. Use the sortOrder of the first item in each section.
+  interface Section {
+    type: "ungrouped" | "group";
+    groupName?: string;
+    firstSortOrder: number;
+    items: LineItem[];
+  }
+
+  const sections: Section[] = [];
+
+  if (ungrouped.length > 0) {
+    sections.push({
+      type: "ungrouped",
+      firstSortOrder: ungrouped[0].sortOrder,
+      items: ungrouped,
+    });
+  }
+
+  for (const group of groupOrder) {
+    const items = groupMap.get(group)!;
+    sections.push({
+      type: "group",
+      groupName: group,
+      firstSortOrder: items[0].sortOrder,
+      items,
+    });
+  }
+
+  // Sort sections by their first item's sortOrder
+  sections.sort((a, b) => a.firstSortOrder - b.firstSortOrder);
+
+  // Flatten into sortable rows
+  const rows: SortableRow[] = [];
+  for (const section of sections) {
+    if (section.type === "group") {
+      rows.push({
+        id: `group:${section.groupName}`,
+        type: "group-header",
+        groupName: section.groupName!,
+        itemIds: section.items.map((i) => i.id),
+      });
+      for (const item of section.items) {
+        rows.push({
+          id: item.id,
+          type: "item",
+          groupName: section.groupName!,
+          item,
+        });
+      }
+    } else {
+      for (const item of section.items) {
+        rows.push({
+          id: item.id,
+          type: "item",
+          groupName: null,
+          item,
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Sortable item row component
+// ---------------------------------------------------------------------------
+function SortableItemRow({
+  item,
+  isGrouped,
+  parentGroupDragging,
+  expandedKits,
+  onToggleKit,
+  onEdit,
+  onDelete,
+  isDeletePending,
+  isDragOverlay,
+}: {
+  item: LineItem;
+  isGrouped?: boolean;
+  parentGroupDragging?: boolean;
+  expandedKits: Set<string>;
+  onToggleKit: (id: string) => void;
+  onEdit: (item: LineItem) => void;
+  onDelete: (id: string, isKit: boolean) => void;
+  isDeletePending: boolean;
+  isDragOverlay?: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled: isDragOverlay });
+
+  const style = isDragOverlay
+    ? undefined
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      };
+
+  const isKitParent = !!item.kitId && !item.isKitChild;
+  const Icon = isKitParent ? Container : (typeIcons[item.type] || Package);
+  const itemName = isKitParent
+    ? item.description || "Unnamed Kit"
+    : item.type === "EQUIPMENT"
+      ? [item.model?.name, item.model?.modelNumber].filter(Boolean).join(" - ") ||
+        item.description ||
+        "Unnamed item"
+      : item.description || "Unnamed item";
+  const isExpanded = expandedKits.has(item.id);
+  const childItems = isKitParent ? (item.childLineItems || []) : [];
+
+  return (
+    <React.Fragment>
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={`${isKitParent ? "bg-muted/30" : ""} ${isDragging || parentGroupDragging ? "opacity-30" : ""} ${isDragOverlay ? "bg-background" : ""}`}
+      >
+        <TableCell className={`w-8 px-1 ${isGrouped ? "pl-6" : ""}`}>
+          <button
+            type="button"
+            className="flex h-full cursor-grab items-center px-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            {isKitParent ? (
+              <button
+                type="button"
+                onClick={() => onToggleKit(item.id)}
+                className="flex items-center gap-1.5 text-left"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                    isExpanded ? "rotate-90" : ""
+                  }`}
+                />
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <span className="font-medium">{itemName}</span>
+                  <Badge
+                    variant="outline"
+                    className="ml-2 text-xs bg-indigo-500/10 text-indigo-600 border-indigo-500/20"
+                  >
+                    Kit
+                  </Badge>
+                  {item.pricingMode === "ITEMIZED" && (
+                    <Badge variant="outline" className="ml-1 text-xs">
+                      Itemized
+                    </Badge>
+                  )}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {childItems.length} item{childItems.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </button>
+            ) : (
+              <>
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <span className="font-medium">{itemName}</span>
+                  {item.isOptional && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 text-xs bg-amber-500/10 text-amber-600 border-amber-500/20"
+                    >
+                      Optional
+                    </Badge>
+                  )}
+                  {item.isOverbooked && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 text-xs bg-red-500/10 text-red-600 border-red-500/20"
+                    >
+                      Overbooked
+                    </Badge>
+                  )}
+                  {item.notes && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {item.notes}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </TableCell>
+        <TableCell className="text-center">{item.quantity}</TableCell>
+        <TableCell className="text-right">
+          {formatCurrency(item.unitPrice as number | null)}
+          {item.unitPrice != null && (
+            <span className="text-xs text-muted-foreground ml-0.5">
+              {pricingLabels[item.pricingType]}
+            </span>
+          )}
+        </TableCell>
+        <TableCell className="text-center">{item.duration}</TableCell>
+        <TableCell className="text-right font-medium">
+          {formatCurrency(item.lineTotal as number | null)}
+        </TableCell>
+        <TableCell>
+          <Badge
+            variant="outline"
+            className={statusColors[item.status] || ""}
+          >
+            {item.status}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            {!isKitParent && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onEdit(item)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onDelete(item.id, isKitParent)}
+              disabled={isDeletePending}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+      {isKitParent &&
+        isExpanded &&
+        (
+          childItems as Array<{
+            id: string;
+            model?: { name: string } | null;
+            description?: string | null;
+            asset?: { assetTag: string } | null;
+            quantity: number;
+            duration: number;
+            unitPrice?: unknown;
+            lineTotal?: unknown;
+          }>
+        ).map((child) => (
+          <TableRow key={child.id} className="bg-muted/10">
+            <TableCell className="w-8" />
+            <TableCell>
+              <div className="flex items-center gap-2 pl-8">
+                <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <div>
+                  <span className="text-sm">
+                    {child.model?.name || child.description || "Unnamed"}
+                  </span>
+                  {child.asset?.assetTag && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      ({child.asset.assetTag})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </TableCell>
+            <TableCell className="text-center text-sm">
+              {child.quantity}
+            </TableCell>
+            <TableCell className="text-right text-sm">
+              {formatCurrency(child.unitPrice as number | null)}
+            </TableCell>
+            <TableCell className="text-center text-sm">
+              {child.duration}
+            </TableCell>
+            <TableCell className="text-right text-sm">
+              {formatCurrency(child.lineTotal as number | null)}
+            </TableCell>
+            <TableCell />
+            <TableCell />
+          </TableRow>
+        ))}
+    </React.Fragment>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable group header component
+// ---------------------------------------------------------------------------
+function SortableGroupHeader({
+  id,
+  groupName,
+  groupItems,
+  isDragOverlay,
+}: {
+  id: string;
+  groupName: string;
+  groupItems?: LineItem[];
+  isDragOverlay?: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: isDragOverlay });
+
+  const style = isDragOverlay
+    ? undefined
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      };
+
+  return (
+    <React.Fragment>
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={`border-b-0 ${isDragging ? "opacity-30" : ""} ${isDragOverlay ? "bg-muted" : ""}`}
+      >
+        <TableCell colSpan={8} className="py-2 px-1">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className="flex cursor-grab items-center px-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+            <h3 className="text-sm font-semibold text-muted-foreground">
+              {groupName}
+            </h3>
+          </div>
+        </TableCell>
+      </TableRow>
+      {/* In the drag overlay, render a compact preview of group items */}
+      {isDragOverlay && groupItems && groupItems.length > 0 && (
+        groupItems.map((item) => {
+          const isKitParent = !!item.kitId && !item.isKitChild;
+          const Icon = isKitParent ? Container : (typeIcons[item.type] || Package);
+          const name = isKitParent
+            ? item.description || "Unnamed Kit"
+            : item.type === "EQUIPMENT"
+              ? [item.model?.name, item.model?.modelNumber].filter(Boolean).join(" - ") ||
+                item.description || "Unnamed"
+              : item.description || "Unnamed";
+          return (
+            <TableRow key={item.id} className="bg-background/80">
+              <TableCell className="w-8 px-1" />
+              <TableCell>
+                <div className="flex items-center gap-2 pl-4">
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="text-sm">{name}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+              <TableCell className="text-right text-sm">
+                {formatCurrency(item.unitPrice as number | null)}
+              </TableCell>
+              <TableCell className="text-center text-sm">{item.duration}</TableCell>
+              <TableCell className="text-right text-sm font-medium">
+                {formatCurrency(item.lineTotal as number | null)}
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className={`text-xs ${statusColors[item.status] || ""}`}>
+                  {item.status}
+                </Badge>
+              </TableCell>
+              <TableCell />
+            </TableRow>
+          );
+        })
+      )}
+    </React.Fragment>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel component
+// ---------------------------------------------------------------------------
 export function LineItemsPanel({
   projectId,
   rentalStartDate,
@@ -98,10 +545,21 @@ export function LineItemsPanel({
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [kitDialogOpen, setKitDialogOpen] = useState(false);
   const [selectedKitId, setSelectedKitId] = useState("");
-  const [kitPricingMode, setKitPricingMode] = useState<"KIT_PRICE" | "ITEMIZED">("KIT_PRICE");
+  const [kitPricingMode, setKitPricingMode] = useState<
+    "KIT_PRICE" | "ITEMIZED"
+  >("KIT_PRICE");
   const [kitUnitPrice, setKitUnitPrice] = useState("");
+  const [kitGroupName, setKitGroupName] = useState("");
   const [expandedKits, setExpandedKits] = useState<Set<string>>(new Set());
-  const [editingItem, setEditingItem] = useState<(typeof lineItems)[0] | null>(null);
+  const [editingItem, setEditingItem] = useState<LineItem | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const { data: project } = useQuery({
     queryKey: ["project", projectId],
@@ -115,9 +573,25 @@ export function LineItemsPanel({
   });
 
   const { data: kitAvailability } = useQuery({
-    queryKey: ["kit-availability", selectedKitId, rentalStartDate?.toISOString(), rentalEndDate?.toISOString(), projectId],
-    queryFn: () => checkKitAvailability(selectedKitId, rentalStartDate!, rentalEndDate!, projectId),
-    enabled: kitDialogOpen && !!selectedKitId && !!rentalStartDate && !!rentalEndDate,
+    queryKey: [
+      "kit-availability",
+      selectedKitId,
+      rentalStartDate?.toISOString(),
+      rentalEndDate?.toISOString(),
+      projectId,
+    ],
+    queryFn: () =>
+      checkKitAvailability(
+        selectedKitId,
+        rentalStartDate!,
+        rentalEndDate!,
+        projectId,
+      ),
+    enabled:
+      kitDialogOpen &&
+      !!selectedKitId &&
+      !!rentalStartDate &&
+      !!rentalEndDate,
   });
 
   const deleteMutation = useMutation({
@@ -137,39 +611,89 @@ export function LineItemsPanel({
         kitPricingMode,
         kitPricingMode === "KIT_PRICE" && kitUnitPrice
           ? parseFloat(kitUnitPrice)
-          : undefined
+          : undefined,
+        kitGroupName || undefined,
       ),
     onSuccess: () => {
+      if (kitGroupName) addExtraGroup(kitGroupName);
       toast.success("Kit added to project");
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
       setKitDialogOpen(false);
       setSelectedKitId("");
       setKitPricingMode("KIT_PRICE");
       setKitUnitPrice("");
+      setKitGroupName("");
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const lineItems = project?.lineItems || [];
+  const reorderMutation = useMutation({
+    mutationFn: ({
+      itemIds,
+      groupUpdates,
+    }: {
+      itemIds: string[];
+      groupUpdates?: { id: string; groupName: string | null }[];
+    }) => reorderLineItems(projectId, itemIds, groupUpdates),
+    onError: (e) => {
+      toast.error("Failed to reorder: " + e.message);
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+  });
 
-  // Filter out kit child items — they render under their parent
-  const topLevelItems = lineItems.filter((item) => !item.isKitChild);
+  const lineItems: LineItem[] = project?.lineItems || [];
 
-  // Group items by groupName
-  const grouped = new Map<string, typeof topLevelItems>();
-  const ungrouped: typeof topLevelItems = [];
+  const [extraGroups, setExtraGroups] = useState<string[]>([]);
 
-  for (const item of topLevelItems) {
-    if (item.groupName) {
-      const existing = grouped.get(item.groupName) || [];
-      existing.push(item);
-      grouped.set(item.groupName, existing);
-    } else {
-      ungrouped.push(item);
+  const existingGroups = useMemo(() => {
+    const names = new Set<string>();
+    for (const item of lineItems) {
+      if (item.groupName) names.add(item.groupName);
     }
-  }
+    for (const g of extraGroups) {
+      names.add(g);
+    }
+    return [...names].sort();
+  }, [lineItems, extraGroups]);
 
-  function toggleKitExpanded(kitItemId: string) {
+  const addExtraGroup = useCallback((group: string) => {
+    setExtraGroups((prev) => prev.includes(group) ? prev : [...prev, group]);
+  }, []);
+
+  const topLevelItems = useMemo(
+    () => lineItems.filter((item) => !item.isKitChild),
+    [lineItems],
+  );
+
+  const sortableRows = useMemo(
+    () => buildSortableRows(topLevelItems),
+    [topLevelItems],
+  );
+
+  const sortableIds = useMemo(
+    () => sortableRows.map((r) => r.id),
+    [sortableRows],
+  );
+
+  // Find the active row for the drag overlay
+  const activeRow = activeId
+    ? sortableRows.find((r) => r.id === activeId)
+    : null;
+
+  // When dragging a group, we need the group name to fade out its items
+  const draggingGroupName =
+    activeRow?.type === "group-header" ? activeRow.groupName : null;
+
+  // Collect items for the group being dragged (for the overlay)
+  const draggingGroupItems = useMemo(() => {
+    if (!draggingGroupName) return [];
+    return topLevelItems.filter((i) => i.groupName === draggingGroupName);
+  }, [draggingGroupName, topLevelItems]);
+
+  const toggleKitExpanded = useCallback((kitItemId: string) => {
     setExpandedKits((prev) => {
       const next = new Set(prev);
       if (next.has(kitItemId)) {
@@ -179,190 +703,193 @@ export function LineItemsPanel({
       }
       return next;
     });
+  }, []);
+
+  const handleDelete = useCallback(
+    (id: string, isKit: boolean) => {
+      const msg = isKit
+        ? "Remove this kit and all its items?"
+        : "Remove this line item?";
+      if (confirm(msg)) {
+        deleteMutation.mutate(id);
+      }
+    },
+    [deleteMutation],
+  );
+
+  // -----------------------------------------------------------------------
+  // DnD handlers
+  // -----------------------------------------------------------------------
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
   }
 
-  function renderItemRow(item: (typeof lineItems)[0]) {
-    const isKitParent = !!item.kitId && !item.isKitChild;
-    const Icon = isKitParent ? Container : (typeIcons[item.type] || Package);
-    const itemName =
-      isKitParent
-        ? item.description || "Unnamed Kit"
-        : item.type === "EQUIPMENT"
-          ? [item.model?.name, item.model?.modelNumber]
-              .filter(Boolean)
-              .join(" - ") || item.description || "Unnamed item"
-          : item.description || "Unnamed item";
-    const isExpanded = expandedKits.has(item.id);
-    const childItems = isKitParent ? (item.childLineItems || []) : [];
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    return (
-      <React.Fragment key={item.id}>
-        <TableRow className={isKitParent ? "bg-muted/30" : undefined}>
-          <TableCell>
-            <div className="flex items-center gap-2">
-              {isKitParent ? (
-                <button
-                  type="button"
-                  onClick={() => toggleKitExpanded(item.id)}
-                  className="flex items-center gap-1.5 text-left"
-                >
-                  <ChevronRight
-                    className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                      isExpanded ? "rotate-90" : ""
-                    }`}
-                  />
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <span className="font-medium">{itemName}</span>
-                    <Badge
-                      variant="outline"
-                      className="ml-2 text-xs bg-indigo-500/10 text-indigo-600 border-indigo-500/20"
-                    >
-                      Kit
-                    </Badge>
-                    {item.pricingMode === "ITEMIZED" && (
-                      <Badge
-                        variant="outline"
-                        className="ml-1 text-xs"
-                      >
-                        Itemized
-                      </Badge>
-                    )}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {childItems.length} item{childItems.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </button>
-              ) : (
-                <>
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <span className="font-medium">{itemName}</span>
-                    {item.isOptional && (
-                      <Badge
-                        variant="outline"
-                        className="ml-2 text-xs bg-amber-500/10 text-amber-600 border-amber-500/20"
-                      >
-                        Optional
-                      </Badge>
-                    )}
-                    {item.notes && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.notes}
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </TableCell>
-          <TableCell className="text-center">{item.quantity}</TableCell>
-          <TableCell className="text-right">
-            {formatCurrency(item.unitPrice as number | null)}
-            {item.unitPrice != null && (
-              <span className="text-xs text-muted-foreground ml-0.5">
-                {pricingLabels[item.pricingType]}
-              </span>
-            )}
-          </TableCell>
-          <TableCell className="text-center">{item.duration}</TableCell>
-          <TableCell className="text-right font-medium">
-            {formatCurrency(item.lineTotal as number | null)}
-          </TableCell>
-          <TableCell>
-            <Badge
-              variant="outline"
-              className={statusColors[item.status] || ""}
-            >
-              {item.status}
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <div className="flex items-center gap-1">
-              {!isKitParent && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setEditingItem(item)}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  const msg = isKitParent
-                    ? "Remove this kit and all its items?"
-                    : "Remove this line item?";
-                  if (confirm(msg)) {
-                    deleteMutation.mutate(item.id);
-                  }
-                }}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-        {isKitParent && isExpanded && (childItems as Array<{ id: string; model?: { name: string } | null; description?: string | null; asset?: { assetTag: string } | null; quantity: number; duration: number; unitPrice?: unknown; lineTotal?: unknown }>).map((child) => (
-          <TableRow key={child.id} className="bg-muted/10">
-            <TableCell>
-              <div className="flex items-center gap-2 pl-8">
-                <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div>
-                  <span className="text-sm">{child.model?.name || child.description || "Unnamed"}</span>
-                  {child.asset?.assetTag && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      ({child.asset.assetTag})
-                    </span>
-                  )}
-                </div>
-              </div>
-            </TableCell>
-            <TableCell className="text-center text-sm">{child.quantity}</TableCell>
-            <TableCell className="text-right text-sm">
-              {formatCurrency(child.unitPrice as number | null)}
-            </TableCell>
-            <TableCell className="text-center text-sm">{child.duration}</TableCell>
-            <TableCell className="text-right text-sm">
-              {formatCurrency(child.lineTotal as number | null)}
-            </TableCell>
-            <TableCell />
-            <TableCell />
-          </TableRow>
-        ))}
-      </React.Fragment>
-    );
+    const activeIdx = sortableRows.findIndex((r) => r.id === active.id);
+    const overIdx = sortableRows.findIndex((r) => r.id === over.id);
+    if (activeIdx === -1 || overIdx === -1) return;
+
+    const activeRow = sortableRows[activeIdx];
+
+    if (activeRow.type === "group-header") {
+      // Move the entire group (header + all its items)
+      handleGroupMove(activeIdx, overIdx);
+    } else {
+      // Move a single item
+      handleItemMove(activeIdx, overIdx);
+    }
   }
 
-  function renderTable(items: typeof lineItems, groupTitle?: string) {
-    return (
-      <div key={groupTitle || "__ungrouped"}>
-        {groupTitle && (
-          <h3 className="text-sm font-semibold text-muted-foreground mb-2 mt-4 first:mt-0">
-            {groupTitle}
-          </h3>
-        )}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead className="text-center w-16">Qty</TableHead>
-                <TableHead className="text-right w-28">Unit Price</TableHead>
-                <TableHead className="text-center w-20">Duration</TableHead>
-                <TableHead className="text-right w-28">Total</TableHead>
-                <TableHead className="w-24">Status</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>{items.map(renderItemRow)}</TableBody>
-          </Table>
-        </div>
-      </div>
+  function handleGroupMove(fromIdx: number, toIdx: number) {
+    const row = sortableRows[fromIdx];
+    const groupName = row.groupName!;
+
+    // Collect indices: the header + all consecutive items belonging to this group
+    const groupIndices = [fromIdx];
+    for (let i = fromIdx + 1; i < sortableRows.length; i++) {
+      const r = sortableRows[i];
+      if (r.type === "item" && r.groupName === groupName) {
+        groupIndices.push(i);
+      } else {
+        break;
+      }
+    }
+
+    // Remove the group rows from the list
+    const remaining = sortableRows.filter(
+      (_, i) => !groupIndices.includes(i),
     );
+    const groupRows = groupIndices.map((i) => sortableRows[i]);
+
+    // Snap the insertion point to a section boundary in the remaining list.
+    // A section boundary is index 0, or the start of a group header, or just
+    // after the last item of a section (where a group/ungrouped block ends).
+    const rawInsert = (() => {
+      if (toIdx > fromIdx) {
+        const removedBefore = groupIndices.filter((i) => i < toIdx).length;
+        return toIdx - removedBefore + 1;
+      }
+      return toIdx;
+    })();
+
+    // Find all valid boundary positions in `remaining`
+    const boundaries: number[] = [0]; // start is always valid
+    for (let i = 0; i < remaining.length; i++) {
+      if (remaining[i].type === "group-header") {
+        boundaries.push(i);
+      }
+      // After the last item of a group (next is a different group or end)
+      if (
+        remaining[i].type === "item" &&
+        (i + 1 >= remaining.length ||
+          remaining[i + 1].type === "group-header" ||
+          remaining[i + 1].groupName !== remaining[i].groupName)
+      ) {
+        boundaries.push(i + 1);
+      }
+    }
+    // Deduplicate and sort
+    const uniqueBoundaries = [...new Set(boundaries)].sort((a, b) => a - b);
+
+    // Pick the closest boundary to rawInsert
+    let insertAt = uniqueBoundaries[0];
+    let minDist = Math.abs(rawInsert - insertAt);
+    for (const b of uniqueBoundaries) {
+      const dist = Math.abs(rawInsert - b);
+      if (dist < minDist) {
+        minDist = dist;
+        insertAt = b;
+      }
+    }
+
+    // Clamp
+    insertAt = Math.max(0, Math.min(remaining.length, insertAt));
+
+    // Insert group rows at the new position
+    const newRows = [
+      ...remaining.slice(0, insertAt),
+      ...groupRows,
+      ...remaining.slice(insertAt),
+    ];
+
+    persistOrder(newRows);
+  }
+
+  function handleItemMove(fromIdx: number, toIdx: number) {
+    const newRows = arrayMove(sortableRows, fromIdx, toIdx);
+    // Determine if the item moved into a different group
+    const movedRow = newRows[toIdx];
+    const movedItemId = movedRow.id;
+
+    // Find what group context the item is now in by looking at surrounding rows
+    let newGroupName: string | null = null;
+    for (let i = toIdx - 1; i >= 0; i--) {
+      const r = newRows[i];
+      if (r.type === "group-header") {
+        newGroupName = r.groupName;
+        break;
+      }
+      if (r.type === "item") {
+        newGroupName = r.groupName;
+        break;
+      }
+    }
+
+    const groupUpdates: { id: string; groupName: string | null }[] = [];
+    if (newGroupName !== movedRow.groupName) {
+      groupUpdates.push({ id: movedItemId, groupName: newGroupName });
+      // Update in the local rows so persistOrder sees the right data
+      movedRow.groupName = newGroupName;
+    }
+
+    persistOrder(newRows, groupUpdates);
+  }
+
+  function persistOrder(
+    newRows: SortableRow[],
+    groupUpdates?: { id: string; groupName: string | null }[],
+  ) {
+    // Extract only item IDs in order (skip group headers)
+    const orderedItemIds = newRows
+      .filter((r) => r.type === "item")
+      .map((r) => r.id);
+
+    // Optimistic update: reorder lineItems in the cache
+    queryClient.setQueryData(
+      ["project", projectId],
+      (old: Awaited<ReturnType<typeof getProject>> | undefined) => {
+        if (!old) return old;
+        const itemMap = new Map(old.lineItems.map((li) => [li.id, li]));
+        const reordered = orderedItemIds.flatMap((id, index) => {
+          const li = itemMap.get(id);
+          if (!li) return [];
+          const groupChange = groupUpdates?.find((g) => g.id === id);
+          return [
+            {
+              ...li,
+              sortOrder: index,
+              ...(groupChange ? { groupName: groupChange.groupName } : {}),
+            },
+          ];
+        });
+        // Add kit children back (they keep their parent's order context)
+        const children = old.lineItems.filter((li) => li.isKitChild);
+        return {
+          ...old,
+          lineItems: [...reordered, ...children],
+        };
+      },
+    );
+
+    reorderMutation.mutate({ itemIds: orderedItemIds, groupUpdates });
+  }
+
+  function handleDragCancel() {
+    setActiveId(null);
   }
 
   return (
@@ -403,13 +930,92 @@ export function LineItemsPanel({
         </Card>
       ) : (
         <>
-          {/* Ungrouped items first */}
-          {ungrouped.length > 0 && renderTable(ungrouped)}
+          <div className="rounded-md border">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8 px-1" />
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-center w-16">Qty</TableHead>
+                    <TableHead className="text-right w-28">
+                      Unit Price
+                    </TableHead>
+                    <TableHead className="text-center w-20">
+                      Duration
+                    </TableHead>
+                    <TableHead className="text-right w-28">Total</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-16" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <SortableContext
+                    items={sortableIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {sortableRows.map((row) =>
+                      row.type === "group-header" ? (
+                        <SortableGroupHeader
+                          key={row.id}
+                          id={row.id}
+                          groupName={row.groupName!}
+                        />
+                      ) : (
+                        <SortableItemRow
+                          key={row.id}
+                          item={row.item!}
+                          isGrouped={!!row.groupName}
+                          parentGroupDragging={!!draggingGroupName && draggingGroupName === row.groupName}
+                          expandedKits={expandedKits}
+                          onToggleKit={toggleKitExpanded}
+                          onEdit={setEditingItem}
+                          onDelete={handleDelete}
+                          isDeletePending={deleteMutation.isPending}
+                        />
+                      ),
+                    )}
+                  </SortableContext>
+                </TableBody>
+              </Table>
 
-          {/* Grouped items */}
-          {[...grouped.entries()].map(([groupName, items]) =>
-            renderTable(items, groupName)
-          )}
+              <DragOverlay>
+                {activeRow ? (
+                  <div className="rounded-md border bg-background shadow-xl">
+                    <table className="w-full">
+                      <tbody>
+                        {activeRow.type === "group-header" ? (
+                          <SortableGroupHeader
+                            id={activeRow.id}
+                            groupName={activeRow.groupName!}
+                            groupItems={draggingGroupItems}
+                            isDragOverlay
+                          />
+                        ) : (
+                          <SortableItemRow
+                            item={activeRow.item!}
+                            isGrouped={!!activeRow.groupName}
+                            expandedKits={expandedKits}
+                            onToggleKit={toggleKitExpanded}
+                            onEdit={setEditingItem}
+                            onDelete={handleDelete}
+                            isDeletePending={false}
+                            isDragOverlay
+                          />
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
 
           {/* Totals */}
           {project && (
@@ -429,7 +1035,10 @@ export function LineItemsPanel({
                           Discount ({Number(project.discountPercent)}%)
                         </span>
                         <span>
-                          -{formatCurrency(project.discountAmount as number | null)}
+                          -
+                          {formatCurrency(
+                            project.discountAmount as number | null,
+                          )}
                         </span>
                       </div>
                     )}
@@ -446,6 +1055,17 @@ export function LineItemsPanel({
                       {formatCurrency(project.total as number | null)}
                     </span>
                   </div>
+                  {project.invoicedTotal != null && (
+                    <>
+                      <div className="my-1 h-px bg-border" />
+                      <div className="flex justify-between text-base">
+                        <span className="font-semibold text-primary">Invoiced Total</span>
+                        <span className="font-semibold text-primary">
+                          {formatCurrency(project.invoicedTotal as unknown as number | null)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -457,18 +1077,26 @@ export function LineItemsPanel({
         projectId={projectId}
         rentalStartDate={rentalStartDate}
         rentalEndDate={rentalEndDate}
+        existingGroups={existingGroups}
+        onGroupCreated={addExtraGroup}
         open={equipmentDialogOpen}
         onOpenChange={setEquipmentDialogOpen}
       />
 
       <AddServiceDialog
         projectId={projectId}
+        existingGroups={existingGroups}
+        onGroupCreated={addExtraGroup}
         open={serviceDialogOpen}
         onOpenChange={setServiceDialogOpen}
       />
 
       <EditLineItemDialog
         projectId={projectId}
+        existingGroups={existingGroups}
+        onGroupCreated={addExtraGroup}
+        rentalStartDate={rentalStartDate}
+        rentalEndDate={rentalEndDate}
         lineItem={editingItem}
         open={!!editingItem}
         onOpenChange={(open) => {
@@ -485,6 +1113,7 @@ export function LineItemsPanel({
             setSelectedKitId("");
             setKitPricingMode("KIT_PRICE");
             setKitUnitPrice("");
+            setKitGroupName("");
           }
         }}
       >
@@ -498,24 +1127,38 @@ export function LineItemsPanel({
               <ComboboxPicker
                 value={selectedKitId}
                 onChange={setSelectedKitId}
-                options={
-                  (kitsData?.kits || []).map((kit) => ({
-                    value: kit.id,
-                    label: `${kit.assetTag} — ${kit.name}`,
-                    description: kit.category?.name,
-                  }))
-                }
+                options={(kitsData?.kits || []).map((kit) => ({
+                  value: kit.id,
+                  label: `${kit.assetTag} - ${kit.name}`,
+                  description: kit.category?.name,
+                }))}
                 placeholder="Select a kit..."
                 searchPlaceholder="Search kits..."
                 emptyMessage="No kits found."
               />
             </div>
 
-            {selectedKitId && kitAvailability && !kitAvailability.available && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                Kit is unavailable: {kitAvailability.conflictsWith}
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Group Name</Label>
+              <ComboboxPicker
+                value={kitGroupName}
+                onChange={setKitGroupName}
+                options={existingGroups.map((g) => ({ value: g, label: g }))}
+                placeholder="e.g. Audio, Lighting"
+                searchPlaceholder="Search or type new group..."
+                emptyMessage="Type to create a new group."
+                allowClear
+                creatable
+              />
+            </div>
+
+            {selectedKitId &&
+              kitAvailability &&
+              !kitAvailability.available && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                  Kit is unavailable: {kitAvailability.conflictsWith}
+                </div>
+              )}
 
             <div className="space-y-2">
               <Label>Pricing Mode</Label>
@@ -567,7 +1210,11 @@ export function LineItemsPanel({
           <DialogFooter>
             <Button
               onClick={() => addKitMutation.mutate()}
-              disabled={!selectedKitId || addKitMutation.isPending || (kitAvailability && !kitAvailability.available)}
+              disabled={
+                !selectedKitId ||
+                addKitMutation.isPending ||
+                (kitAvailability && !kitAvailability.available)
+              }
             >
               {addKitMutation.isPending ? "Adding..." : "Add Kit"}
             </Button>

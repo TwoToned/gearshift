@@ -58,6 +58,7 @@ export const projectSchema = z.object({
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   depositPercent: z.coerce.number().min(0).max(100).optional(),
   depositPaid: z.coerce.number().min(0).optional(),
+  invoicedTotal: z.coerce.number().min(0).optional(),
   tags: z.array(z.string()).default([]),
 });
 

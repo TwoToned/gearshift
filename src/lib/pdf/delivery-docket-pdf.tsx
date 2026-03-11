@@ -19,6 +19,8 @@ interface LineItem {
   asset: { assetTag: string } | null;
   bulkAsset: { assetTag: string } | null;
   kit?: { assetTag: string; name: string } | null;
+  notes: string | null;
+  isOverbooked?: boolean;
   childLineItems?: LineItem[];
 }
 
@@ -108,14 +110,14 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                 )}
               </View>
             ) : (
-              <Text style={styles.value}>—</Text>
+              <Text style={styles.value}>-</Text>
             )}
             {project.siteContactName && (
               <View style={{ marginTop: 6 }}>
                 <Text style={styles.label}>Site Contact</Text>
                 <Text style={styles.value}>
                   {project.siteContactName}
-                  {project.siteContactPhone ? ` — ${project.siteContactPhone}` : ""}
+                  {project.siteContactPhone ? ` - ${project.siteContactPhone}` : ""}
                 </Text>
               </View>
             )}
@@ -134,7 +136,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                 <Text style={styles.label}>Rental Period</Text>
                 <Text style={styles.value}>
                   {formatDate(project.rentalStartDate)}
-                  {project.rentalEndDate ? ` — ${formatDate(project.rentalEndDate)}` : ""}
+                  {project.rentalEndDate ? ` - ${formatDate(project.rentalEndDate)}` : ""}
                 </Text>
               </View>
             )}
@@ -177,7 +179,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                       ? (item.description || item.kit?.name || "Kit")
                       : item.model
                         ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
-                        : item.description || "—";
+                        : item.description || "-";
 
                     return (
                       <View key={item.id}>
@@ -185,14 +187,24 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                           <Text style={[styles.td, { width: 24, textAlign: "center", color: "#999" }]}>
                             {rowNum}
                           </Text>
-                          <Text style={[styles.td, { flex: 3 }]}>
-                            {bulk ? `${item.checkedOutQuantity}x ${itemName}` : itemName}
-                          </Text>
+                          <View style={{ flex: 3 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Text style={styles.td}>
+                                {bulk ? `${item.checkedOutQuantity}x ${itemName}` : itemName}
+                              </Text>
+                              {item.isOverbooked && (
+                                <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                              )}
+                            </View>
+                            {item.notes && (
+                              <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
+                            )}
+                          </View>
                           <Text style={[styles.td, { width: 40, textAlign: "center" }]}>
                             {isKit ? children.length : bulk ? item.checkedOutQuantity : 1}
                           </Text>
                           <Text style={[styles.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
-                            {isKit ? (item.kit?.assetTag || "—") : bulk ? "—" : (item.asset?.assetTag || "—")}
+                            {isKit ? (item.kit?.assetTag || "-") : bulk ? "-" : (item.asset?.assetTag || "-")}
                           </Text>
                           <View style={[styles.td, { width: 50, alignItems: "center", justifyContent: "center" }]}>
                             <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
@@ -202,13 +214,13 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                           <View key={child.id} style={styles.tableRow}>
                             <Text style={[styles.td, { width: 24 }]}> </Text>
                             <Text style={[styles.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                              {child.model?.name || child.description || "—"}
+                              {child.model?.name || child.description || "-"}
                             </Text>
                             <Text style={[styles.td, { width: 40, textAlign: "center", fontSize: 8 }]}>
                               {child.quantity}
                             </Text>
                             <Text style={[styles.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
-                              {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+                              {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
                             </Text>
                             <View style={[styles.td, { width: 50, alignItems: "center", justifyContent: "center" }]}>
                             <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
@@ -266,7 +278,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          {org.name} • {org.email || ""} • {org.phone || ""}
+          {org.name} | {org.email || ""} | {org.phone || ""}
           {"\n"}Ref: {project.projectNumber}
         </Text>
       </Page>

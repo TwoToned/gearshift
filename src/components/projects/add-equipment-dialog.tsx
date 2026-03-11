@@ -33,6 +33,8 @@ interface AddEquipmentDialogProps {
   projectId: string;
   rentalStartDate?: Date;
   rentalEndDate?: Date;
+  existingGroups?: string[];
+  onGroupCreated?: (group: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -41,6 +43,8 @@ export function AddEquipmentDialog({
   projectId,
   rentalStartDate,
   rentalEndDate,
+  existingGroups = [],
+  onGroupCreated,
   open,
   onOpenChange,
 }: AddEquipmentDialogProps) {
@@ -136,10 +140,14 @@ export function AddEquipmentDialog({
   }, [assetLookup, form]);
 
   const mutation = useMutation({
-    mutationFn: (data: LineItemFormValues) => addLineItem(projectId, data),
-    onSuccess: () => {
+    mutationFn: (data: LineItemFormValues) => addLineItem(projectId, data, overbookConfirmed),
+    onSuccess: (_result, variables) => {
+      if (variables.groupName && onGroupCreated) {
+        onGroupCreated(variables.groupName);
+      }
       toast.success("Equipment added");
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["availability"] });
       onOpenChange(false);
       resetState();
     },
@@ -158,6 +166,7 @@ export function AddEquipmentDialog({
     setAssetTagInput("");
     setLookupTag("");
     setMode("model");
+    setOverbookConfirmed(false);
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -179,9 +188,15 @@ export function AddEquipmentDialog({
     return "text-green-600 dark:text-green-400";
   }
 
+  const [overbookConfirmed, setOverbookConfirmed] = useState(false);
   const requestedQty = Number(form.watch("quantity")) || 1;
-  const modelAvailabilityBlocked = mode === "model" && availability && requestedQty > availability.available;
-  const canSubmitModel = mode === "model" && !!selectedModelId && !modelAvailabilityBlocked;
+  const isOverbooked = mode === "model" && !!availability && requestedQty > availability.available;
+
+  // Reset overbook confirmation when model or quantity changes
+  useEffect(() => {
+    setOverbookConfirmed(false);
+  }, [selectedModelId, requestedQty]);
+  const canSubmitModel = mode === "model" && !!selectedModelId && (!isOverbooked || overbookConfirmed);
   const canSubmitAsset = mode === "asset-tag" && assetLookup?.found && assetLookup.available;
 
   return (
@@ -244,6 +259,11 @@ export function AddEquipmentDialog({
                         available out of{" "}
                         <span className="font-semibold">{availability.totalStock}</span>{" "}
                         total
+                        {availability.bookedOnThisProject > 0 && (
+                          <span className="text-muted-foreground font-normal">
+                            {" "}({availability.bookedOnThisProject} already on this project)
+                          </span>
+                        )}
                       </p>
                       {availability.conflicts.length > 0 && (
                         <div className="flex items-start gap-2 text-amber-600 dark:text-amber-400">
@@ -260,6 +280,24 @@ export function AddEquipmentDialog({
                       )}
                     </div>
                   ) : null}
+                </div>
+              )}
+
+              {isOverbooked && (
+                <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3 space-y-2">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                    <AlertTriangle className="inline-block mr-1.5 h-3.5 w-3.5" />
+                    This will overbook {requestedQty} units with only {availability?.available ?? 0} available
+                  </p>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={overbookConfirmed}
+                      onChange={(e) => setOverbookConfirmed(e.target.checked)}
+                      className="accent-red-500"
+                    />
+                    <span className="text-red-600 dark:text-red-400">I understand, overbook anyway</span>
+                  </label>
                 </div>
               )}
             </>
@@ -381,11 +419,22 @@ export function AddEquipmentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="eq-groupName">Group Name</Label>
-            <Input
-              id="eq-groupName"
-              {...form.register("groupName")}
-              placeholder="e.g. Audio, Lighting"
+            <Label>Group Name</Label>
+            <Controller
+              control={form.control}
+              name="groupName"
+              render={({ field }) => (
+                <ComboboxPicker
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                  options={existingGroups.map((g) => ({ value: g, label: g }))}
+                  placeholder="e.g. Audio, Lighting"
+                  searchPlaceholder="Search or type new group..."
+                  emptyMessage="Type to create a new group."
+                  allowClear
+                  creatable
+                />
+              )}
             />
           </div>
 

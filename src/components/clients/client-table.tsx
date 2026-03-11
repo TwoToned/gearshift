@@ -6,14 +6,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Plus } from "lucide-react";
 
 import { getClients } from "@/server/clients";
+import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -33,16 +34,20 @@ const typeLabels: Record<string, string> = {
 };
 
 export function ClientTable() {
+  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
+    useTablePreferences("clients", { sortBy: "name", sortOrder: "asc" });
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
-  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", { search, type, page }],
+    queryKey: ["clients", { search, type, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getClients({
       search: search || undefined,
       type: type || undefined,
       page,
+      pageSize,
+      sortBy,
+      sortOrder,
     }),
   });
 
@@ -85,12 +90,12 @@ export function ClientTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-right">Projects</TableHead>
-              <TableHead>Status</TableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
+              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
+              <SortableTableHead sortKey="contactName" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Contact</SortableTableHead>
+              <SortableTableHead sortKey="contactEmail" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Email</SortableTableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Projects</SortableTableHead>
+              <SortableTableHead sortKey="isActive" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,21 +144,22 @@ export function ClientTable() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <p className="text-sm text-muted-foreground">
             Page {page} of {totalPages} ({total} total)
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
-          </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Previous
+          </Button>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

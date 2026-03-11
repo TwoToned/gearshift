@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { requireOrganization } from "@/lib/auth-server";
 import { QuotePDF } from "@/lib/pdf/quote-pdf";
 import { InvoicePDF } from "@/lib/pdf/invoice-pdf";
-import { PackingListPDF } from "@/lib/pdf/packing-list-pdf";
+import { PullSlipPDF } from "@/lib/pdf/packing-list-pdf";
 import { ReturnSheetPDF } from "@/lib/pdf/return-sheet-pdf";
 import { DeliveryDocketPDF } from "@/lib/pdf/delivery-docket-pdf";
+import { computeOverbookedStatus } from "@/lib/availability";
 
 export async function GET(
   request: NextRequest,
@@ -78,9 +79,23 @@ export async function GET(
     taxLabel: (orgSettings.taxLabel as string) || "GST",
   };
 
+  // Compute overbooked status dynamically
+  const overbookedIds = await computeOverbookedStatus(
+    organizationId,
+    project.lineItems,
+    project.rentalStartDate,
+    project.rentalEndDate,
+    project.id,
+  );
+
+  const enrichedLineItems = project.lineItems.map((li) => ({
+    ...li,
+    isOverbooked: overbookedIds.has(li.id),
+  }));
+
   // Serialize Decimals to numbers
   const serializedProject = JSON.parse(
-    JSON.stringify(project, (_key, value) =>
+    JSON.stringify({ ...project, lineItems: enrichedLineItems }, (_key, value) =>
       value && typeof value === "object" && typeof value.toNumber === "function"
         ? value.toNumber()
         : value
@@ -95,9 +110,9 @@ export async function GET(
       doc = <InvoicePDF org={orgData} project={serializedProject} />;
       filename = `Invoice-${project.projectNumber}.pdf`;
       break;
-    case "packing-list":
-      doc = <PackingListPDF org={orgData} project={serializedProject} />;
-      filename = `PackingList-${project.projectNumber}.pdf`;
+    case "pull-slip":
+      doc = <PullSlipPDF org={orgData} project={serializedProject} />;
+      filename = `PullSlip-${project.projectNumber}.pdf`;
       break;
     case "return-sheet":
       doc = <ReturnSheetPDF org={orgData} project={serializedProject} />;

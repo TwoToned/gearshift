@@ -674,6 +674,7 @@ model Project {
   total             Decimal?      @db.Decimal(12, 2)
   depositPercent    Decimal?      @db.Decimal(5, 2)
   depositPaid       Decimal?      @db.Decimal(12, 2)
+  invoicedTotal     Decimal?      @db.Decimal(12, 2)
   tags              String[]      @default([])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt

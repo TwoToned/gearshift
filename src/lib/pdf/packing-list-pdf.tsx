@@ -18,10 +18,12 @@ interface LineItem {
   asset: { assetTag: string } | null;
   bulkAsset: { assetTag: string } | null;
   kit?: { assetTag: string; name: string } | null;
+  notes: string | null;
+  isOverbooked?: boolean;
   childLineItems?: LineItem[];
 }
 
-interface PackingListPDFProps {
+interface PullSlipPDFProps {
   org: { name: string };
   project: {
     projectNumber: string;
@@ -34,7 +36,7 @@ interface PackingListPDFProps {
   };
 }
 
-export function PackingListPDF({ org, project }: PackingListPDFProps) {
+export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
   // Filter out kit children (they'll be rendered under their parent)
   const equipmentItems = project.lineItems.filter(
     (i) => i.status !== "CANCELLED" && !i.isKitChild
@@ -62,10 +64,10 @@ export function PackingListPDF({ org, project }: PackingListPDFProps) {
         <View style={styles.header}>
           <View>
             <Text style={styles.companyName}>{org.name}</Text>
-            <Text style={styles.companyDetails}>Packing List</Text>
+            <Text style={styles.companyDetails}>Pull Slip</Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>PACKING LIST</Text>
+            <Text style={styles.docTitle}>PULL SLIP</Text>
             <Text style={styles.docMeta}>
               {project.projectNumber}
               {"\n"}{project.name}
@@ -103,7 +105,9 @@ export function PackingListPDF({ org, project }: PackingListPDFProps) {
         {/* Items table */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.th, { width: 20, textAlign: "center" }]}>✓</Text>
+            <View style={[styles.th, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+              <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#fff", borderRadius: 1 }} />
+            </View>
             <Text style={[styles.th, { flex: 3 }]}>Item</Text>
             <Text style={[styles.th, { width: 30, textAlign: "center" }]}>Qty</Text>
             <Text style={[styles.th, { width: 80 }]}>Asset Tag</Text>
@@ -126,36 +130,61 @@ export function PackingListPDF({ org, project }: PackingListPDFProps) {
                       <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
                         <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
                       </View>
-                      <Text style={[styles.td, { flex: 3 }]}>
-                        {isKit
-                          ? `🧳 ${item.description || item.kit?.name || "Kit"}`
-                          : item.model
-                            ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
-                            : item.description || "—"}
-                      </Text>
+                      <View style={{ flex: 3 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Text style={[styles.td, { fontFamily: isKit ? "Helvetica-Bold" : "Helvetica" }]}>
+                            {isKit
+                              ? `[Kit] ${item.description || item.kit?.name || "Kit"}`
+                              : item.model
+                                ? `${item.model.name}${item.model.modelNumber ? ` (${item.model.modelNumber})` : ""}`
+                                : item.description || "-"}
+                          </Text>
+                          {item.isOverbooked && (
+                            <Text style={{ fontSize: 6, color: "#dc2626", backgroundColor: "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>OVERBOOKED</Text>
+                          )}
+                        </View>
+                        {item.notes && (
+                          <Text style={{ fontSize: 7, color: "#888", marginTop: 1 }}>{item.notes}</Text>
+                        )}
+                      </View>
                       <Text style={[styles.td, { width: 30, textAlign: "center" }]}>
                         {isKit ? children.length : item.quantity}
                       </Text>
                       <Text style={[styles.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
-                        {isKit ? (item.kit?.assetTag || "—") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "—")}
+                        {isKit ? (item.kit?.assetTag || "-") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "-")}
                       </Text>
                       <Text style={[styles.td, { width: 70, fontSize: 8, color: "#888" }]}>
-                        {item.model?.category?.name || "—"}
+                        {item.model?.category?.name || "-"}
                       </Text>
                     </View>
+                    {!isKit && item.quantity > 1 && (() => {
+                      const shortName = item.model
+                        ? item.model.name
+                        : (item.description || "Item");
+                      return (
+                        <View style={{ paddingLeft: 26, paddingRight: 6, paddingBottom: 4 }}>
+                          {Array.from({ length: item.quantity }).map((_, i) => (
+                            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 1 }}>
+                              <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                              <Text style={{ fontSize: 7, color: "#666" }}>{shortName} - {i + 1}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    })()}
                     {children.map((child) => (
                       <View key={child.id} style={styles.tableRow}>
                         <View style={[styles.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
-                        <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
-                      </View>
+                          <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                        </View>
                         <Text style={[styles.td, { flex: 3, paddingLeft: 12, fontSize: 8, color: "#555" }]}>
-                          {child.model?.name || child.description || "—"}
+                          {child.model?.name || child.description || "-"}
                         </Text>
                         <Text style={[styles.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
                           {child.quantity}
                         </Text>
                         <Text style={[styles.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
-                          {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+                          {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
                         </Text>
                         <Text style={[styles.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
                           {child.model?.category?.name || ""}
@@ -171,7 +200,7 @@ export function PackingListPDF({ org, project }: PackingListPDFProps) {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          {org.name} • {project.projectNumber} • Printed {formatDate(new Date().toISOString())}
+          {org.name} - {project.projectNumber} - Printed {formatDate(new Date().toISOString())}
         </Text>
       </Page>
     </Document>

@@ -12,10 +12,13 @@ export async function getClients(params?: {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
   const {
     search, type, isActive = true, page = 1, pageSize = 25,
+    sortBy = "name", sortOrder = "asc",
   } = params || {};
 
   const where: Prisma.ClientWhereInput = {
@@ -37,7 +40,7 @@ export async function getClients(params?: {
       include: {
         _count: { select: { projects: true } },
       },
-      orderBy: { name: "asc" },
+      orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

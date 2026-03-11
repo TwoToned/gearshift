@@ -20,9 +20,11 @@ export async function getModels(params?: {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
-  const { search, categoryId, assetType, isActive = true, page = 1, pageSize = 25 } = params || {};
+  const { search, categoryId, assetType, isActive = true, page = 1, pageSize = 25, sortBy = "name", sortOrder = "asc" } = params || {};
 
   const where: Prisma.ModelWhereInput = {
     organizationId,
@@ -45,7 +47,8 @@ export async function getModels(params?: {
         category: true,
         _count: { select: { assets: true, bulkAssets: true } },
       },
-      orderBy: { name: "asc" },
+      orderBy: sortBy === "category" ? { category: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

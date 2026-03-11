@@ -25,6 +25,8 @@ export async function getKits(params?: {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }) {
   const { organizationId } = await getOrgContext();
   const {
@@ -35,6 +37,8 @@ export async function getKits(params?: {
     isActive = true,
     page = 1,
     pageSize = 25,
+    sortBy = "assetTag",
+    sortOrder = "asc",
   } = params || {};
 
   const where: Prisma.KitWhereInput = {
@@ -60,7 +64,9 @@ export async function getKits(params?: {
         location: { select: { name: true } },
         _count: { select: { serializedItems: true, bulkItems: true } },
       },
-      orderBy: { assetTag: "asc" },
+      orderBy: sortBy === "category" ? { category: { name: sortOrder } }
+        : sortBy === "location" ? { location: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -285,6 +291,68 @@ export async function addSerializedItemToKit(
       });
 
       return item;
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// addSerializedItemsToKit – batch add multiple serialized assets
+// ---------------------------------------------------------------------------
+export async function addSerializedItemsToKit(
+  kitId: string,
+  items: Array<{ assetId: string; position?: string }>,
+) {
+  const { organizationId, userId } = await getOrgContext();
+
+  if (items.length === 0) throw new Error("No items to add");
+
+  const kit = await prisma.kit.findUnique({
+    where: { id: kitId, organizationId },
+  });
+  if (!kit) throw new Error("Kit not found");
+  if (kit.status !== "AVAILABLE") {
+    throw new Error("Items can only be added to AVAILABLE kits");
+  }
+
+  const assetIds = items.map((i) => i.assetId);
+  const assets = await prisma.asset.findMany({
+    where: { id: { in: assetIds }, organizationId },
+  });
+
+  for (const asset of assets) {
+    if (asset.status !== "AVAILABLE") {
+      throw new Error(`Asset ${asset.assetTag} is not AVAILABLE`);
+    }
+    if (asset.kitId) {
+      throw new Error(`Asset ${asset.assetTag} is already in another kit`);
+    }
+  }
+
+  if (assets.length !== assetIds.length) {
+    throw new Error("One or more assets were not found");
+  }
+
+  return serialize(
+    await prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const item of items) {
+        const record = await tx.kitSerializedItem.create({
+          data: {
+            organizationId,
+            kitId,
+            assetId: item.assetId,
+            position: item.position,
+            addedById: userId,
+          },
+          include: { asset: { include: { model: true } } },
+        });
+        await tx.asset.update({
+          where: { id: item.assetId },
+          data: { kitId, locationId: kit.locationId },
+        });
+        created.push(record);
+      }
+      return created;
     }),
   );
 }

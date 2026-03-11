@@ -7,15 +7,16 @@ import { Search, Plus } from "lucide-react";
 
 import { getKits } from "@/server/kits";
 import { getLocations } from "@/server/locations";
+import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -37,10 +38,11 @@ const conditionColors: Record<string, string> = {
 };
 
 export default function KitsPage() {
+  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
+    useTablePreferences("kits", { sortBy: "assetTag", sortOrder: "asc" });
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [locationId, setLocationId] = useState("");
-  const [page, setPage] = useState(1);
 
   const { data: locations = [] } = useQuery({
     queryKey: ["locations"],
@@ -48,13 +50,16 @@ export default function KitsPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kits", { search, status, locationId, page }],
+    queryKey: ["kits", { search, status, locationId, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getKits({
         search: search || undefined,
         status: status || undefined,
         locationId: locationId || undefined,
         page,
+        pageSize,
+        sortBy,
+        sortOrder,
       }),
   });
 
@@ -130,13 +135,13 @@ export default function KitsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Asset Tag</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Condition</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead className="text-right">Items</TableHead>
+              <SortableTableHead sortKey="assetTag" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset Tag</SortableTableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
+              <SortableTableHead sortKey="category" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Category</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
+              <SortableTableHead sortKey="condition" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Condition</SortableTableHead>
+              <SortableTableHead sortKey="location" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Location</SortableTableHead>
+              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Items</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -191,21 +196,22 @@ export default function KitsPage() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <p className="text-sm text-muted-foreground">
             Page {page} of {totalPages} ({total} total)
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
-          </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Previous
+          </Button>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
