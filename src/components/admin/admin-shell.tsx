@@ -76,7 +76,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex md:hidden items-center justify-between border-b bg-card px-4 py-3">
+      <div className="fixed top-0 left-0 right-0 z-40 flex md:hidden items-center justify-between border-b bg-card px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive text-destructive-foreground font-bold text-xs">
             <Shield className="h-3.5 w-3.5" />

@@ -117,14 +117,7 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       activeRef.current = true;
       await scanner.start(
         selectedCamera,
-        {
-          fps: 10,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const w = Math.min(180, Math.floor(viewfinderWidth * 0.5));
-            const h = Math.min(120, Math.floor(viewfinderHeight * 0.4));
-            return { width: w, height: h };
-          },
-        },
+        { fps: 10 },
         (decodedText) => {
           // Guard against callbacks firing after scanner is stopped
           if (!activeRef.current) return;
