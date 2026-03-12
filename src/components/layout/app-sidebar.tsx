@@ -16,6 +16,7 @@ import {
   Warehouse,
   Container,
   ShieldCheck,
+  BookTemplate,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -70,6 +71,9 @@ const navItems: NavItem[] = [
     url: "/projects",
     icon: FolderOpen,
     resource: "project",
+    items: [
+      { title: "Templates", url: "/projects/templates", icon: BookTemplate, resource: "project" },
+    ],
   },
   {
     title: "Warehouse",

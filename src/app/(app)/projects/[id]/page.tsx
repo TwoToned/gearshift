@@ -3,6 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Pencil,
   Archive,
@@ -15,6 +16,9 @@ import {
   DollarSign,
   FileText,
   ChevronDown,
+  Copy,
+  BookTemplate,
+  MoreHorizontal,
 } from "lucide-react";
 import { LineItemsPanel } from "@/components/projects/line-items-panel";
 import { useRouter } from "next/navigation";
@@ -27,6 +31,7 @@ import {
   archiveProject,
   deleteProject,
 } from "@/server/projects";
+import { DuplicateProjectDialog } from "@/components/projects/duplicate-project-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,6 +139,8 @@ export default function ProjectDetailPage({
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [dupMode, setDupMode] = useState<"duplicate" | "template" | null>(null);
+
   const { data: project, isLoading } = useQuery({
     queryKey: ["project", id],
     queryFn: () => getProject(id),
@@ -199,6 +206,12 @@ export default function ProjectDetailPage({
             >
               {statusLabels[project.status] || project.status}
             </Badge>
+            {project.isTemplate && (
+              <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
+                <BookTemplate className="mr-1 h-3 w-3" />
+                Template
+              </Badge>
+            )}
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-1">
             {project.name}
@@ -260,6 +273,27 @@ export default function ProjectDetailPage({
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
+          </CanDo>
+          <CanDo resource="project" action="create">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" />}>
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setDupMode("duplicate")}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate Project
+                </DropdownMenuItem>
+                {!project.isTemplate && (
+                  <DropdownMenuItem onClick={() => setDupMode("template")}>
+                    <BookTemplate className="mr-2 h-4 w-4" />
+                    Save as Template
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </CanDo>
+          <CanDo resource="project" action="update">
             {project.status === "CANCELLED" ? (
               <Button
                 variant="outline"
@@ -659,6 +693,19 @@ export default function ProjectDetailPage({
         </TabsContent>
       </Tabs>
     </div>
+
+    {dupMode && (
+      <DuplicateProjectDialog
+        open={!!dupMode}
+        onOpenChange={(open) => !open && setDupMode(null)}
+        sourceProject={{
+          id: project.id,
+          projectNumber: project.projectNumber,
+          name: project.name,
+        }}
+        mode={dupMode}
+      />
+    )}
     </RequirePermission>
   );
 }

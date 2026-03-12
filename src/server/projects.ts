@@ -9,6 +9,7 @@ import {
 import type { Prisma, ProjectStatus } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
+import { recalculateProjectTotals } from "@/server/line-items";
 
 export async function getProjects(params?: {
   search?: string;
@@ -40,6 +41,7 @@ export async function getProjects(params?: {
 
   const where: Prisma.ProjectWhereInput = {
     organizationId,
+    isTemplate: false,
     ...(status && {
       status: status as Prisma.EnumProjectStatusFilter,
     }),
@@ -206,7 +208,7 @@ export async function getProject(id: string) {
   return serialize({ ...project, lineItems: enrichedLineItems });
 }
 
-export async function createProject(data: ProjectFormValues) {
+export async function createProject(data: ProjectFormValues & { isTemplate?: boolean }) {
   const { organizationId } = await getOrgContext();
   const parsed = projectSchema.parse(data);
 
@@ -215,6 +217,7 @@ export async function createProject(data: ProjectFormValues) {
       await prisma.project.create({
         data: {
           organizationId,
+          isTemplate: data.isTemplate ?? false,
           projectNumber: parsed.projectNumber,
         name: parsed.name,
         clientId: parsed.clientId || null,
@@ -328,6 +331,260 @@ export async function archiveProject(id: string) {
       data: { status: "CANCELLED" },
     })
   );
+}
+
+export async function duplicateProject(sourceId: string, newProjectNumber: string, newName: string) {
+  const { organizationId } = await getOrgContext();
+
+  const source = await prisma.project.findUnique({
+    where: { id: sourceId, organizationId },
+    include: {
+      lineItems: {
+        where: { isKitChild: false },
+        include: {
+          childLineItems: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  if (!source) throw new Error("Project not found");
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const newProject = await tx.project.create({
+        data: {
+          organizationId,
+          projectNumber: newProjectNumber,
+          name: newName,
+          clientId: source.clientId,
+          status: "ENQUIRY",
+          type: source.type,
+          description: source.description,
+          locationId: source.locationId,
+          siteContactName: source.siteContactName,
+          siteContactPhone: source.siteContactPhone,
+          siteContactEmail: source.siteContactEmail,
+          crewNotes: source.crewNotes,
+          internalNotes: source.internalNotes,
+          clientNotes: source.clientNotes,
+          discountPercent: source.discountPercent,
+          depositPercent: source.depositPercent,
+          tags: source.tags,
+          isTemplate: false,
+        },
+      });
+
+      // Copy line items (parent items first, then children)
+      for (const li of source.lineItems) {
+        const parentItem = await tx.projectLineItem.create({
+          data: {
+            organizationId,
+            projectId: newProject.id,
+            type: li.type,
+            modelId: li.modelId,
+            bulkAssetId: li.bulkAssetId,
+            kitId: li.kitId,
+            supplierId: li.supplierId,
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            pricingType: li.pricingType,
+            duration: li.duration,
+            discount: li.discount,
+            lineTotal: li.lineTotal,
+            sortOrder: li.sortOrder,
+            groupName: li.groupName,
+            notes: li.notes,
+            isOptional: li.isOptional,
+            isSubhire: li.isSubhire,
+            showSubhireOnDocs: li.showSubhireOnDocs,
+            isKitChild: false,
+            pricingMode: li.pricingMode,
+            status: "QUOTED",
+          },
+        });
+
+        // Copy child line items (kit children)
+        if (li.childLineItems?.length) {
+          for (const child of li.childLineItems) {
+            await tx.projectLineItem.create({
+              data: {
+                organizationId,
+                projectId: newProject.id,
+                type: child.type,
+                modelId: child.modelId,
+                bulkAssetId: child.bulkAssetId,
+                description: child.description,
+                quantity: child.quantity,
+                unitPrice: child.unitPrice,
+                pricingType: child.pricingType,
+                duration: child.duration,
+                discount: child.discount,
+                lineTotal: child.lineTotal,
+                sortOrder: child.sortOrder,
+                groupName: child.groupName,
+                notes: child.notes,
+                isKitChild: true,
+                parentLineItemId: parentItem.id,
+                status: "QUOTED",
+              },
+            });
+          }
+        }
+      }
+
+      // Recalculate totals
+      await recalculateProjectTotals(newProject.id);
+
+      return serialize(newProject);
+    });
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("Unique constraint")) {
+      throw new Error(`Project code "${newProjectNumber}" already exists`);
+    }
+    throw e;
+  }
+}
+
+export async function saveAsTemplate(projectId: string, templateName: string, templateNumber: string) {
+  const { organizationId } = await getOrgContext();
+
+  const source = await prisma.project.findUnique({
+    where: { id: projectId, organizationId },
+    include: {
+      lineItems: {
+        where: { isKitChild: false },
+        include: { childLineItems: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  if (!source) throw new Error("Project not found");
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const template = await tx.project.create({
+        data: {
+          organizationId,
+          projectNumber: templateNumber,
+          name: templateName,
+          clientId: source.clientId,
+          status: "ENQUIRY",
+          type: source.type,
+          description: source.description,
+          locationId: source.locationId,
+          siteContactName: source.siteContactName,
+          siteContactPhone: source.siteContactPhone,
+          siteContactEmail: source.siteContactEmail,
+          crewNotes: source.crewNotes,
+          internalNotes: source.internalNotes,
+          clientNotes: source.clientNotes,
+          discountPercent: source.discountPercent,
+          depositPercent: source.depositPercent,
+          tags: source.tags,
+          isTemplate: true,
+        },
+      });
+
+      for (const li of source.lineItems) {
+        const parentItem = await tx.projectLineItem.create({
+          data: {
+            organizationId,
+            projectId: template.id,
+            type: li.type,
+            modelId: li.modelId,
+            bulkAssetId: li.bulkAssetId,
+            kitId: li.kitId,
+            supplierId: li.supplierId,
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            pricingType: li.pricingType,
+            duration: li.duration,
+            discount: li.discount,
+            lineTotal: li.lineTotal,
+            sortOrder: li.sortOrder,
+            groupName: li.groupName,
+            notes: li.notes,
+            isOptional: li.isOptional,
+            isSubhire: li.isSubhire,
+            showSubhireOnDocs: li.showSubhireOnDocs,
+            isKitChild: false,
+            pricingMode: li.pricingMode,
+            status: "QUOTED",
+          },
+        });
+
+        if (li.childLineItems?.length) {
+          for (const child of li.childLineItems) {
+            await tx.projectLineItem.create({
+              data: {
+                organizationId,
+                projectId: template.id,
+                type: child.type,
+                modelId: child.modelId,
+                bulkAssetId: child.bulkAssetId,
+                description: child.description,
+                quantity: child.quantity,
+                unitPrice: child.unitPrice,
+                pricingType: child.pricingType,
+                duration: child.duration,
+                discount: child.discount,
+                lineTotal: child.lineTotal,
+                sortOrder: child.sortOrder,
+                groupName: child.groupName,
+                notes: child.notes,
+                isKitChild: true,
+                parentLineItemId: parentItem.id,
+                status: "QUOTED",
+              },
+            });
+          }
+        }
+      }
+
+      await recalculateProjectTotals(template.id);
+
+      return serialize(template);
+    });
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("Unique constraint")) {
+      throw new Error(`Project code "${templateNumber}" already exists`);
+    }
+    throw e;
+  }
+}
+
+export async function getTemplates() {
+  const { organizationId } = await getOrgContext();
+
+  const templates = await prisma.project.findMany({
+    where: { organizationId, isTemplate: true },
+    include: {
+      client: true,
+      location: true,
+      _count: { select: { lineItems: { where: { isKitChild: false } } } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return serialize(templates);
+}
+
+export async function deleteTemplate(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  const template = await prisma.project.findUnique({
+    where: { id, organizationId },
+  });
+  if (!template) throw new Error("Template not found");
+  if (!template.isTemplate) throw new Error("This is not a template");
+
+  await prisma.project.delete({ where: { id, organizationId } });
+  return { success: true };
 }
 
 export async function deleteProject(id: string) {

@@ -25,7 +25,8 @@ import { QuickCreateClient } from "@/components/clients/quick-create-client";
 import { QuickCreateLocation } from "@/components/assets/quick-create-location";
 
 interface ProjectFormProps {
-  initialData?: ProjectFormValues & { id: string };
+  initialData?: ProjectFormValues & { id: string; isTemplate?: boolean };
+  isTemplate?: boolean;
 }
 
 function formatDateForInput(date: unknown): string {
@@ -35,10 +36,11 @@ function formatDateForInput(date: unknown): string {
   return d.toISOString().split("T")[0];
 }
 
-export function ProjectForm({ initialData }: ProjectFormProps) {
+export function ProjectForm({ initialData, isTemplate: isTemplateProp }: ProjectFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isEditing = !!initialData;
+  const isTemplate = isTemplateProp ?? initialData?.isTemplate ?? false;
   const [quickCreateClientOpen, setQuickCreateClientOpen] = useState(false);
   const [quickCreateLocationOpen, setQuickCreateLocationOpen] = useState(false);
 
@@ -110,9 +112,15 @@ export function ProjectForm({ initialData }: ProjectFormProps) {
 
   const mutation = useMutation({
     mutationFn: (data: ProjectFormValues) =>
-      isEditing ? updateProject(initialData.id, data) : createProject(data),
+      isEditing
+        ? updateProject(initialData.id, data)
+        : createProject({ ...data, isTemplate }),
     onSuccess: (result) => {
-      toast.success(isEditing ? "Project updated" : "Project created");
+      toast.success(
+        isEditing
+          ? isTemplate ? "Template updated" : "Project updated"
+          : isTemplate ? "Template created" : "Project created"
+      );
       router.push(`/projects/${result.id}`);
     },
     onError: (e) => toast.error(e.message),

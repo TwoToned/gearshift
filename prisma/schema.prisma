@@ -806,6 +806,7 @@ model Project {
   depositPaid       Decimal?      @db.Decimal(12, 2)
   invoicedTotal     Decimal?      @db.Decimal(12, 2)
   tags              String[]      @default([])
+  isTemplate        Boolean       @default(false)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -819,6 +820,7 @@ model Project {
   @@index([clientId])
   @@index([locationId])
   @@index([rentalStartDate, rentalEndDate])
+  @@index([isTemplate])
   @@map("project")
 }
 

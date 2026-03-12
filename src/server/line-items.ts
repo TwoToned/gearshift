@@ -586,7 +586,7 @@ function calculateLineTotal(
   return Math.max(0, gross - disc);
 }
 
-async function recalculateProjectTotals(projectId: string) {
+export async function recalculateProjectTotals(projectId: string) {
   const lineItems = await prisma.projectLineItem.findMany({
     where: {
       projectId,
