@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { bulkAssetSchema, type BulkAssetFormValues } from "@/lib/validations/asset";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
@@ -99,7 +99,7 @@ export async function getBulkAsset(id: string) {
 }
 
 export async function createBulkAsset(data: BulkAssetFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("bulkAsset", "create");
   const parsed = bulkAssetSchema.parse(data);
   try {
     const result = await prisma.bulkAsset.create({
@@ -128,7 +128,7 @@ export async function createBulkAsset(data: BulkAssetFormValues) {
 }
 
 export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("bulkAsset", "update");
   const parsed = bulkAssetSchema.parse(data);
 
   const existing = await prisma.bulkAsset.findUnique({ where: { id, organizationId } });
@@ -156,7 +156,7 @@ export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
 }
 
 export async function deleteBulkAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("bulkAsset", "delete");
 
   const asset = await prisma.bulkAsset.findUnique({
     where: { id, organizationId },
@@ -178,7 +178,7 @@ export async function deleteBulkAsset(id: string) {
 }
 
 export async function updateBulkAssetNotes(id: string, notes: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("bulkAsset", "update");
   return serialize(await prisma.bulkAsset.update({
     where: { id, organizationId },
     data: { notes: notes || null },
@@ -186,7 +186,7 @@ export async function updateBulkAssetNotes(id: string, notes: string) {
 }
 
 export async function archiveBulkAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("bulkAsset", "update");
   return serialize(await prisma.bulkAsset.update({
     where: { id, organizationId },
     data: { isActive: false, status: "RETIRED" },

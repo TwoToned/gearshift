@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { supplierSchema, type SupplierFormValues } from "@/lib/validations/asset";
 
@@ -17,7 +17,7 @@ export async function getSuppliers() {
 }
 
 export async function createSupplier(data: SupplierFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("orgSettings", "update");
   const parsed = supplierSchema.parse(data);
   // Clean empty strings to null
   const cleaned = {
@@ -37,7 +37,7 @@ export async function createSupplier(data: SupplierFormValues) {
 }
 
 export async function updateSupplier(id: string, data: SupplierFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("orgSettings", "update");
   const parsed = supplierSchema.parse(data);
   const cleaned = {
     ...parsed,
@@ -57,7 +57,7 @@ export async function updateSupplier(id: string, data: SupplierFormValues) {
 }
 
 export async function deleteSupplier(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("orgSettings", "update");
   const supplier = await prisma.supplier.findUnique({
     where: { id, organizationId },
     include: { _count: { select: { assets: true } } },

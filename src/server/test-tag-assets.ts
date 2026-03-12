@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { reserveTestTagIds, peekNextTestTagIds, getOrgTestTagSettings } from "@/server/settings";
 import type { Prisma, TestTagStatus } from "@/generated/prisma/client";
@@ -137,7 +137,7 @@ export async function createTestTagAsset(data: {
   assetId?: string;
   bulkAssetId?: string;
 }) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId } = await requirePermission("testTag", "create");
 
   // If linking to a serialized asset, use the asset's tag as the test tag ID
   let testTagId = data.testTagId;
@@ -194,7 +194,7 @@ export async function createTestTagAssetsFromBulk(data: {
   modelName?: string;
   location?: string;
 }) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("testTag", "create");
 
   // Verify bulk asset exists
   const bulkAsset = await prisma.bulkAsset.findFirst({
@@ -240,7 +240,7 @@ export async function updateTestTagAsset(id: string, data: {
   assetId?: string | null;
   bulkAssetId?: string | null;
 }) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("testTag", "update");
 
   const existing = await prisma.testTagAsset.findFirst({
     where: { id, organizationId },
@@ -268,7 +268,7 @@ export async function updateTestTagAsset(id: string, data: {
 }
 
 export async function retireTestTagAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("testTag", "update");
 
   const existing = await prisma.testTagAsset.findFirst({
     where: { id, organizationId },
@@ -284,7 +284,7 @@ export async function retireTestTagAsset(id: string) {
 }
 
 export async function deleteTestTagAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("testTag", "delete");
 
   const existing = await prisma.testTagAsset.findFirst({
     where: { id, organizationId },

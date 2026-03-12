@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 import type { Prisma } from "@/generated/prisma/client";
@@ -240,7 +240,7 @@ export async function checkOutItems(
     notes?: string;
   }>
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("warehouse", "check_out");
 
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
@@ -387,7 +387,7 @@ export async function checkInItems(
     notes?: string;
   }>
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("warehouse", "check_in");
 
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
@@ -518,7 +518,7 @@ export async function checkInItems(
 // ---------------------------------------------------------------------------
 
 export async function checkOutKit(projectId: string, kitId: string) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("warehouse", "check_out");
 
   return serialize(await prisma.$transaction(async (tx) => {
     // Find the kit parent line item on this project
@@ -585,7 +585,7 @@ export async function checkInKit(
   kitId: string,
   returnCondition: "GOOD" | "DAMAGED" | "MISSING" = "GOOD"
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("warehouse", "check_in");
 
   return serialize(await prisma.$transaction(async (tx) => {
     const kitLineItem = await tx.projectLineItem.findFirst({
@@ -701,7 +701,7 @@ export async function quickAddAndCheckOut(
     quantity?: number;
   }
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("warehouse", "check_out");
 
   const result = await prisma.$transaction(async (tx) => {
     // Get next sort order

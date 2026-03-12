@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import type { OrgSettings } from "@/server/settings";
 
@@ -108,7 +108,7 @@ export async function createTestTagRecord(data: {
   failureNotes?: string;
   nextDueDate: Date | string;
 }) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("testTag", "create");
 
   // Verify asset exists and belongs to org
   const testTagAsset = await prisma.testTagAsset.findFirst({

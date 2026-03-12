@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
 
 export async function getCategories() {
@@ -40,7 +40,7 @@ export async function getCategoryTree() {
 }
 
 export async function createCategory(data: CategoryFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "create");
   const parsed = categorySchema.parse(data);
   return prisma.category.create({
     data: {
@@ -52,7 +52,7 @@ export async function createCategory(data: CategoryFormValues) {
 }
 
 export async function updateCategory(id: string, data: CategoryFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "update");
   const parsed = categorySchema.parse(data);
   return prisma.category.update({
     where: { id, organizationId },
@@ -64,7 +64,7 @@ export async function updateCategory(id: string, data: CategoryFormValues) {
 }
 
 export async function deleteCategory(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "delete");
   // Check for children or models first
   const category = await prisma.category.findUnique({
     where: { id, organizationId },

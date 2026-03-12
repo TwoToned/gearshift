@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
@@ -101,7 +101,7 @@ export async function getLocation(id: string) {
 }
 
 export async function createLocation(data: LocationFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("location", "create");
   const parsed = locationSchema.parse(data);
 
   // If this is set as default, unset other defaults
@@ -122,7 +122,7 @@ export async function createLocation(data: LocationFormValues) {
 }
 
 export async function updateLocation(id: string, data: LocationFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("location", "update");
   const parsed = locationSchema.parse(data);
 
   if (parsed.isDefault) {
@@ -142,7 +142,7 @@ export async function updateLocation(id: string, data: LocationFormValues) {
 }
 
 export async function deleteLocation(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("location", "delete");
   const location = await prisma.location.findUnique({
     where: { id, organizationId },
     include: { _count: { select: { assets: true, bulkAssets: true, children: true } } },
@@ -156,7 +156,7 @@ export async function deleteLocation(id: string) {
 }
 
 export async function updateLocationNotes(id: string, notes: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("location", "update");
   return serialize(await prisma.location.update({
     where: { id, organizationId },
     data: { notes: notes || null },

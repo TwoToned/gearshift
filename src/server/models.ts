@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
 import type { Prisma } from "@/generated/prisma/client";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
@@ -91,7 +91,7 @@ export async function getModel(id: string) {
 }
 
 export async function createModel(data: ModelFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "create");
   const parsed = modelSchema.parse(data);
   const model = await prisma.model.create({
     data: {
@@ -130,7 +130,7 @@ export async function createModel(data: ModelFormValues) {
 }
 
 export async function updateModel(id: string, data: ModelFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "update");
   const parsed = modelSchema.parse(data);
   const model = await prisma.model.update({
     where: { id, organizationId },
@@ -197,7 +197,7 @@ export async function updateModel(id: string, data: ModelFormValues) {
 }
 
 export async function archiveModel(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "delete");
 
   // Delete all assets and bulk assets under this model
   await Promise.all([
