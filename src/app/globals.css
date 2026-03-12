@@ -144,10 +144,15 @@
   }
 }
 
-/* Ensure full viewport height on iOS */
+/* Ensure full viewport height and safe areas on iOS */
 html, body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
+}
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* Safe area support for notched devices */
