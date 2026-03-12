@@ -83,7 +83,17 @@ export function InviteMember() {
         <Label>Role</Label>
         <Select value={role} onValueChange={(v) => setRole(v ?? "member")}>
           <SelectTrigger className="w-full sm:w-[160px]">
-            <SelectValue />
+            <SelectValue>
+              {(() => {
+                const builtIn = builtInRoles.find((r) => r.value === role);
+                if (builtIn) return builtIn.label;
+                if (role.startsWith("custom:")) {
+                  const cr = customRolesList.find((c) => `custom:${c.id}` === role);
+                  return cr?.name ?? "Unknown Role";
+                }
+                return role.charAt(0).toUpperCase() + role.slice(1);
+              })()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {builtInRoles.map((r) => (

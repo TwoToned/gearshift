@@ -2,6 +2,7 @@
 
 import { use, useMemo } from "react";
 import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Archive, Plus, Package, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -111,6 +112,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <RequirePermission resource="model" action="read">
+    <PageMeta title={model?.name} />
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Archive, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -79,6 +80,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <RequirePermission resource="client" action="read">
+    <PageMeta title={client?.name} />
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

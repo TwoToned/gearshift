@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -192,6 +193,7 @@ export default function ProjectDetailPage({
 
   return (
     <RequirePermission resource="project" action="read">
+    <PageMeta title={project ? `${project.projectNumber} ${project.name}` : undefined} />
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

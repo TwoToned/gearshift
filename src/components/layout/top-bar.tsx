@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { OrgSwitcher } from "./org-switcher";
@@ -12,8 +14,63 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
+import { usePlatformName } from "@/lib/use-platform-name";
+
+/** Map route segments to display names */
+const segmentLabels: Record<string, string> = {
+  dashboard: "Dashboard",
+  assets: "Assets",
+  registry: "Registry",
+  models: "Models",
+  availability: "Availability",
+  kits: "Kits",
+  projects: "Projects",
+  templates: "Templates",
+  warehouse: "Warehouse",
+  clients: "Clients",
+  locations: "Locations",
+  maintenance: "Maintenance",
+  "test-and-tag": "Test & Tag",
+  "quick-test": "Quick Test",
+  reports: "Reports",
+  settings: "Settings",
+  billing: "Billing",
+  branding: "Branding",
+  team: "Team",
+  account: "Account",
+  changelog: "Changelog",
+  new: "New",
+  edit: "Edit",
+  "pull-sheet": "Pull Sheet",
+};
+
+function getPageTitle(pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return "Dashboard";
+
+  // Build display breadcrumb, skipping ID-like segments
+  const parts: string[] = [];
+  for (const seg of segments) {
+    const label = segmentLabels[seg];
+    if (label) {
+      parts.push(label);
+    }
+    // Skip ID segments (cuid, uuid, etc.)
+  }
+
+  return parts.length > 0 ? parts.join(" / ") : "Dashboard";
+}
 
 export function TopBar({ title }: { title?: string }) {
+  const pathname = usePathname();
+  const platformName = usePlatformName();
+  const displayTitle = title || getPageTitle(pathname);
+
+  // Update document title based on current page
+  useEffect(() => {
+    document.title = `${displayTitle} — ${platformName}`;
+  }, [displayTitle, platformName]);
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
@@ -21,7 +78,7 @@ export function TopBar({ title }: { title?: string }) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbPage>{title || "Dashboard"}</BreadcrumbPage>
+            <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>

@@ -2,6 +2,7 @@
 
 import { use, Suspense, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, Pencil, Trash2, FileText } from "lucide-react";
@@ -150,6 +151,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="space-y-6">
+      <PageMeta title={asset ? `${asset.assetTag}${asset.customName ? ` — ${asset.customName}` : ""}` : undefined} />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">

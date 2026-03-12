@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { DynamicFavicon } from "@/components/layout/dynamic-favicon";
 import { BrandingProvider } from "@/components/providers/branding-provider";
 import { getSession } from "@/lib/auth-server";
 
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <BrandingProvider>
+        <DynamicFavicon />
         <AppSidebar />
         <SidebarInset>
           <TopBar />

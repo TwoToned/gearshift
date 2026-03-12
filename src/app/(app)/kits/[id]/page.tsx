@@ -2,6 +2,7 @@
 
 import { use, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Loader2, X, ScanBarcode } from "lucide-react";
@@ -203,6 +204,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
 
   return (
     <RequirePermission resource="kit" action="read">
+    <PageMeta title={kit ? `${kit.assetTag}${kit.name ? ` — ${kit.name}` : ""}` : undefined} />
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
+
 import {
   Select,
   SelectContent,
@@ -262,29 +262,14 @@ export function MemberList() {
                     }}
                   >
                     <SelectTrigger className="w-[140px] h-8 text-xs">
-                      <SelectValue>
-                        {display.label}
-                      </SelectValue>
+                      <SelectValue>{display.label}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {builtInAssignableRoles.map((r) => (
+                      {allAssignableRoles.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
                           {r.label}
                         </SelectItem>
                       ))}
-                      {hasCustomRoles && (
-                        <>
-                          <Separator className="my-1" />
-                          <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-                            Custom Roles
-                          </div>
-                          {((customRoles || []) as CustomRoleData[]).map((cr) => (
-                            <SelectItem key={`custom:${cr.id}`} value={`custom:${cr.id}`}>
-                              {cr.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
                     </SelectContent>
                   </Select>
                 </NotViewer>
