@@ -31,16 +31,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <SidebarProvider>
-      <BrandingProvider>
-        <DynamicFavicon />
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar />
-          <main className="flex-1 overflow-auto p-4 pb-safe-mobile md:p-6 md:pb-6">{children}</main>
-        </SidebarInset>
-        <MobileNav />
-      </BrandingProvider>
-    </SidebarProvider>
+    <>
+      <SidebarProvider>
+        <BrandingProvider>
+          <DynamicFavicon />
+          <AppSidebar />
+          <SidebarInset>
+            <TopBar />
+            <main className="flex-1 overflow-auto p-4 pb-safe-mobile md:p-6 md:pb-6">{children}</main>
+          </SidebarInset>
+        </BrandingProvider>
+      </SidebarProvider>
+      <MobileNav />
+    </>
   );
 }

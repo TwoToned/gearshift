@@ -155,6 +155,23 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Barcode scanner — force html5-qrcode video and scan overlay to fit container */
+.scanner-viewport {
+  height: 240px;
+  overflow: hidden;
+}
+.scanner-viewport > div {
+  width: 100% !important;
+  height: 240px !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+.scanner-viewport video {
+  object-fit: cover !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+}
+
 /* Bottom padding for mobile content — clears bottom nav + safe area */
 @media (max-width: 767px) {
   .pb-safe-mobile {

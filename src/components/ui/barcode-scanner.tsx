@@ -243,7 +243,7 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       </div>
 
       {/* Scanner viewport */}
-      <div className="relative bg-black" style={{ minHeight: 180, maxHeight: 260 }} ref={scannerRef}>
+      <div className="relative bg-black scanner-viewport" ref={scannerRef}>
         {starting && (
           <div className="absolute inset-0 flex items-center justify-center text-white">
             <div className="flex flex-col items-center gap-2">
