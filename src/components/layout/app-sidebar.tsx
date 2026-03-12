@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,6 +18,7 @@ import {
   Container,
   ShieldCheck,
   BookTemplate,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -118,24 +120,51 @@ const navItems: NavItem[] = [
   },
 ];
 
+/** Check if the current path is within a nav item or any of its children */
+function isWithinItem(pathname: string, item: NavItem): boolean {
+  if (pathname === item.url || pathname.startsWith(item.url + "/")) return true;
+  return !!item.items?.some(
+    (sub) => pathname === sub.url || pathname.startsWith(sub.url + "/")
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { name: platformName, icon: platformIcon } = usePlatformBranding();
   const { permissions, isLoading } = useCurrentRole();
   const initials = platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
+  // Pinned = manually toggled open via chevron button (persists across navigation)
+  // Auto-expanded sections only stay open while the path is inside them
+  const [pinned, setPinned] = useState<Set<string>>(new Set());
+
+  const togglePinned = useCallback((title: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      return next;
+    });
+  }, []);
+
+  // A section is visible if it's pinned OR the user is currently inside it
+  const isSectionOpen = useCallback(
+    (item: NavItem) => pinned.has(item.title) || isWithinItem(pathname, item),
+    [pinned, pathname]
+  );
+
   /** Check if user has ANY permission (including "read") for a resource */
   const hasAccess = (resource?: Resource): boolean => {
-    if (!resource) return true; // no resource restriction (e.g. dashboard)
-    if (isLoading || !permissions) return true; // show while loading (avoid flash)
+    if (!resource) return true;
+    if (isLoading || !permissions) return true;
     const actions = permissions[resource];
     return !!actions && actions.length > 0;
   };
 
-  const visibleItems = navItems.filter((item) => {
-    if (!hasAccess(item.resource)) return false;
-    return true;
-  });
+  const visibleItems = navItems.filter((item) => hasAccess(item.resource));
 
   return (
     <Sidebar>
@@ -166,35 +195,53 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleItems.map((item) => {
                 const visibleSubs = item.items?.filter((sub) => hasAccess(sub.resource));
+                const hasSubs = visibleSubs && visibleSubs.length > 0;
+                const isOpen = hasSubs && isSectionOpen(item);
+                const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
 
-                return visibleSubs && visibleSubs.length > 0 ? (
+                return hasSubs ? (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      render={<Link href={item.url!} />}
-                      isActive={pathname === item.url || pathname.startsWith(item.url)}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                    <SidebarMenuSub>
-                      {visibleSubs.map((sub) => (
-                        <SidebarMenuSubItem key={sub.title}>
-                          <SidebarMenuSubButton
-                            render={<Link href={sub.url} />}
-                            isActive={pathname === sub.url || pathname.startsWith(sub.url + "/")}
-                          >
-                            <sub.icon className="h-4 w-4" />
-                            <span>{sub.title}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
+                    <div className="flex items-center">
+                      <SidebarMenuButton
+                        render={<Link href={item.url!} />}
+                        isActive={isActive}
+                        className="flex-1"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                      <button
+                        onClick={() => togglePinned(item.title)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
+                      >
+                        <ChevronRight
+                          className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                            isOpen ? "rotate-90" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {isOpen && (
+                      <SidebarMenuSub>
+                        {visibleSubs.map((sub) => (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton
+                              render={<Link href={sub.url} />}
+                              isActive={pathname === sub.url || pathname.startsWith(sub.url + "/")}
+                            >
+                              <sub.icon className="h-4 w-4" />
+                              <span>{sub.title}</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
                   </SidebarMenuItem>
                 ) : (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       render={<Link href={item.url} />}
-                      isActive={pathname === item.url}
+                      isActive={isActive}
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
