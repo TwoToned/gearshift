@@ -72,7 +72,7 @@ export function TopBar({ title }: { title?: string }) {
   }, [displayTitle, platformName]);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 pwa-top-safe">
+    <header className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b bg-background px-4 pt-[env(safe-area-inset-top,0px)] h-[calc(3.5rem+env(safe-area-inset-top,0px))]">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4 hidden sm:block" />
       <Breadcrumb className="hidden sm:flex">

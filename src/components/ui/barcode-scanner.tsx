@@ -115,11 +115,11 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       if (selectedIdx >= 0) setCurrentCameraIdx(selectedIdx);
 
       activeRef.current = true;
-      // Size the scan box to fit within the viewport
+      // Size the scan box to fit within the viewport — keep it small and centered
       const viewportEl = document.getElementById(elementId);
-      const vpWidth = viewportEl?.clientWidth || 300;
-      const boxWidth = Math.min(200, Math.floor(vpWidth * 0.6));
-      const boxHeight = Math.min(120, Math.floor(boxWidth * 0.55));
+      const vpWidth = viewportEl?.clientWidth || 280;
+      const boxWidth = Math.min(160, Math.floor(vpWidth * 0.45));
+      const boxHeight = Math.min(100, Math.floor(boxWidth * 0.6));
       await scanner.start(
         selectedCamera,
         {
@@ -245,7 +245,7 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       </div>
 
       {/* Scanner viewport */}
-      <div className="relative aspect-[3/2] max-h-[280px] bg-black" ref={scannerRef}>
+      <div className="relative aspect-[4/3] max-h-[220px] bg-black" ref={scannerRef}>
         {starting && (
           <div className="absolute inset-0 flex items-center justify-center text-white">
             <div className="flex flex-col items-center gap-2">

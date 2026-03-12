@@ -144,12 +144,20 @@
   }
 }
 
+/* Ensure full viewport height on iOS */
+html, body {
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
 /* Safe area support for notched devices */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Safe area adjustments for notch/dynamic island */
-.pwa-top-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+/* Bottom padding for mobile content — clears bottom nav + safe area */
+@media (max-width: 767px) {
+  .pb-safe-mobile {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
 }
