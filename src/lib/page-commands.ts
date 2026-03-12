@@ -163,6 +163,43 @@ export const PAGE_COMMANDS: PageCommand[] = [
     aliases: ["settings", "config", "preferences", "prefs", "setup", "options", "admin"],
     icon: "Settings",
     description: "Organization settings and configuration",
+    children: [
+      {
+        label: "Billing",
+        href: "/settings/billing",
+        aliases: ["billing", "currency", "tax", "gst", "invoicing", "finance"],
+        icon: "CreditCard",
+        description: "Currency and tax configuration",
+      },
+      {
+        label: "Assets",
+        href: "/settings/assets",
+        aliases: ["assetsettings", "assettags", "tags", "categories", "suppliers"],
+        icon: "Package",
+        description: "Asset tags, categories, and suppliers",
+      },
+      {
+        label: "Test & Tag Settings",
+        href: "/settings/test-and-tag",
+        aliases: ["testtagsettings", "tntsettings", "ttsettings", "testconfig"],
+        icon: "ShieldCheck",
+        description: "Test tag ID format and testing defaults",
+      },
+      {
+        label: "Branding",
+        href: "/settings/branding",
+        aliases: ["branding", "colors", "colours", "logo", "theme", "customise", "customize"],
+        icon: "Palette",
+        description: "Colors and logo customization",
+      },
+      {
+        label: "Team",
+        href: "/settings/team",
+        aliases: ["team", "members", "invites", "invitations", "roles", "permissions", "people", "staff"],
+        icon: "Users",
+        description: "Team members, roles, and permissions",
+      },
+    ],
   },
   {
     label: "Account",

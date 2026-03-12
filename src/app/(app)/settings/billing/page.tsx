@@ -1,0 +1,103 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  getOrganization,
+  updateOrganization,
+  type OrgSettings,
+} from "@/server/settings";
+import { useCanDo } from "@/lib/use-permissions";
+
+export default function BillingSettingsPage() {
+  const queryClient = useQueryClient();
+  const canEdit = useCanDo("orgSettings", "update");
+
+  const { data: org } = useQuery({
+    queryKey: ["organization"],
+    queryFn: getOrganization,
+  });
+
+  const [name, setName] = useState("");
+  const [settings, setSettings] = useState<OrgSettings>({});
+
+  useEffect(() => {
+    if (org) {
+      setName((org as Record<string, unknown>).name as string || "");
+      setSettings((org as Record<string, unknown>).settings as OrgSettings || {});
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateOrganization({ name, settings }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organization"] });
+      toast.success("Settings saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateSetting = (key: keyof OrgSettings, value: string | number) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Billing</CardTitle>
+        <CardDescription>
+          Currency and tax configuration for quotes and invoices.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Input
+              id="currency"
+              value={settings.currency || "AUD"}
+              onChange={(e) => updateSetting("currency", e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="taxRate">Tax Rate (%)</Label>
+            <Input
+              id="taxRate"
+              type="number"
+              step="0.01"
+              value={settings.taxRate ?? 10}
+              onChange={(e) => updateSetting("taxRate", parseFloat(e.target.value) || 0)}
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="taxLabel">Tax Label</Label>
+            <Input
+              id="taxLabel"
+              value={settings.taxLabel || "GST"}
+              onChange={(e) => updateSetting("taxLabel", e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+        </div>
+        {canEdit && (
+          <div className="flex justify-end">
+            <Button
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
