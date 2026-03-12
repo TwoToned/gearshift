@@ -144,16 +144,22 @@
   }
 }
 
-/* iOS PWA viewport lock — prevent body scrolling on mobile.
-   --app-height is set by ViewportHeight component to window.innerHeight,
-   which is the only reliable value in iOS PWA standalone mode. */
+/* iOS PWA viewport lock.
+   With viewport-fit:cover + black-translucent, iOS pushes content up
+   into the status bar but doesn't extend the viewport height to match,
+   leaving a gap at the bottom. Adding safe-area-inset-top to min-height
+   compensates for this shift. */
 @media (max-width: 767px) {
-  html, body {
+  html {
+    min-height: calc(100% + env(safe-area-inset-top));
+    overflow: hidden;
+  }
+  body {
     height: 100%;
     overflow: hidden;
   }
   .app-shell {
-    height: var(--app-height, 100%);
+    height: 100%;
   }
 }
 
