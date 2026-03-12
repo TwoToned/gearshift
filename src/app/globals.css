@@ -149,18 +149,16 @@
    into the status bar but doesn't extend the viewport height to match,
    leaving a gap at the bottom. min-height on html fills that background gap.
    The app-shell uses position:fixed to pin to actual viewport edges so
-   the flex layout works correctly (top bar stays, content scrolls, nav sticks). */
+   the flex layout works correctly (top bar stays, content scrolls, nav sticks).
+   Only applies when .app-shell is present — other layouts (admin) scroll normally. */
+html {
+  min-height: calc(100% + env(safe-area-inset-top));
+}
 @media (max-width: 767px) {
-  html {
-    min-height: calc(100% + env(safe-area-inset-top));
-    overflow: hidden;
-  }
-  body {
-    overflow: hidden;
-  }
   .app-shell {
     position: fixed;
     inset: 0;
+    overflow: hidden;
   }
 }
 
