@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   BookTemplate,
   ChevronRight,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -66,6 +67,7 @@ const navItems: NavItem[] = [
     resource: "asset",
     items: [
       { title: "Models", url: "/assets/models", icon: Boxes, resource: "model" },
+      { title: "Categories", url: "/assets/categories", icon: Tags, resource: "model" },
       { title: "Kits", url: "/kits", icon: Container, resource: "kit" },
       { title: "Availability", url: "/assets/availability", icon: CalendarRange, resource: "asset" },
     ],

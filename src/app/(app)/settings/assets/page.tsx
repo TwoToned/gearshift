@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CategoryManager } from "@/components/assets/category-manager";
 import { SupplierManager } from "@/components/settings/supplier-manager";
 import {
   getOrganization,
@@ -116,8 +115,16 @@ export default function AssetsSettingsPage() {
 
       {canEdit && (
         <Card>
-          <CardContent className="pt-6">
-            <CategoryManager />
+          <CardHeader>
+            <CardTitle>Categories</CardTitle>
+            <CardDescription>
+              Organize your equipment into categories and subcategories.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" render={<Link href="/assets/categories" />}>
+              Manage Categories
+            </Button>
           </CardContent>
         </Card>
       )}

@@ -496,14 +496,14 @@ export async function globalSearch(query: string) {
     results.push({
       id: cat.id, type: "category",
       title: cat.name, subtitle: `${cat.modelCount} model${cat.modelCount !== 1 ? "s" : ""}`,
-      href: `/assets/models?category=${cat.id}`, relevance: Number(cat.match_quality) || 0,
+      href: `/assets/categories/${cat.id}`, relevance: Number(cat.match_quality) || 0,
     });
     // Sub-categories
     for (const sub of (subCategoriesByParent.get(cat.id) || [])) {
       results.push({
         id: sub.id, type: "category", isChild: true,
         title: sub.name, subtitle: null,
-        href: `/assets/models?category=${sub.id}`, relevance: 0,
+        href: `/assets/categories/${sub.id}`, relevance: 0,
       });
     }
     // Models in this category

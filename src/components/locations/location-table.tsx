@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Plus, Star } from "lucide-react";
@@ -33,6 +33,46 @@ const typeLabels: Record<string, string> = {
   OFFSITE: "Offsite",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildTreeRows(locations: any[]): { location: any; depth: number }[] {
+  const childrenMap = new Map<string | null, typeof locations>();
+  for (const loc of locations) {
+    const pid = loc.parentId || null;
+    if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+    childrenMap.get(pid)!.push(loc);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: { location: any; depth: number }[] = [];
+
+  function addChildren(parentId: string | null, depth: number) {
+    const children = childrenMap.get(parentId) || [];
+    for (const child of children) {
+      rows.push({ location: child, depth });
+      addChildren(child.id, depth + 1);
+    }
+  }
+
+  // Start with root locations (no parentId, or parent not in current result set)
+  const locationIds = new Set(locations.map((l) => l.id));
+  const roots = locations.filter((l) => !l.parentId || !locationIds.has(l.parentId));
+
+  for (const root of roots) {
+    rows.push({ location: root, depth: 0 });
+    addChildren(root.id, 1);
+  }
+
+  // If tree-building produced fewer rows than input (shouldn't happen), add missing ones
+  const addedIds = new Set(rows.map((r) => r.location.id));
+  for (const loc of locations) {
+    if (!addedIds.has(loc.id)) {
+      rows.push({ location: loc, depth: 0 });
+    }
+  }
+
+  return rows;
+}
+
 export function LocationTable() {
   const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
     useTablePreferences("locations", { sortBy: "name", sortOrder: "asc" });
@@ -51,9 +91,10 @@ export function LocationTable() {
     }),
   });
 
-  const locations = data?.locations || [];
   const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
+
+  const treeRows = useMemo(() => buildTreeRows(data?.locations || []), [data?.locations]);
 
   return (
     <div className="space-y-4">
@@ -91,30 +132,29 @@ export function LocationTable() {
           <TableHeader>
             <TableRow>
               <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
-              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
-              <SortableTableHead sortKey="address" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Address</SortableTableHead>
+              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden sm:table-cell">Type</SortableTableHead>
+              <SortableTableHead sortKey="address" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden md:table-cell">Address</SortableTableHead>
               <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Assets</SortableTableHead>
-              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Parent</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell>
+                <TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell>
               </TableRow>
-            ) : locations.length === 0 ? (
+            ) : treeRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   No locations found.
                 </TableCell>
               </TableRow>
             ) : (
-              locations.map((location) => {
+              treeRows.map(({ location, depth }) => {
                 const assetCount = (location._count?.assets || 0) + (location._count?.bulkAssets || 0) + (location._count?.kits || 0);
                 return (
                   <TableRow key={location.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" style={{ paddingLeft: depth * 24 }}>
                         <Link href={`/locations/${location.id}`} className="font-medium hover:underline">
                           {location.name}
                         </Link>
@@ -123,19 +163,16 @@ export function LocationTable() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Badge variant="outline" className={typeColors[location.type] || ""}>
                         {typeLabels[location.type] || location.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-muted-foreground">
                       {location.address || "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">
                       {assetCount}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {location.parent?.name || "\u2014"}
                     </TableCell>
                   </TableRow>
                 );
