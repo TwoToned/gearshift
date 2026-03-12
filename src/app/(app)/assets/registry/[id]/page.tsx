@@ -115,9 +115,6 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
     onError: (e) => toast.error(e.message),
   });
 
-  const isLoading = isBulk ? bulkQuery.isLoading : assetQuery.isLoading;
-  if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
-
   // ─── Bulk Asset → Redirect to Model page ────────────────────────────
   const bulkModelId = isBulk ? bulkQuery.data?.modelId : null;
   useEffect(() => {
@@ -125,6 +122,9 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
       router.replace(`/assets/models/${bulkModelId}`);
     }
   }, [bulkModelId, router]);
+
+  const isLoading = isBulk ? bulkQuery.isLoading : assetQuery.isLoading;
+  if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
 
   if (isBulk) {
     if (!bulkQuery.data) return <div className="text-muted-foreground">Bulk asset not found.</div>;
