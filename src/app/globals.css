@@ -144,22 +144,23 @@
   }
 }
 
-/* iOS PWA viewport lock.
+/* iOS PWA viewport fix.
    With viewport-fit:cover + black-translucent, iOS pushes content up
    into the status bar but doesn't extend the viewport height to match,
-   leaving a gap at the bottom. Adding safe-area-inset-top to min-height
-   compensates for this shift. */
+   leaving a gap at the bottom. min-height on html fills that background gap.
+   The app-shell uses position:fixed to pin to actual viewport edges so
+   the flex layout works correctly (top bar stays, content scrolls, nav sticks). */
 @media (max-width: 767px) {
   html {
     min-height: calc(100% + env(safe-area-inset-top));
     overflow: hidden;
   }
   body {
-    height: 100%;
     overflow: hidden;
   }
   .app-shell {
-    height: 100%;
+    position: fixed;
+    inset: 0;
   }
 }
 
