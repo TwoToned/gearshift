@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Package,
@@ -16,6 +16,8 @@ import {
   CornerDownRight,
   ChevronsUpDown,
   Layers,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -48,6 +50,11 @@ const typeLabels: Record<SearchResultType, string> = {
   maintenance: "Maintenance",
 };
 
+/** Normalize for local fuzzy filtering */
+function normalize(s: string): string {
+  return s.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
 export function CommandSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -55,15 +62,59 @@ export function CommandSearch() {
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expanded, setExpanded] = useState(true);
+
+  // Drill-down state: when Tab is pressed on a parent, we scope to its children
+  const [drillParent, setDrillParent] = useState<SearchResult | null>(null);
+  const [drillChildren, setDrillChildren] = useState<SearchResult[]>([]);
+  const [drillQuery, setDrillQuery] = useState("");
+
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  // The visible results based on expand/collapse state
-  const visibleResults = expanded
-    ? results
-    : results.filter((r) => !r.isChild);
+  const isDrilling = drillParent !== null;
+
+  // Filter drill-down children by the drill query
+  const filteredDrillChildren = useMemo(() => {
+    if (!isDrilling) return [];
+    if (!drillQuery) return drillChildren;
+    const nq = normalize(drillQuery);
+    if (!nq) return drillChildren;
+
+    // Score each child by how well it matches
+    const scored = drillChildren.map((child) => {
+      const nTitle = normalize(child.title);
+      const nSub = normalize(child.subtitle || "");
+      let score = 0;
+      if (nTitle === nq) score = 100;
+      else if (nTitle.startsWith(nq)) score = 80;
+      else if (nTitle.includes(nq)) score = 60;
+      else if (nSub.includes(nq)) score = 40;
+      // Also check if all characters appear in order (subsequence match)
+      else {
+        let ti = 0;
+        for (let qi = 0; qi < nq.length && ti < nTitle.length; ti++) {
+          if (nTitle[ti] === nq[qi]) qi++;
+          if (qi === nq.length) { score = 20; break; }
+        }
+      }
+      return { child, score };
+    });
+
+    // Return only matches, sorted by score desc
+    return scored
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((s) => s.child);
+  }, [isDrilling, drillChildren, drillQuery]);
+
+  // The visible results based on mode
+  const visibleResults = isDrilling
+    ? filteredDrillChildren
+    : expanded
+      ? results
+      : results.filter((r) => !r.isChild);
 
   // Cmd+K listener
   useEffect(() => {
@@ -85,6 +136,7 @@ export function CommandSearch() {
       setQuery("");
       setResults([]);
       setSelectedIndex(0);
+      exitDrill();
     }
   }, [open]);
 
@@ -116,9 +168,14 @@ export function CommandSearch() {
   }, []);
 
   const handleQueryChange = (value: string) => {
-    setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSearch(value), 250);
+    if (isDrilling) {
+      setDrillQuery(value);
+      setSelectedIndex(0);
+    } else {
+      setQuery(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => doSearch(value), 250);
+    }
   };
 
   const navigate = (result: SearchResult) => {
@@ -126,24 +183,85 @@ export function CommandSearch() {
     router.push(result.href);
   };
 
+  /** Enter drill-down mode for a parent result */
+  const enterDrill = (parentIdx: number) => {
+    const parent = visibleResults[parentIdx];
+    if (!parent || parent.isChild) return;
+
+    // Find this parent's children in the full results
+    const fullIdx = results.indexOf(parent);
+    if (fullIdx === -1) return;
+
+    const children: SearchResult[] = [];
+    for (let i = fullIdx + 1; i < results.length; i++) {
+      if (results[i].isChild) {
+        children.push(results[i]);
+      } else {
+        break;
+      }
+    }
+
+    if (children.length === 0) return; // No children to drill into
+
+    setDrillParent(parent);
+    setDrillChildren(children);
+    setDrillQuery("");
+    setSelectedIndex(0);
+  };
+
+  const exitDrill = () => {
+    setDrillParent(null);
+    setDrillChildren([]);
+    setDrillQuery("");
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Cmd+L / Ctrl+L: toggle expand/collapse
-    if (e.key === "l" && (e.metaKey || e.ctrlKey)) {
+    // Escape in drill mode: exit drill
+    if (e.key === "Escape" && isDrilling) {
+      e.preventDefault();
+      e.stopPropagation();
+      exitDrill();
+      return;
+    }
+
+    // Backspace on empty drill query: exit drill
+    if (e.key === "Backspace" && isDrilling && drillQuery === "") {
+      e.preventDefault();
+      exitDrill();
+      return;
+    }
+
+    // Tab: drill into selected parent's children
+    if (e.key === "Tab" && !isDrilling) {
+      e.preventDefault();
+      enterDrill(selectedIndex);
+      return;
+    }
+
+    // Tab in drill mode: navigate to selected child
+    if (e.key === "Tab" && isDrilling && visibleResults[selectedIndex]) {
+      e.preventDefault();
+      navigate(visibleResults[selectedIndex]);
+      return;
+    }
+
+    // Cmd+L / Ctrl+L: toggle expand/collapse (only in main mode)
+    if (e.key === "l" && (e.metaKey || e.ctrlKey) && !isDrilling) {
       e.preventDefault();
       setExpanded((prev) => !prev);
       setSelectedIndex(0);
       return;
     }
 
-    // Shift+Right: expand children
-    if (e.key === "ArrowRight" && e.shiftKey) {
+    // Shift+Right: expand children (main mode)
+    if (e.key === "ArrowRight" && e.shiftKey && !isDrilling) {
       e.preventDefault();
       if (!expanded) { setExpanded(true); setSelectedIndex(0); }
       return;
     }
 
-    // Shift+Left: collapse children
-    if (e.key === "ArrowLeft" && e.shiftKey) {
+    // Shift+Left: collapse children (main mode)
+    if (e.key === "ArrowLeft" && e.shiftKey && !isDrilling) {
       e.preventDefault();
       if (expanded) { setExpanded(false); setSelectedIndex(0); }
       return;
@@ -151,7 +269,7 @@ export function CommandSearch() {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (e.shiftKey) {
+      if (e.shiftKey && !isDrilling) {
         // Shift+Down: skip to next parent
         let next = selectedIndex + 1;
         while (next < visibleResults.length && visibleResults[next].isChild) {
@@ -163,7 +281,7 @@ export function CommandSearch() {
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (e.shiftKey) {
+      if (e.shiftKey && !isDrilling) {
         // Shift+Up: skip to previous parent
         let prev = selectedIndex - 1;
         while (prev > 0 && visibleResults[prev].isChild) {
@@ -179,8 +297,9 @@ export function CommandSearch() {
     }
   };
 
-  // Section headers: show when type changes between non-child items
+  // Section headers: show when type changes between non-child items (main mode only)
   const getSectionLabel = (idx: number): string | null => {
+    if (isDrilling) return null;
     const result = visibleResults[idx];
     if (result.isChild) return null;
     for (let i = idx - 1; i >= 0; i--) {
@@ -192,6 +311,12 @@ export function CommandSearch() {
   };
 
   const hasChildren = results.some((r) => r.isChild);
+
+  // Check if selected result has children (for Tab hint)
+  const selectedHasChildren = !isDrilling && visibleResults[selectedIndex] && !visibleResults[selectedIndex]?.isChild && (() => {
+    const fullIdx = results.indexOf(visibleResults[selectedIndex]);
+    return fullIdx >= 0 && fullIdx + 1 < results.length && results[fullIdx + 1]?.isChild;
+  })();
 
   return (
     <>
@@ -207,18 +332,30 @@ export function CommandSearch() {
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false} className="p-0 gap-0 sm:max-w-lg overflow-hidden">
-          <div className="flex items-center border-b px-3">
+          <div className="flex items-center border-b px-3 gap-1">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {/* Drill-down breadcrumb */}
+            {isDrilling && drillParent && (
+              <button
+                onClick={exitDrill}
+                className="shrink-0 flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground hover:bg-accent/80 transition-colors"
+              >
+                {(() => { const Icon = typeIcons[drillParent.type] || Package; return <Icon className="h-3 w-3" />; })()}
+                <span className="max-w-[150px] truncate">{drillParent.title}</span>
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                <X className="h-3 w-3 text-muted-foreground/60 hover:text-foreground" />
+              </button>
+            )}
             <Input
               ref={inputRef}
-              value={query}
+              value={isDrilling ? drillQuery : query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search models, assets, projects, kits..."
+              placeholder={isDrilling ? `Filter ${drillParent?.title}...` : "Search models, assets, projects, kits..."}
               className="h-11 border-0 shadow-none focus-visible:ring-0 px-2"
             />
             {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-            {hasChildren && (
+            {hasChildren && !isDrilling && (
               <button
                 onClick={() => { setExpanded((prev) => !prev); setSelectedIndex(0); }}
                 className="shrink-0 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -229,16 +366,24 @@ export function CommandSearch() {
             )}
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
-            {query.length >= 2 && visibleResults.length === 0 && !loading && (
+            {/* No results states */}
+            {!isDrilling && query.length >= 2 && visibleResults.length === 0 && !loading && (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No results found.
               </div>
             )}
+            {isDrilling && drillQuery && filteredDrillChildren.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No matching children.
+              </div>
+            )}
+            {/* Results list */}
             {visibleResults.length > 0 && (
               <div className="p-1">
                 {visibleResults.map((result, idx) => {
                   const sectionLabel = getSectionLabel(idx);
-                  const Icon = result.isChild ? CornerDownRight : (typeIcons[result.type] || Package);
+                  const Icon = (result.isChild && !isDrilling) ? CornerDownRight : (typeIcons[result.type] || Package);
+                  const isChild = result.isChild && !isDrilling;
 
                   return (
                     <div key={`${result.type}-${result.id}-${idx}`}>
@@ -255,7 +400,7 @@ export function CommandSearch() {
                         onClick={() => navigate(result)}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         className={`flex w-full items-center gap-3 rounded-md py-1.5 text-left text-sm transition-colors ${
-                          result.isChild ? "pl-9 pr-3" : "px-3"
+                          isChild ? "pl-9 pr-3" : "px-3"
                         } ${
                           idx === selectedIndex
                             ? "bg-accent text-accent-foreground"
@@ -263,10 +408,10 @@ export function CommandSearch() {
                         }`}
                       >
                         <Icon className={`h-3.5 w-3.5 shrink-0 ${
-                          result.isChild ? "text-muted-foreground/50" : "text-muted-foreground"
+                          isChild ? "text-muted-foreground/50" : "text-muted-foreground"
                         }`} />
                         <div className="flex-1 min-w-0">
-                          <div className={`truncate ${result.isChild ? "text-xs" : "text-sm font-medium"}`}>
+                          <div className={`truncate ${isChild ? "text-xs" : "text-sm font-medium"}`}>
                             {result.title}
                           </div>
                           {result.subtitle && (
@@ -275,7 +420,7 @@ export function CommandSearch() {
                             </div>
                           )}
                         </div>
-                        {!result.isChild && (
+                        {!isChild && !isDrilling && (
                           <span className="shrink-0 text-xs text-muted-foreground/60">
                             {typeLabels[result.type]}
                           </span>
@@ -286,33 +431,46 @@ export function CommandSearch() {
                 })}
               </div>
             )}
-            {query.length < 2 && (
+            {!isDrilling && query.length < 2 && (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 Type to search...
               </div>
             )}
           </div>
-          {results.length > 0 && (
-            <div className="border-t px-3 py-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+          {/* Footer hints */}
+          {(results.length > 0 || isDrilling) && (
+            <div className="border-t px-3 py-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1">
                 <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">↑↓</kbd>
                 navigate
               </span>
-              <span className="flex items-center gap-1">
-                <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧↑↓</kbd>
-                skip children
-              </span>
+              {!isDrilling && (
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧↑↓</kbd>
+                  skip children
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⏎</kbd>
                 open
               </span>
-              {hasChildren && (
-                <>
-                  <span className="flex items-center gap-1">
-                    <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧←→</kbd>
-                    {expanded ? "collapse" : "expand"}
-                  </span>
-                </>
+              {selectedHasChildren && (
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Tab</kbd>
+                  drill in
+                </span>
+              )}
+              {isDrilling && (
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Esc</kbd>
+                  back
+                </span>
+              )}
+              {hasChildren && !isDrilling && (
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧←→</kbd>
+                  {expanded ? "collapse" : "expand"}
+                </span>
               )}
             </div>
           )}
