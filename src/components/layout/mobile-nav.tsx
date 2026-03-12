@@ -13,7 +13,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { useRouter } from "next/navigation";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { scanLookup } from "@/server/scan-lookup";
 
 const navItems = [
@@ -32,10 +31,7 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const isMobile = useIsMobile();
   const [scannerOpen, setScannerOpen] = useState(false);
-
-  if (!isMobile) return null;
 
   const handleScan = async (value: string) => {
     try {
