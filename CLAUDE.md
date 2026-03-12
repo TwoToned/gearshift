@@ -23,22 +23,28 @@ No test framework is configured.
 
 ### Route Groups
 - `src/app/(auth)/` — public pages (login, register, onboarding). Centered card layout, no sidebar.
-- `src/app/(app)/` — protected pages. Sidebar + top bar layout via `SidebarProvider`.
-- `src/app/(admin)/admin/` — site admin panel. Layout checks `User.role === "admin"`.
+- `src/app/(app)/` — protected pages. Sidebar + top bar layout via `SidebarProvider`. Mobile bottom nav.
+- `src/app/(admin)/admin/` — site admin panel. Layout checks `User.role === "admin"`. Own mobile-responsive shell.
 - `src/app/api/auth/[...all]/` — Better Auth catch-all handler.
 - `src/app/api/documents/[projectId]/` — PDF document generation endpoint.
 - `src/app/api/files/[...path]/` — S3 file proxy. Verifies `storageKey` starts with user's `activeOrganizationId`.
+- `src/app/api/uploads/` — File upload to S3 (multipart form, returns metadata).
+- `src/app/api/test-tag-reports/[reportType]/` — T&T report PDF/CSV generation (10 report types).
+- `src/app/api/platform-name/` — Get site settings (name, icon, logo, registration policy).
+- `src/app/api/current-role/` — Get user's role in active org.
 - `src/app/api/admin/org-export/[orgId]/` — Organization export (site admin only).
 - `src/app/api/admin/org-import/` — Organization import (site admin only).
+- `src/app/api/admin-register/` — Secret admin registration token verification + promotion.
 
 ### Auth & Multi-Tenancy
-- **Better Auth** with Organization plugin. Server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
-- Middleware (`src/middleware.ts`) checks `better-auth.session_token` cookie; redirects unauthenticated users to `/login`.
+- **Better Auth** with Organization, TwoFactor, and Admin plugins. Server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
+- Middleware (`src/middleware.ts`) checks `better-auth.session_token` or `__Secure-better-auth.session_token` cookie; redirects unauthenticated users to `/login`.
+- Public routes exempted from auth: `/login`, `/register`, `/api/auth`, `/invite`, `/two-factor`, `/no-organization`, `/onboarding`, `/api/platform-name`, `/api/registration-policy`.
 - Every session has `activeOrganizationId`. All data must be scoped to it.
 - `src/lib/auth-server.ts` — `getSession()`, `requireSession()`, `requireOrganization()`.
 - `src/lib/admin-auth.ts` — `requireSiteAdminApi()` for API route handlers (checks `User.role === "admin"`).
-- `src/lib/org-context.ts` — `getOrgContext()` returns `{ organizationId, userId }`, `orgWhere()` injects org scope into Prisma queries, `requireRole()` validates membership.
-- Roles: owner, admin, manager, staff, warehouse.
+- `src/lib/org-context.ts` — `getOrgContext()` returns `{ organizationId, userId }`, `orgWhere()` injects org scope into Prisma queries, `requireRole()` validates membership, `requirePermission(resource, action)` enforces permissions.
+- Roles: owner, admin, manager, member, viewer (legacy: staff, warehouse — mapped to member-level).
 
 ### Database
 - Prisma v6, client generated to `src/generated/prisma/`. Import from `@/generated/prisma/client` (not `@/generated/prisma`).
@@ -61,6 +67,34 @@ No test framework is configured.
 - Providers in root layout: ThemeProvider (next-themes), QueryProvider (React Query).
 - **Base UI SelectValue portal issue**: `SelectValue` can't resolve item text from portal-rendered items; pass explicit label text as children.
 
+### Mobile & PWA
+- **PWA**: Manifest at `/public/manifest.json`, `display: standalone`, offline page at `/offline`. Configured via `@ducanh2912/next-pwa`.
+- **Viewport**: `viewport-fit: cover`, `apple-mobile-web-app-capable: yes`, `statusBarStyle: black-translucent`. Set in `src/app/layout.tsx`.
+- **iOS PWA viewport fix**: With `viewport-fit:cover` + `black-translucent`, iOS pushes content into the status bar but doesn't extend viewport height to match, leaving a bottom gap. Fix: `html { min-height: calc(100% + env(safe-area-inset-top)) }` in `globals.css`. The `.app-shell` class uses `position: fixed; inset: 0` on mobile to pin to viewport edges.
+- **App layout** (`src/app/(app)/layout.tsx`): Outer div has class `app-shell` with flex column. On mobile: `position: fixed; inset: 0; overflow: hidden`. On desktop (`md:`): `position: relative; min-height: 100svh`.
+- **Mobile bottom nav** (`src/components/layout/mobile-nav.tsx`): Flow element (not `position: fixed`) inside the flex column with `shrink-0`. Hidden on desktop via `md:hidden`. Includes quick scan button.
+- **Safe area handling**: Use inline styles with `env(safe-area-inset-*)` — Tailwind arbitrary values don't reliably preserve `env()` through compilation. Applied per-element on:
+  - TopBar: `style={{ paddingTop: "env(safe-area-inset-top, 0px)", minHeight: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}`
+  - Sheet (sidebar): `paddingTop` and `paddingBottom` safe area via merged inline style in `SheetContent`.
+  - Full-screen mobile dialogs: Pass `style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top, 0px))" }}` to `DialogContent`.
+  - MobileNav: `paddingBottom: "env(safe-area-inset-bottom, 0px)"` on inner div.
+  - AdminShell: `pt-[calc(0.75rem+env(safe-area-inset-top,0px))]` on mobile header.
+- **DialogContent safe area**: The `style` prop is extracted and merged; close button uses `style.paddingTop` to offset itself below the safe area.
+- **Barcode scanner** (`src/components/ui/barcode-scanner.tsx`): Uses `html5-qrcode`. No overlay — whole camera feed is scan area. Audio chime via Web Audio API (1200Hz sine, 150ms). Callbacks stored in refs to prevent re-render loops. `continuous` prop for multi-scan mode.
+- **Scan lookup** (`src/server/scan-lookup.ts`): Resolves barcode value to URL — checks Asset → Kit → BulkAsset → TestTagAsset by tag/ID.
+- **Touch targets**: `min-height: 44px; min-width: 44px` for `.touch-target` on touch devices. Checkboxes get 24px min size.
+
+### Command Search & Global Search
+- **Component**: `src/components/layout/command-search.tsx` — advanced search/command palette triggered by search icon or keyboard shortcut.
+- **Page commands**: `src/lib/page-commands.ts` — `PAGE_COMMANDS` array defines navigable pages with aliases, icons, descriptions, optional entity search.
+- **Normal mode**: Free text searches across models, assets, bulk assets, kits, projects, clients, locations, categories, maintenance records. Uses `globalSearch()` from `src/server/search.ts`.
+- **@ mode**: Type `@` prefix to navigate pages. Tab drills into children. After space, remaining text searches entities on that page (e.g., `@project drum hire`).
+- **Date shortcuts**: Typing a date (DD/MM/YYYY, ISO, etc.) navigates to availability calendar for that date.
+- **Child results**: Models show their assets, clients show projects, locations show children, categories show models, kits show items.
+- **Keyboard**: `Shift+↑/↓` skip child results, `Tab` drills into pages, `Esc` goes back, `Cmd+L` toggles children.
+- **Full-screen on mobile**: Dialog uses `h-[100dvh]` with safe area padding on mobile.
+- **When adding new features**: If the feature has a list/detail page, add it to `PAGE_COMMANDS` in `src/lib/page-commands.ts` so it's searchable. If it has entities, add a search type to `globalSearch()` in `src/server/search.ts` so items appear in search results.
+
 ### Media System
 - **Modern approach**: `ModelMedia`, `AssetMedia`, `KitMedia`, `ProjectMedia`, `ClientMedia`, `LocationMedia` join tables linking to `FileUpload`.
 - **Legacy fields**: `model.image`, `model.images`, `asset.images`, `kit.image`, `kit.images` — still exist but UI uses media tables.
@@ -68,11 +102,12 @@ No test framework is configured.
 - **Resolution**: `src/lib/media-utils.ts` — `resolveModelPhotoUrl()`, `resolveAssetPhotoUrl()` (cascading: asset photo → model photo).
 - **Uploads**: `MediaUploader` component for drag-to-reorder, primary marking, removal. Files uploaded via `src/app/api/uploads/route.ts`.
 - **File proxy**: `src/app/api/files/[...path]/route.ts` — serves S3 files, validates org prefix. Returns 403 if `storageKey` doesn't match active org.
-- **Storage**: `src/lib/storage.ts` — S3/MinIO client. `uploadToS3()`, `getFromS3()`, `deleteFromS3()`, `ensureBucket()`.
+- **Storage**: `src/lib/storage.ts` — S3/MinIO client. `uploadToS3()`, `getFromS3()`, `deleteFromS3()`, `ensureBucket()`. Files stored under `{orgId}/{folder}/{entityId}/{uuid}-{name}`.
 
 ### PDF Documents (`src/lib/pdf/`)
 - `@react-pdf/renderer` with Helvetica font only. Unicode symbols don't render — use ASCII alternatives (`-` not `—`, `|` not `•`), `View` boxes with borders for checkboxes.
-- Documents: `quote-pdf.tsx`, `invoice-pdf.tsx`, `packing-list-pdf.tsx` (pull slip), `return-sheet-pdf.tsx`, `delivery-docket-pdf.tsx`.
+- **Project documents**: `quote-pdf.tsx`, `invoice-pdf.tsx`, `packing-list-pdf.tsx` (pull slip), `return-sheet-pdf.tsx`, `delivery-docket-pdf.tsx`.
+- **T&T reports**: 10 PDFs in `test-tag-*.tsx` plus shared components in `test-tag-pdf-shared.tsx`.
 - Shared styles in `src/lib/pdf/styles.ts`.
 - All documents render kit contents as indented children under the kit parent row.
 - Line item notes shown as subtitles on all documents.
@@ -84,6 +119,7 @@ No test framework is configured.
 - React Hook Form + `zodResolver()` + `useMutation()`.
 - Optional date fields: `z.union([z.literal(""), z.coerce.date()]).optional().transform(v => v === "" ? undefined : v)`.
 - Numeric fields: `z.coerce.number()`.
+- Zod schemas CANNOT be exported from `"use server"` files — must be in `src/lib/validations/`.
 
 ### Asset Types
 - **Serialized** (`Asset`): individually tracked with unique asset tags, have a `status` field (AVAILABLE, CHECKED_OUT, IN_MAINTENANCE, LOST, RESERVED, RETIRED).
@@ -134,9 +170,11 @@ No test framework is configured.
 - **Notifications**: Overdue maintenance generates notifications. Shows first asset + count for multi-asset records.
 - **Filter dropdowns**: Use explicit `SelectValue` children to avoid Base UI portal rendering issue with raw enum values.
 - Asset relation: `Asset.maintenanceLinks` → `MaintenanceRecordAsset[]` (not `maintenanceRecords`).
+- **Camera scanning**: Maintenance form has camera button for scanning assets via barcode (continuous mode).
 
 ### Notifications
 - Server: `src/server/notifications.ts` — generates notifications for upcoming/overdue events.
+- **Types**: overdue_maintenance, overdue_return, upcoming_project, low_stock, pending_invitation.
 - Client: `src/components/layout/notifications.tsx` — bell icon in top bar with dropdown.
 - **Dismiss on click**: localStorage-based. `getDismissedIds()`/`saveDismissedIds()` helpers. Auto-prunes stale IDs.
 - Click handler dismisses notification and navigates to `notification.href`.
@@ -176,6 +214,7 @@ No test framework is configured.
 ### Table Components
 - `SortableTableHead` and `PageSizeSelect` in `src/components/ui/sortable-table-head.tsx`.
 - `useTablePreferences` hook (`src/lib/use-table-preferences.ts`) persists sort, page size, and view mode to localStorage per table key.
+- Responsive column hiding: use `hidden sm:table-cell`, `hidden md:table-cell`, `hidden lg:table-cell` to progressively show columns.
 
 ### Test & Tag (T&T) Module
 - **Routes**: `src/app/(app)/test-and-tag/` — register, new item, quick test, reports, item detail `[id]`.
@@ -197,9 +236,10 @@ No test framework is configured.
 - **Two-tier model**: Site admins (global) + organization roles (per-org).
 - **Site admin**: `User.role = "admin"`. First user auto-promoted. Additional admins via secret registration link (`/register/admin?token=...`). Requires env vars `SITE_ADMIN_REGISTRATION_ENABLED=true` and `SITE_ADMIN_SECRET_TOKEN`.
 - **Org roles** (hierarchy): `owner`, `admin`, `manager`, `member`, `viewer`. Legacy: `staff`, `warehouse` (mapped to member-level permissions).
-- **Permissions**: `src/lib/permissions.ts` defines `rolePermissions` map. Enforced via `requirePermission(resource, action)` in `src/lib/org-context.ts`.
+- **Permissions**: `src/lib/permissions.ts` defines `rolePermissions` map with 14 resources: asset, bulkAsset, model, kit, project, client, warehouse, testTag, maintenance, location, document, orgSettings, orgMembers, reports. Enforced via `requirePermission(resource, action)` in `src/lib/org-context.ts`.
+- **Custom roles**: Per-org custom roles with JSON-stored permissions. Managed via `src/server/custom-roles.ts`.
 - **Server actions**: `src/server/site-admin.ts` (platform admin), `src/server/org-members.ts` (org member management), `src/server/user-profile.ts` (user account).
-- **Admin panel**: `src/app/(admin)/admin/` — dashboard, organizations (with export/import), users, settings.
+- **Admin panel**: `src/app/(admin)/admin/` — dashboard, organizations (with export/import), users, settings. Mobile-responsive via `AdminShell` component.
 - **Account page**: `src/app/(app)/account/` — profile, password change, 2FA setup, organizations, active sessions.
 - **2FA**: Better Auth `twoFactor` plugin (TOTP). Setup in account page. Verification at `/two-factor`. Site admin can force-disable.
 - **Email**: Resend SDK (`src/lib/email.ts`). Used for invitations, password reset, email verification, role change notifications.
@@ -237,3 +277,17 @@ No test framework is configured.
 - All hooks must be called unconditionally (before any early returns) to satisfy React's Rules of Hooks.
 - Query/mutation pattern: `useQuery` for data fetching, `useMutation` for writes, `queryClient.invalidateQueries()` on success.
 - Page components with `params: Promise<{ id: string }>` use `const { id } = use(params)`.
+- `useSearchParams()` must wrap page content in `<Suspense>` boundary.
+
+### Adding New Features Checklist
+When implementing a new feature, ensure it integrates with existing systems:
+1. **Search**: Add to `globalSearch()` in `src/server/search.ts` and `PAGE_COMMANDS` in `src/lib/page-commands.ts`.
+2. **Permissions**: Add resource to `src/lib/permissions.ts` `rolePermissions` map. Use `requirePermission()` in server actions. Check `hasAccess()` in sidebar.
+3. **Sidebar**: Add nav item to `navItems` in `src/components/layout/app-sidebar.tsx` with `resource` for permission gating.
+4. **Top bar breadcrumbs**: Add segment label to `segmentLabels` in `src/components/layout/top-bar.tsx`.
+5. **Notifications**: If the feature has time-based events, add notification type to `src/server/notifications.ts`.
+6. **Dashboard**: Add stats/activity to `src/server/dashboard.ts` if relevant.
+7. **Templates exclusion**: If feature queries projects, add `isTemplate: false` filter.
+8. **Mobile**: Ensure responsive tables (column hiding), touch targets, overflow handling (`break-words min-w-0`).
+9. **Org scoping**: Every query must include `organizationId`. Use `getOrgContext()` or `orgWhere()`.
+10. **Serialization**: Always `serialize()` return values from server actions.
