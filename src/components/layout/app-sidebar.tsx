@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -24,6 +24,7 @@ import {
 import { usePlatformBranding } from "@/lib/use-platform-name";
 import { useCurrentRole } from "@/lib/use-permissions";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
+import { getBuildInfo } from "@/server/changelog";
 import type { Resource } from "@/lib/permissions";
 import {
   Sidebar,
@@ -134,6 +135,12 @@ export function AppSidebar() {
   const { permissions, isLoading } = useCurrentRole();
   const initials = platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
+  // Build info for version display
+  const [buildLabel, setBuildLabel] = useState("");
+  useEffect(() => {
+    getBuildInfo().then((info) => setBuildLabel(`#${info.commitCount}.${info.hash}`));
+  }, []);
+
   // Pinned = manually toggled open via chevron button (persists across navigation)
   // Auto-expanded sections only stay open while the path is inside them
   const [pinned, setPinned] = useState<Set<string>>(new Set());
@@ -184,7 +191,7 @@ export function AppSidebar() {
             href="/changelog"
             className="ml-auto text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground transition-colors bg-muted/50 hover:bg-muted px-1.5 py-0.5 rounded-md"
           >
-            #{process.env.NEXT_PUBLIC_GIT_COMMIT_COUNT}.{process.env.NEXT_PUBLIC_GIT_HASH}
+            {buildLabel}
           </Link>
         </div>
       </SidebarHeader>

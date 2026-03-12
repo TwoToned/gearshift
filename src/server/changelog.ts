@@ -8,6 +8,21 @@ export interface ChangelogEntry {
   message: string;
 }
 
+export interface BuildInfo {
+  hash: string;
+  commitCount: string;
+}
+
+export async function getBuildInfo(): Promise<BuildInfo> {
+  try {
+    const hash = execSync("git rev-parse --short HEAD", { encoding: "utf-8", timeout: 5000 }).trim();
+    const commitCount = execSync("git rev-list --count HEAD", { encoding: "utf-8", timeout: 5000 }).trim();
+    return { hash, commitCount };
+  } catch {
+    return { hash: "unknown", commitCount: "0" };
+  }
+}
+
 export async function getChangelog(): Promise<ChangelogEntry[]> {
   try {
     const raw = execSync(
