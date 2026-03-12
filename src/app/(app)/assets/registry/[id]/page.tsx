@@ -1,6 +1,6 @@
 "use client";
 
-import { use, Suspense } from "react";
+import { use, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -119,10 +119,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
 
   // ─── Bulk Asset → Redirect to Model page ────────────────────────────
+  const bulkModelId = isBulk ? bulkQuery.data?.modelId : null;
+  useEffect(() => {
+    if (bulkModelId) {
+      router.replace(`/assets/models/${bulkModelId}`);
+    }
+  }, [bulkModelId, router]);
+
   if (isBulk) {
-    const ba = bulkQuery.data;
-    if (!ba) return <div className="text-muted-foreground">Bulk asset not found.</div>;
-    router.replace(`/assets/models/${ba.modelId}`);
+    if (!bulkQuery.data) return <div className="text-muted-foreground">Bulk asset not found.</div>;
     return <div className="text-muted-foreground">Redirecting to model...</div>;
   }
 
