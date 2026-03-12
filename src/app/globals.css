@@ -149,9 +149,7 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Standalone PWA mode adjustments */
-@media (display-mode: standalone) {
-  .pwa-top-safe {
-    padding-top: env(safe-area-inset-top);
-  }
+/* Safe area adjustments for notch/dynamic island */
+.pwa-top-safe {
+  padding-top: env(safe-area-inset-top, 0px);
 }

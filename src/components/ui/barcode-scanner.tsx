@@ -115,11 +115,16 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       if (selectedIdx >= 0) setCurrentCameraIdx(selectedIdx);
 
       activeRef.current = true;
+      // Size the scan box to fit within the viewport
+      const viewportEl = document.getElementById(elementId);
+      const vpWidth = viewportEl?.clientWidth || 300;
+      const boxWidth = Math.min(200, Math.floor(vpWidth * 0.6));
+      const boxHeight = Math.min(120, Math.floor(boxWidth * 0.55));
       await scanner.start(
         selectedCamera,
         {
           fps: 10,
-          qrbox: { width: 250, height: 140 },
+          qrbox: { width: boxWidth, height: boxHeight },
           aspectRatio: 1.5,
         },
         (decodedText) => {

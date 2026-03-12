@@ -10,9 +10,11 @@ import {
   ScanBarcode,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { scanLookup } from "@/server/scan-lookup";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
@@ -35,16 +37,25 @@ export function MobileNav() {
 
   if (!isMobile) return null;
 
-  const handleScan = (value: string) => {
-    // Navigate to the scanned asset/tag
-    // Try warehouse lookup first, then asset registry
-    router.push(`/warehouse?scan=${encodeURIComponent(value)}`);
+  const handleScan = async (value: string) => {
+    try {
+      const result = await scanLookup(value);
+      if (result.url) {
+        setScannerOpen(false);
+        router.push(result.url);
+        toast.success(`Found ${result.label}`);
+      } else {
+        toast.error(`Nothing found for "${value}"`);
+      }
+    } catch {
+      toast.error("Lookup failed");
+    }
   };
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-        <div className="flex items-center justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="flex items-center justify-around px-1">
           {navItems.map((item) => {
             if (item.isScan) {
               return (
