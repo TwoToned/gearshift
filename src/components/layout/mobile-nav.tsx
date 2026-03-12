@@ -25,8 +25,8 @@ const navItems = [
 
 /**
  * Mobile bottom navigation bar.
- * Shown only on mobile screens. Provides quick access to key sections
- * and a central scan button for camera-based barcode scanning.
+ * Rendered in the layout flow (not fixed) — the parent layout uses
+ * a flex column with h-[100dvh] so this nav naturally sits at the bottom.
  */
 export function MobileNav() {
   const pathname = usePathname();
@@ -50,8 +50,8 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background md:hidden">
-        <div className="flex items-center justify-around px-1" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <nav className="shrink-0 border-t bg-background md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="flex items-center justify-around px-1">
           {navItems.map((item) => {
             if (item.isScan) {
               return (

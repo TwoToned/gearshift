@@ -180,9 +180,3 @@ body {
   display: none !important;
 }
 
-/* Bottom padding for mobile content — clears bottom nav + safe area */
-@media (max-width: 767px) {
-  .pb-safe-mobile {
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
-  }
-}
