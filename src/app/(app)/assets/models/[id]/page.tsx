@@ -3,11 +3,12 @@
 import { use } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Archive, Plus, Package } from "lucide-react";
+import { Pencil, Archive, Plus, Package, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getModel, archiveModel } from "@/server/models";
+import { archiveBulkAsset, deleteBulkAsset } from "@/server/bulk-assets";
 import {
   addModelMedia,
   removeModelMedia,
@@ -31,6 +32,7 @@ import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveModelPhotoUrl } from "@/lib/media-utils";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { BookingCalendar } from "@/components/bookings/booking-calendar";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -61,6 +63,26 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
       queryClient.invalidateQueries({ queryKey: ["models"] });
       router.push("/assets/models");
     },
+  });
+
+  const archiveBulkMutation = useMutation({
+    mutationFn: (bulkId: string) => archiveBulkAsset(bulkId),
+    onSuccess: () => {
+      toast.success("Bulk asset archived");
+      queryClient.invalidateQueries({ queryKey: ["model", id] });
+      queryClient.invalidateQueries({ queryKey: ["bulk-assets"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteBulkMutation = useMutation({
+    mutationFn: (bulkId: string) => deleteBulkAsset(bulkId),
+    onSuccess: () => {
+      toast.success("Bulk asset deleted");
+      queryClient.invalidateQueries({ queryKey: ["model", id] });
+      queryClient.invalidateQueries({ queryKey: ["bulk-assets"] });
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   if (isLoading) {
@@ -139,6 +161,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">
+          <BookingCalendar entityType="model" entityId={id} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
@@ -279,15 +302,16 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Location</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {model.bulkAssets.map((ba) => (
                       <TableRow key={ba.id}>
                         <TableCell>
-                          <Link href={`/assets/registry/${ba.id}?type=bulk`} className="font-mono text-sm font-medium hover:underline">
+                          <span className="font-mono text-sm font-medium">
                             {ba.assetTag}
-                          </Link>
+                          </span>
                         </TableCell>
                         <TableCell className="text-right font-medium">{ba.availableQuantity}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{ba.totalQuantity}</TableCell>
@@ -297,6 +321,45 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{ba.location?.name || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <CanDo resource="asset" action="update">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                render={<Link href={`/assets/registry/${ba.id}/edit?type=bulk`} />}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              {ba.isActive ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => {
+                                    if (confirm("Archive this bulk asset?"))
+                                      archiveBulkMutation.mutate(ba.id);
+                                  }}
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => {
+                                    if (confirm("Permanently delete this bulk asset?"))
+                                      deleteBulkMutation.mutate(ba.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </CanDo>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

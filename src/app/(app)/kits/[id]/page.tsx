@@ -34,6 +34,7 @@ import { resolveKitPhotoUrl } from "@/lib/media-utils";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import {
   Dialog,
   DialogContent,
@@ -291,6 +292,8 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </CardContent>
       </Card>
+
+      <BookingCalendar entityType="kit" entityId={id} />
 
       {/* Contents Card */}
       <Card>

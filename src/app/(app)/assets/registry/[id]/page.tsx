@@ -34,6 +34,7 @@ import { NotesEditor } from "@/components/ui/notes-editor";
 import { resolveAssetPhotoUrl, isAssetPhotoCustom } from "@/lib/media-utils";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { BookingCalendar } from "@/components/bookings/booking-calendar";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -117,95 +118,12 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const isLoading = isBulk ? bulkQuery.isLoading : assetQuery.isLoading;
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
 
-  // ─── Bulk Asset Detail ───────────────────────────────────────────────
+  // ─── Bulk Asset → Redirect to Model page ────────────────────────────
   if (isBulk) {
     const ba = bulkQuery.data;
     if (!ba) return <div className="text-muted-foreground">Bulk asset not found.</div>;
-
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight font-mono">{ba.assetTag}</h1>
-              <Badge variant="outline">Bulk</Badge>
-              <Badge variant="outline" className={statusColors[ba.status] || ""}>
-                {ba.status.replace("_", " ")}
-              </Badge>
-            </div>
-            <p className="text-muted-foreground">
-              <Link href={`/assets/models/${ba.modelId}`} className="hover:underline">
-                {ba.model.name}
-              </Link>
-              {ba.model.category && <> &middot; {ba.model.category.name}</>}
-            </p>
-          </div>
-          <CanDo resource="asset" action="update">
-            <div className="flex gap-2">
-              <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit?type=bulk`} />}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              {ba.isActive && (
-                <Button
-                  variant="outline"
-                  className="text-destructive"
-                  onClick={() => { if (confirm("Archive this bulk asset?")) archiveMutation.mutate(); }}
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  Archive
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                className="text-destructive"
-                onClick={() => { if (confirm("Permanently delete this bulk asset? This cannot be undone.")) deleteMutation.mutate(); }}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          </CanDo>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Available</p>
-              <p className="text-2xl font-bold">{ba.availableQuantity}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Total Owned</p>
-              <p className="text-2xl font-bold">{ba.totalQuantity}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Price / Unit</p>
-              <p className="text-2xl font-bold">
-                {ba.purchasePricePerUnit ? `$${Number(ba.purchasePricePerUnit).toFixed(2)}` : "—"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Location</p>
-              <p className="text-2xl font-bold">{ba.location?.name || "—"}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <NotesEditor
-          initialNotes={ba.notes || ""}
-          queryKey={["bulkAsset", id]}
-          onSave={(notes) => updateBulkAssetNotes(id, notes)}
-          placeholder="Add notes about this bulk asset..."
-        />
-      </div>
-    );
+    router.replace(`/assets/models/${ba.modelId}`);
+    return <div className="text-muted-foreground">Redirecting to model...</div>;
   }
 
   // ─── Serialized Asset Detail ─────────────────────────────────────────
@@ -287,6 +205,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">
+          <BookingCalendar entityType="asset" entityId={id} modelId={asset.modelId} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
