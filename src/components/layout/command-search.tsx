@@ -18,6 +18,16 @@ import {
   Layers,
   ChevronRight,
   X,
+  LayoutDashboard,
+  Warehouse,
+  ShieldCheck,
+  BarChart3,
+  Settings,
+  UserCircle,
+  CalendarRange,
+  Container,
+  BookTemplate,
+  AtSign,
 } from "lucide-react";
 import {
   Dialog,
@@ -25,6 +35,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { globalSearch, type SearchResult, type SearchResultType } from "@/server/search";
+import { matchPageCommands, PAGE_COMMANDS, type PageCommand } from "@/lib/page-commands";
+
+// ─── Icon maps ─────────────────────────────────────────────────────
 
 const typeIcons: Record<SearchResultType, React.ComponentType<{ className?: string }>> = {
   model: Package,
@@ -50,9 +63,29 @@ const typeLabels: Record<SearchResultType, string> = {
   maintenance: "Maintenance",
 };
 
-/** Normalize for local fuzzy filtering */
+const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  LayoutDashboard, Package, Boxes, Box, CalendarRange, Container,
+  FolderOpen, BookTemplate, Warehouse, Users, MapPin, Wrench,
+  ShieldCheck, BarChart3, Settings, UserCircle,
+};
+
 function normalize(s: string): string {
   return s.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
+// ─── Unified result type ───────────────────────────────────────────
+
+interface DisplayItem {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isChild?: boolean;
+  /** For section labels in normal search mode */
+  typeLabel?: string;
+  /** If this item has children (for Tab drill hint) */
+  hasChildren?: boolean;
 }
 
 export function CommandSearch() {
@@ -63,10 +96,16 @@ export function CommandSearch() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expanded, setExpanded] = useState(true);
 
-  // Drill-down state: when Tab is pressed on a parent, we scope to its children
-  const [drillParent, setDrillParent] = useState<SearchResult | null>(null);
-  const [drillChildren, setDrillChildren] = useState<SearchResult[]>([]);
+  // Drill-down state
+  const [drillParent, setDrillParent] = useState<DisplayItem | null>(null);
+  const [drillChildren, setDrillChildren] = useState<DisplayItem[]>([]);
   const [drillQuery, setDrillQuery] = useState("");
+
+  // @ command state: when query starts with @, we're in page nav mode
+  // entitySearch: after picking a page with searchable, we search entities
+  const [atEntityPage, setAtEntityPage] = useState<PageCommand | null>(null);
+  const [atEntityResults, setAtEntityResults] = useState<SearchResult[]>([]);
+  const [atEntityLoading, setAtEntityLoading] = useState(false);
 
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,15 +113,207 @@ export function CommandSearch() {
   const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   const isDrilling = drillParent !== null;
+  const isAtMode = query.startsWith("@");
+  const isAtEntityMode = atEntityPage !== null;
 
-  // Filter drill-down children by the drill query
+  // ─── @ mode: build page command results ──────────────────────
+
+  const atQuery = isAtMode ? query.slice(1) : "";
+  const atMatches = useMemo(() => {
+    if (!isAtMode || isDrilling || isAtEntityMode) return [];
+    return matchPageCommands(atQuery);
+  }, [isAtMode, atQuery, isDrilling, isAtEntityMode]);
+
+  // Build display items for @ mode
+  const atDisplayItems = useMemo((): DisplayItem[] => {
+    if (!isAtMode || isDrilling || isAtEntityMode) return [];
+
+    // Check if any match has an entity query — if so, we need to do entity search
+    const topMatch = atMatches[0];
+    if (topMatch?.entityQuery && topMatch.command.searchable && topMatch.score >= 60) {
+      // Don't show page list — entity search will handle it
+      return [];
+    }
+
+    const items: DisplayItem[] = [];
+    const shown = new Set<string>();
+
+    for (const match of atMatches) {
+      const cmd = match.command;
+      if (shown.has(cmd.href)) continue;
+      shown.add(cmd.href);
+
+      const IconComp = pageIcons[cmd.icon] || Package;
+      items.push({
+        id: `page-${cmd.href}`,
+        title: cmd.label,
+        subtitle: cmd.description,
+        href: cmd.href,
+        icon: IconComp,
+        hasChildren: !!cmd.children?.length || !!cmd.searchable,
+      });
+
+      // Show children of this command
+      if (cmd.children) {
+        for (const child of cmd.children) {
+          if (shown.has(child.href)) continue;
+          shown.add(child.href);
+          const ChildIcon = pageIcons[child.icon] || Package;
+          items.push({
+            id: `page-${child.href}`,
+            title: child.label,
+            subtitle: child.description,
+            href: child.href,
+            icon: ChildIcon,
+            isChild: true,
+          });
+        }
+      }
+    }
+
+    return items;
+  }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
+
+  // @ entity search: when user types e.g. "@project drum hire"
+  const atEntityQuery = useMemo(() => {
+    if (!isAtMode || isDrilling || isAtEntityMode) return null;
+    const topMatch = atMatches[0];
+    if (topMatch?.entityQuery && topMatch.command.searchable && topMatch.score >= 60) {
+      return { command: topMatch.command, query: topMatch.entityQuery };
+    }
+    return null;
+  }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
+
+  // Trigger entity search for @ mode inline
+  useEffect(() => {
+    if (!atEntityQuery) {
+      setAtEntityResults([]);
+      return;
+    }
+    if (atEntityQuery.query.length < 2) {
+      setAtEntityResults([]);
+      return;
+    }
+    setAtEntityLoading(true);
+    const abortController = new AbortController();
+    globalSearch(atEntityQuery.query).then((data) => {
+      if (abortController.signal.aborted) return;
+      // Filter to only the relevant type
+      const typeMap: Record<string, SearchResultType[]> = {
+        model: ["model"],
+        asset: ["asset", "bulk-asset"],
+        kit: ["kit"],
+        project: ["project"],
+        client: ["client"],
+        location: ["location"],
+        maintenance: ["maintenance"],
+      };
+      const allowedTypes = typeMap[atEntityQuery.command.searchType || ""] || [];
+      const filtered = (data.results as SearchResult[]).filter(
+        (r) => allowedTypes.includes(r.type)
+      );
+      setAtEntityResults(filtered);
+      setSelectedIndex(0);
+    }).catch(() => {
+      setAtEntityResults([]);
+    }).finally(() => {
+      if (!abortController.signal.aborted) setAtEntityLoading(false);
+    });
+    return () => abortController.abort();
+  }, [atEntityQuery]);
+
+  // Build display items for @ entity results
+  const atEntityDisplayItems = useMemo((): DisplayItem[] => {
+    if (!atEntityQuery) return [];
+    const items: DisplayItem[] = [];
+    // Add the page itself as first item
+    const cmd = atEntityQuery.command;
+    const IconComp = pageIcons[cmd.icon] || Package;
+    items.push({
+      id: `page-${cmd.href}`,
+      title: `Go to ${cmd.label}`,
+      subtitle: cmd.description,
+      href: cmd.href,
+      icon: IconComp,
+    });
+    // Add entity results
+    for (const r of atEntityResults) {
+      items.push({
+        id: `${r.type}-${r.id}`,
+        title: r.title,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: typeIcons[r.type] || Package,
+        isChild: r.isChild,
+        typeLabel: r.isChild ? undefined : typeLabels[r.type],
+      });
+    }
+    return items;
+  }, [atEntityQuery, atEntityResults]);
+
+  // ─── @ entity drill mode (Tab on a page to search its entities) ──
+
+  const atEntityDrillItems = useMemo((): DisplayItem[] => {
+    if (!isAtEntityMode) return [];
+    const items: DisplayItem[] = [];
+
+    if (drillQuery.length < 2) return items;
+
+    // We'll populate from atEntityResults which are set by the effect below
+    for (const r of atEntityResults) {
+      items.push({
+        id: `${r.type}-${r.id}`,
+        title: r.title,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: typeIcons[r.type] || Package,
+        isChild: r.isChild,
+      });
+    }
+    return items;
+  }, [isAtEntityMode, atEntityResults, drillQuery]);
+
+  // Trigger search when in @ entity drill mode
+  useEffect(() => {
+    if (!isAtEntityMode || drillQuery.length < 2) {
+      if (isAtEntityMode) setAtEntityResults([]);
+      return;
+    }
+    setAtEntityLoading(true);
+    const abortController = new AbortController();
+    globalSearch(drillQuery).then((data) => {
+      if (abortController.signal.aborted) return;
+      const typeMap: Record<string, SearchResultType[]> = {
+        model: ["model"],
+        asset: ["asset", "bulk-asset"],
+        kit: ["kit"],
+        project: ["project"],
+        client: ["client"],
+        location: ["location"],
+        maintenance: ["maintenance"],
+      };
+      const allowedTypes = typeMap[atEntityPage!.searchType || ""] || [];
+      const filtered = (data.results as SearchResult[]).filter(
+        (r) => allowedTypes.includes(r.type)
+      );
+      setAtEntityResults(filtered);
+      setSelectedIndex(0);
+    }).catch(() => {
+      setAtEntityResults([]);
+    }).finally(() => {
+      if (!abortController.signal.aborted) setAtEntityLoading(false);
+    });
+    return () => abortController.abort();
+  }, [isAtEntityMode, drillQuery, atEntityPage]);
+
+  // ─── Normal search: filter drill children ────────────────────
+
   const filteredDrillChildren = useMemo(() => {
-    if (!isDrilling) return [];
+    if (!isDrilling || isAtEntityMode) return [];
     if (!drillQuery) return drillChildren;
     const nq = normalize(drillQuery);
     if (!nq) return drillChildren;
 
-    // Score each child by how well it matches
     const scored = drillChildren.map((child) => {
       const nTitle = normalize(child.title);
       const nSub = normalize(child.subtitle || "");
@@ -91,7 +322,6 @@ export function CommandSearch() {
       else if (nTitle.startsWith(nq)) score = 80;
       else if (nTitle.includes(nq)) score = 60;
       else if (nSub.includes(nq)) score = 40;
-      // Also check if all characters appear in order (subsequence match)
       else {
         let ti = 0;
         for (let qi = 0; qi < nq.length && ti < nTitle.length; ti++) {
@@ -102,21 +332,62 @@ export function CommandSearch() {
       return { child, score };
     });
 
-    // Return only matches, sorted by score desc
     return scored
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((s) => s.child);
-  }, [isDrilling, drillChildren, drillQuery]);
+  }, [isDrilling, isAtEntityMode, drillChildren, drillQuery]);
 
-  // The visible results based on mode
-  const visibleResults = isDrilling
-    ? filteredDrillChildren
-    : expanded
+  // ─── Build visible items based on current mode ───────────────
+
+  const visibleItems = useMemo((): DisplayItem[] => {
+    // @ entity drill mode (Tab on a page)
+    if (isAtEntityMode) {
+      return atEntityDrillItems;
+    }
+
+    // Drill-down mode (Tab on a search result)
+    if (isDrilling) {
+      return filteredDrillChildren;
+    }
+
+    // @ mode with entity search results (e.g. @project drum hire)
+    if (atEntityQuery) {
+      return atEntityDisplayItems;
+    }
+
+    // @ mode showing page commands
+    if (isAtMode) {
+      return atDisplayItems;
+    }
+
+    // Normal search mode
+    const normalResults = expanded
       ? results
       : results.filter((r) => !r.isChild);
 
-  // Cmd+K listener
+    return normalResults.map((r) => {
+      // Check if this result has children
+      const fullIdx = results.indexOf(r);
+      const hasKids = !r.isChild && fullIdx >= 0 && fullIdx + 1 < results.length && results[fullIdx + 1]?.isChild;
+
+      return {
+        id: `${r.type}-${r.id}`,
+        title: r.title,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: (r.isChild ? CornerDownRight : typeIcons[r.type]) || Package,
+        isChild: r.isChild,
+        typeLabel: r.isChild ? undefined : typeLabels[r.type],
+        hasChildren: hasKids,
+      };
+    });
+  }, [isAtEntityMode, atEntityDrillItems, isDrilling, filteredDrillChildren,
+      atEntityQuery, atEntityDisplayItems, isAtMode, atDisplayItems,
+      expanded, results]);
+
+  // ─── Lifecycle ───────────────────────────────────────────────
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -128,7 +399,6 @@ export function CommandSearch() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  // Focus input when dialog opens
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 0);
@@ -137,18 +407,17 @@ export function CommandSearch() {
       setResults([]);
       setSelectedIndex(0);
       exitDrill();
+      exitAtEntity();
     }
   }, [open]);
 
-  // Auto-scroll selected item into view
   useEffect(() => {
     const el = itemRefs.current.get(selectedIndex);
-    if (el) {
-      el.scrollIntoView({ block: "nearest" });
-    }
+    if (el) el.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
-  // Debounced search
+  // ─── Search ──────────────────────────────────────────────────
+
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
       setResults([]);
@@ -168,42 +437,86 @@ export function CommandSearch() {
   }, []);
 
   const handleQueryChange = (value: string) => {
+    if (isAtEntityMode) {
+      setDrillQuery(value);
+      setSelectedIndex(0);
+      return;
+    }
     if (isDrilling) {
       setDrillQuery(value);
       setSelectedIndex(0);
-    } else {
-      setQuery(value);
+      return;
+    }
+    setQuery(value);
+    setSelectedIndex(0);
+    // Only do server search for non-@ queries
+    if (!value.startsWith("@")) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => doSearch(value), 250);
     }
   };
 
-  const navigate = (result: SearchResult) => {
+  const navigateTo = (href: string) => {
     setOpen(false);
-    router.push(result.href);
+    router.push(href);
   };
 
-  /** Enter drill-down mode for a parent result */
-  const enterDrill = (parentIdx: number) => {
-    const parent = visibleResults[parentIdx];
-    if (!parent || parent.isChild) return;
+  // ─── Drill-down ──────────────────────────────────────────────
 
-    // Find this parent's children in the full results
-    const fullIdx = results.indexOf(parent);
-    if (fullIdx === -1) return;
+  const enterDrill = (idx: number) => {
+    const item = visibleItems[idx];
+    if (!item) return;
 
-    const children: SearchResult[] = [];
-    for (let i = fullIdx + 1; i < results.length; i++) {
-      if (results[i].isChild) {
-        children.push(results[i]);
-      } else {
-        break;
+    // @ mode: drill into a page's entities
+    if (isAtMode && !isDrilling && !isAtEntityMode) {
+      // Find the page command
+      const match = atMatches.find((m) => `page-${m.command.href}` === item.id);
+      const cmd = match?.command;
+      if (cmd?.searchable) {
+        setAtEntityPage(cmd);
+        setDrillQuery("");
+        setAtEntityResults([]);
+        setSelectedIndex(0);
+        return;
       }
+      // If it has children, drill into those
+      if (cmd?.children?.length) {
+        const childItems: DisplayItem[] = cmd.children.map((c) => ({
+          id: `page-${c.href}`,
+          title: c.label,
+          subtitle: c.description,
+          href: c.href,
+          icon: pageIcons[c.icon] || Package,
+        }));
+        setDrillParent(item);
+        setDrillChildren(childItems);
+        setDrillQuery("");
+        setSelectedIndex(0);
+        return;
+      }
+      return;
     }
 
-    if (children.length === 0) return; // No children to drill into
+    // Normal search: drill into children
+    if (item.isChild) return;
+    const fullIdx = results.findIndex((r) => `${r.type}-${r.id}` === item.id);
+    if (fullIdx === -1) return;
 
-    setDrillParent(parent);
+    const children: DisplayItem[] = [];
+    for (let i = fullIdx + 1; i < results.length; i++) {
+      const r = results[i];
+      if (!r.isChild) break;
+      children.push({
+        id: `${r.type}-${r.id}`,
+        title: r.title,
+        subtitle: r.subtitle,
+        href: r.href,
+        icon: typeIcons[r.type] || Package,
+      });
+    }
+    if (children.length === 0) return;
+
+    setDrillParent(item);
     setDrillChildren(children);
     setDrillQuery("");
     setSelectedIndex(0);
@@ -215,53 +528,77 @@ export function CommandSearch() {
     setDrillQuery("");
   };
 
+  const exitAtEntity = () => {
+    setAtEntityPage(null);
+    setAtEntityResults([]);
+    setDrillQuery("");
+  };
+
+  // ─── Keyboard ────────────────────────────────────────────────
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Escape in drill mode: exit drill
-    if (e.key === "Escape" && isDrilling) {
+    // Escape: exit drill/entity mode first, then close dialog
+    if (e.key === "Escape") {
+      if (isAtEntityMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        exitAtEntity();
+        return;
+      }
+      if (isDrilling) {
+        e.preventDefault();
+        e.stopPropagation();
+        exitDrill();
+        return;
+      }
+      return; // Let dialog handle close
+    }
+
+    // Backspace on empty: exit drill/entity mode
+    if (e.key === "Backspace") {
+      if (isAtEntityMode && drillQuery === "") {
+        e.preventDefault();
+        exitAtEntity();
+        return;
+      }
+      if (isDrilling && drillQuery === "") {
+        e.preventDefault();
+        exitDrill();
+        return;
+      }
+    }
+
+    // Tab: drill into selected item
+    if (e.key === "Tab") {
       e.preventDefault();
-      e.stopPropagation();
-      exitDrill();
+      if (isAtEntityMode || isDrilling) {
+        // In drill mode, Tab navigates to selected
+        if (visibleItems[selectedIndex]) {
+          navigateTo(visibleItems[selectedIndex].href);
+        }
+      } else {
+        enterDrill(selectedIndex);
+      }
       return;
     }
 
-    // Backspace on empty drill query: exit drill
-    if (e.key === "Backspace" && isDrilling && drillQuery === "") {
-      e.preventDefault();
-      exitDrill();
-      return;
-    }
-
-    // Tab: drill into selected parent's children
-    if (e.key === "Tab" && !isDrilling) {
-      e.preventDefault();
-      enterDrill(selectedIndex);
-      return;
-    }
-
-    // Tab in drill mode: navigate to selected child
-    if (e.key === "Tab" && isDrilling && visibleResults[selectedIndex]) {
-      e.preventDefault();
-      navigate(visibleResults[selectedIndex]);
-      return;
-    }
-
-    // Cmd+L / Ctrl+L: toggle expand/collapse (only in main mode)
-    if (e.key === "l" && (e.metaKey || e.ctrlKey) && !isDrilling) {
+    // Cmd+L: toggle expand/collapse (normal mode only)
+    if (e.key === "l" && (e.metaKey || e.ctrlKey) && !isDrilling && !isAtEntityMode && !isAtMode) {
       e.preventDefault();
       setExpanded((prev) => !prev);
       setSelectedIndex(0);
       return;
     }
 
-    // Shift+Right: expand children (main mode)
-    if (e.key === "ArrowRight" && e.shiftKey && !isDrilling) {
+    // Shift+Right: expand
+    if (e.key === "ArrowRight" && e.shiftKey && !isDrilling && !isAtEntityMode && !isAtMode) {
       e.preventDefault();
       if (!expanded) { setExpanded(true); setSelectedIndex(0); }
       return;
     }
 
-    // Shift+Left: collapse children (main mode)
-    if (e.key === "ArrowLeft" && e.shiftKey && !isDrilling) {
+    // Shift+Left: collapse
+    if (e.key === "ArrowLeft" && e.shiftKey && !isDrilling && !isAtEntityMode && !isAtMode) {
       e.preventDefault();
       if (expanded) { setExpanded(false); setSelectedIndex(0); }
       return;
@@ -269,54 +606,58 @@ export function CommandSearch() {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (e.shiftKey && !isDrilling) {
-        // Shift+Down: skip to next parent
+      if (e.shiftKey && !isDrilling && !isAtEntityMode) {
         let next = selectedIndex + 1;
-        while (next < visibleResults.length && visibleResults[next].isChild) {
-          next++;
-        }
-        setSelectedIndex(Math.min(next, visibleResults.length - 1));
+        while (next < visibleItems.length && visibleItems[next].isChild) next++;
+        setSelectedIndex(Math.min(next, visibleItems.length - 1));
       } else {
-        setSelectedIndex((i) => Math.min(i + 1, visibleResults.length - 1));
+        setSelectedIndex((i) => Math.min(i + 1, visibleItems.length - 1));
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (e.shiftKey && !isDrilling) {
-        // Shift+Up: skip to previous parent
+      if (e.shiftKey && !isDrilling && !isAtEntityMode) {
         let prev = selectedIndex - 1;
-        while (prev > 0 && visibleResults[prev].isChild) {
-          prev--;
-        }
+        while (prev > 0 && visibleItems[prev].isChild) prev--;
         setSelectedIndex(Math.max(prev, 0));
       } else {
         setSelectedIndex((i) => Math.max(i - 1, 0));
       }
-    } else if (e.key === "Enter" && visibleResults[selectedIndex]) {
+    } else if (e.key === "Enter" && visibleItems[selectedIndex]) {
       e.preventDefault();
-      navigate(visibleResults[selectedIndex]);
+      navigateTo(visibleItems[selectedIndex].href);
     }
   };
 
-  // Section headers: show when type changes between non-child items (main mode only)
+  // ─── Section labels ──────────────────────────────────────────
+
   const getSectionLabel = (idx: number): string | null => {
-    if (isDrilling) return null;
-    const result = visibleResults[idx];
-    if (result.isChild) return null;
+    if (isDrilling || isAtEntityMode || isAtMode) return null;
+    const item = visibleItems[idx];
+    if (item.isChild || !item.typeLabel) return null;
     for (let i = idx - 1; i >= 0; i--) {
-      if (!visibleResults[i].isChild) {
-        return visibleResults[i].type === result.type ? null : (typeLabels[result.type] + "s");
+      if (!visibleItems[i].isChild) {
+        return visibleItems[i].typeLabel === item.typeLabel ? null : (item.typeLabel + "s");
       }
     }
-    return typeLabels[result.type] + "s";
+    return item.typeLabel + "s";
   };
 
   const hasChildren = results.some((r) => r.isChild);
+  const showExpandToggle = hasChildren && !isDrilling && !isAtEntityMode && !isAtMode;
+  const selectedItem = visibleItems[selectedIndex];
+  const selectedHasChildren = selectedItem?.hasChildren && !isDrilling && !isAtEntityMode;
 
-  // Check if selected result has children (for Tab hint)
-  const selectedHasChildren = !isDrilling && visibleResults[selectedIndex] && !visibleResults[selectedIndex]?.isChild && (() => {
-    const fullIdx = results.indexOf(visibleResults[selectedIndex]);
-    return fullIdx >= 0 && fullIdx + 1 < results.length && results[fullIdx + 1]?.isChild;
-  })();
+  // Determine breadcrumb
+  const breadcrumb = isAtEntityMode && atEntityPage
+    ? { label: atEntityPage.label, icon: pageIcons[atEntityPage.icon] || Package }
+    : isDrilling && drillParent
+      ? { label: drillParent.title, icon: drillParent.icon }
+      : null;
+
+  const isLoading = loading || atEntityLoading;
+  const showEmptySearch = !isAtMode && !isDrilling && !isAtEntityMode && query.length >= 2 && visibleItems.length === 0 && !isLoading;
+  const showTyping = !isAtMode && !isDrilling && !isAtEntityMode && query.length < 2;
+  const showAtHint = isAtMode && !isDrilling && !isAtEntityMode && !atEntityQuery && atQuery === "" && visibleItems.length > 0;
 
   return (
     <>
@@ -332,30 +673,40 @@ export function CommandSearch() {
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false} className="p-0 gap-0 sm:max-w-lg overflow-hidden">
+          {/* Search input bar */}
           <div className="flex items-center border-b px-3 gap-1">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {/* Drill-down breadcrumb */}
-            {isDrilling && drillParent && (
+            {isAtMode && !breadcrumb ? (
+              <AtSign className="h-4 w-4 shrink-0 text-primary" />
+            ) : (
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            {breadcrumb && (
               <button
-                onClick={exitDrill}
+                onClick={() => { if (isAtEntityMode) exitAtEntity(); else exitDrill(); }}
                 className="shrink-0 flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground hover:bg-accent/80 transition-colors"
               >
-                {(() => { const Icon = typeIcons[drillParent.type] || Package; return <Icon className="h-3 w-3" />; })()}
-                <span className="max-w-[150px] truncate">{drillParent.title}</span>
+                <breadcrumb.icon className="h-3 w-3" />
+                <span className="max-w-[150px] truncate">{breadcrumb.label}</span>
                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
                 <X className="h-3 w-3 text-muted-foreground/60 hover:text-foreground" />
               </button>
             )}
             <Input
               ref={inputRef}
-              value={isDrilling ? drillQuery : query}
+              value={isDrilling || isAtEntityMode ? drillQuery : query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isDrilling ? `Filter ${drillParent?.title}...` : "Search models, assets, projects, kits..."}
+              placeholder={
+                isAtEntityMode
+                  ? `Search ${atEntityPage?.label}...`
+                  : isDrilling
+                    ? `Filter ${drillParent?.title}...`
+                    : "Search... (@ for pages)"
+              }
               className="h-11 border-0 shadow-none focus-visible:ring-0 px-2"
             />
-            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-            {hasChildren && !isDrilling && (
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            {showExpandToggle && (
               <button
                 onClick={() => { setExpanded((prev) => !prev); setSelectedIndex(0); }}
                 className="shrink-0 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -365,28 +716,31 @@ export function CommandSearch() {
               </button>
             )}
           </div>
+
+          {/* Results */}
           <div className="max-h-[60vh] overflow-y-auto">
-            {/* No results states */}
-            {!isDrilling && query.length >= 2 && visibleResults.length === 0 && !loading && (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                No results found.
-              </div>
+            {showEmptySearch && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No results found.</div>
             )}
-            {isDrilling && drillQuery && filteredDrillChildren.length === 0 && (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                No matching children.
-              </div>
+            {isAtEntityMode && drillQuery.length >= 2 && visibleItems.length === 0 && !isLoading && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No results found.</div>
             )}
-            {/* Results list */}
-            {visibleResults.length > 0 && (
+            {isDrilling && !isAtEntityMode && drillQuery && filteredDrillChildren.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No matching children.</div>
+            )}
+            {visibleItems.length > 0 && (
               <div className="p-1">
-                {visibleResults.map((result, idx) => {
+                {showAtHint && (
+                  <div className="px-3 pt-1 pb-2 text-xs text-muted-foreground">
+                    Type a page name to navigate, or add a space to search within it
+                  </div>
+                )}
+                {visibleItems.map((item, idx) => {
                   const sectionLabel = getSectionLabel(idx);
-                  const Icon = (result.isChild && !isDrilling) ? CornerDownRight : (typeIcons[result.type] || Package);
-                  const isChild = result.isChild && !isDrilling;
+                  const isChild = item.isChild && !isDrilling && !isAtEntityMode;
 
                   return (
-                    <div key={`${result.type}-${result.id}-${idx}`}>
+                    <div key={`${item.id}-${idx}`}>
                       {sectionLabel && (
                         <div className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           {sectionLabel}
@@ -397,7 +751,7 @@ export function CommandSearch() {
                           if (el) itemRefs.current.set(idx, el);
                           else itemRefs.current.delete(idx);
                         }}
-                        onClick={() => navigate(result)}
+                        onClick={() => navigateTo(item.href)}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         className={`flex w-full items-center gap-3 rounded-md py-1.5 text-left text-sm transition-colors ${
                           isChild ? "pl-9 pr-3" : "px-3"
@@ -407,23 +761,28 @@ export function CommandSearch() {
                             : "text-foreground hover:bg-accent/50"
                         }`}
                       >
-                        <Icon className={`h-3.5 w-3.5 shrink-0 ${
+                        <item.icon className={`h-3.5 w-3.5 shrink-0 ${
                           isChild ? "text-muted-foreground/50" : "text-muted-foreground"
                         }`} />
                         <div className="flex-1 min-w-0">
                           <div className={`truncate ${isChild ? "text-xs" : "text-sm font-medium"}`}>
-                            {result.title}
+                            {item.title}
                           </div>
-                          {result.subtitle && (
+                          {item.subtitle && (
                             <div className="truncate text-xs text-muted-foreground">
-                              {result.subtitle}
+                              {item.subtitle}
                             </div>
                           )}
                         </div>
-                        {!isChild && !isDrilling && (
+                        {!isChild && item.typeLabel && !isAtMode && (
                           <span className="shrink-0 text-xs text-muted-foreground/60">
-                            {typeLabels[result.type]}
+                            {item.typeLabel}
                           </span>
+                        )}
+                        {item.hasChildren && idx === selectedIndex && (
+                          <kbd className="shrink-0 rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+                            Tab →
+                          </kbd>
                         )}
                       </button>
                     </div>
@@ -431,23 +790,29 @@ export function CommandSearch() {
                 })}
               </div>
             )}
-            {!isDrilling && query.length < 2 && (
+            {showTyping && (
               <div className="py-6 text-center text-sm text-muted-foreground">
-                Type to search...
+                Type to search... or <span className="font-medium text-primary">@</span> to navigate
+              </div>
+            )}
+            {isAtEntityMode && drillQuery.length < 2 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Type to search {atEntityPage?.label}...
               </div>
             )}
           </div>
+
           {/* Footer hints */}
-          {(results.length > 0 || isDrilling) && (
+          {(visibleItems.length > 0 || isDrilling || isAtEntityMode) && (
             <div className="border-t px-3 py-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1">
                 <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">↑↓</kbd>
                 navigate
               </span>
-              {!isDrilling && (
+              {!isDrilling && !isAtEntityMode && !isAtMode && (
                 <span className="flex items-center gap-1">
                   <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧↑↓</kbd>
-                  skip children
+                  skip
                 </span>
               )}
               <span className="flex items-center gap-1">
@@ -460,13 +825,13 @@ export function CommandSearch() {
                   drill in
                 </span>
               )}
-              {isDrilling && (
+              {(isDrilling || isAtEntityMode) && (
                 <span className="flex items-center gap-1">
                   <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Esc</kbd>
                   back
                 </span>
               )}
-              {hasChildren && !isDrilling && (
+              {showExpandToggle && (
                 <span className="flex items-center gap-1">
                   <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧←→</kbd>
                   {expanded ? "collapse" : "expand"}
