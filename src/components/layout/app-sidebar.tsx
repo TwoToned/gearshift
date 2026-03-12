@@ -283,7 +283,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+      <SidebarFooter className="border-t border-sidebar-border">
         <UserNav />
       </SidebarFooter>
     </Sidebar>

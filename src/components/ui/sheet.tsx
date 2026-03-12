@@ -48,7 +48,7 @@ function SheetContent({
   showCloseButton?: boolean
 }) {
   const safeAreaStyle = side === "left" || side === "right"
-    ? { paddingTop: "env(safe-area-inset-top, 0px)", ...style }
+    ? { paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)", ...style }
     : style;
 
   return (
