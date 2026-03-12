@@ -144,11 +144,16 @@
   }
 }
 
-/* iOS PWA viewport lock — prevent body scrolling on mobile */
+/* iOS PWA viewport lock — prevent body scrolling on mobile.
+   --app-height is set by ViewportHeight component to window.innerHeight,
+   which is the only reliable value in iOS PWA standalone mode. */
 @media (max-width: 767px) {
   html, body {
     height: 100%;
     overflow: hidden;
+  }
+  .app-shell {
+    height: var(--app-height, 100%);
   }
 }
 
