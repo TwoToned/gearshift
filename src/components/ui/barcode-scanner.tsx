@@ -115,17 +115,15 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       if (selectedIdx >= 0) setCurrentCameraIdx(selectedIdx);
 
       activeRef.current = true;
-      // Size the scan box to fit within the viewport — keep it small and centered
-      const viewportEl = document.getElementById(elementId);
-      const vpWidth = viewportEl?.clientWidth || 280;
-      const boxWidth = Math.min(160, Math.floor(vpWidth * 0.45));
-      const boxHeight = Math.min(100, Math.floor(boxWidth * 0.6));
       await scanner.start(
         selectedCamera,
         {
           fps: 10,
-          qrbox: { width: boxWidth, height: boxHeight },
-          aspectRatio: 1.5,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const w = Math.min(180, Math.floor(viewfinderWidth * 0.5));
+            const h = Math.min(120, Math.floor(viewfinderHeight * 0.4));
+            return { width: w, height: h };
+          },
         },
         (decodedText) => {
           // Guard against callbacks firing after scanner is stopped
@@ -245,7 +243,7 @@ export function BarcodeScanner({ open, onScan, onClose, title = "Scan barcode or
       </div>
 
       {/* Scanner viewport */}
-      <div className="relative aspect-[4/3] max-h-[220px] bg-black" ref={scannerRef}>
+      <div className="relative bg-black" style={{ minHeight: 180, maxHeight: 260 }} ref={scannerRef}>
         {starting && (
           <div className="absolute inset-0 flex items-center justify-center text-white">
             <div className="flex flex-col items-center gap-2">
