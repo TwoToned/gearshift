@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col md:block md:h-auto md:min-h-svh">
+    <div className="flex h-[100dvh] flex-col overflow-hidden md:block md:h-auto md:min-h-svh md:overflow-visible">
       <SidebarProvider className="min-h-0 flex-1 md:min-h-svh">
         <BrandingProvider>
           <DynamicFavicon />

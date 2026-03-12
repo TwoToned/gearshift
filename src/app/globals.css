@@ -144,19 +144,10 @@
   }
 }
 
-/* Ensure full viewport height and safe areas on iOS */
-html, body {
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
-}
+/* Safe areas on iOS */
 body {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-}
-
-/* Safe area support for notched devices */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Barcode scanner — fit camera feed in container */
