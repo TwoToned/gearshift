@@ -94,7 +94,7 @@ export default function AdminOrganizationsPage() {
         </div>
 
         {/* Search + Import */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -107,9 +107,9 @@ export default function AdminOrganizationsPage() {
               className="pl-9"
             />
           </div>
-          <Button onClick={() => setImportOpen(true)}>
+          <Button size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import Organization
+            Import
           </Button>
         </div>
 
@@ -121,10 +121,10 @@ export default function AdminOrganizationsPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium">Organization</th>
-                    <th className="p-3 text-left font-medium">Slug</th>
-                    <th className="p-3 text-left font-medium">Owner</th>
-                    <th className="p-3 text-center font-medium">Members</th>
-                    <th className="p-3 text-left font-medium">Created</th>
+                    <th className="p-3 text-left font-medium hidden sm:table-cell">Slug</th>
+                    <th className="p-3 text-left font-medium hidden md:table-cell">Owner</th>
+                    <th className="p-3 text-center font-medium hidden sm:table-cell">Members</th>
+                    <th className="p-3 text-left font-medium hidden lg:table-cell">Created</th>
                     <th className="p-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -155,16 +155,16 @@ export default function AdminOrganizationsPage() {
                               <span className="font-medium">{org.name}</span>
                             </Link>
                           </td>
-                          <td className="p-3 text-muted-foreground font-mono text-xs">
+                          <td className="p-3 text-muted-foreground font-mono text-xs hidden sm:table-cell">
                             {org.slug}
                           </td>
-                          <td className="p-3">
+                          <td className="p-3 hidden md:table-cell">
                             {org.members[0]?.user?.name || "-"}
                           </td>
-                          <td className="p-3 text-center">
+                          <td className="p-3 text-center hidden sm:table-cell">
                             <Badge variant="secondary">{org._count.members}</Badge>
                           </td>
-                          <td className="p-3 text-muted-foreground">
+                          <td className="p-3 text-muted-foreground hidden lg:table-cell">
                             {new Date(org.createdAt).toLocaleDateString()}
                           </td>
                           <td className="p-3 text-right">

@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { DynamicFavicon } from "@/components/layout/dynamic-favicon";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { BrandingProvider } from "@/components/providers/branding-provider";
 import { getSession } from "@/lib/auth-server";
 
@@ -36,8 +37,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <AppSidebar />
         <SidebarInset>
           <TopBar />
-          <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
         </SidebarInset>
+        <MobileNav />
       </BrandingProvider>
     </SidebarProvider>
   );

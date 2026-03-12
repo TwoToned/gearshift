@@ -16,6 +16,7 @@ import { getAssets } from "@/server/assets";
 import { getBulkAssets } from "@/server/bulk-assets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -273,11 +274,14 @@ function NewTestTagAssetInner() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="testTagId">Test Tag ID *</Label>
-                <Input
+                <ScanInput
                   id="testTagId"
                   {...form.register("testTagId")}
+                  onScan={(v) => form.setValue("testTagId", v)}
+                  scannerTitle="Scan test tag"
                   placeholder={peekQuery.data?.[0] || "TT-0001"}
                   readOnly={!!watchAssetId}
+                  showScanButton={!watchAssetId}
                   className={watchAssetId ? "bg-muted" : ""}
                 />
                 {watchAssetId && (

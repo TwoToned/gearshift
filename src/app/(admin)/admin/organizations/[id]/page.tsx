@@ -204,26 +204,26 @@ export default function AdminOrgDetailPage({
     <AdminShell>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" render={<Link href="/admin/organizations" />}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="ghost" size="icon" className="shrink-0" render={<Link href="/admin/organizations" />}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">
                 {isLoading ? "Loading..." : org?.name}
               </h1>
               {org && (
-                <p className="text-muted-foreground text-sm font-mono">
+                <p className="text-muted-foreground text-sm font-mono truncate">
                   {org.slug}
                 </p>
               )}
             </div>
           </div>
           {org && (
-            <Button variant="outline" disabled={exporting} onClick={handleExport}>
+            <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" disabled={exporting} onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" />
-              {exporting ? "Exporting..." : "Export Backup"}
+              {exporting ? "Exporting..." : "Export"}
             </Button>
           )}
         </div>
@@ -272,11 +272,11 @@ export default function AdminOrgDetailPage({
 
         {/* Members */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Members ({members.length})</CardTitle>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Add Member
+              Add
             </Button>
           </CardHeader>
           <CardContent className="p-0">
@@ -285,9 +285,9 @@ export default function AdminOrgDetailPage({
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium">User</th>
-                    <th className="p-3 text-left font-medium">Email</th>
+                    <th className="p-3 text-left font-medium hidden md:table-cell">Email</th>
                     <th className="p-3 text-left font-medium">Role</th>
-                    <th className="p-3 text-left font-medium">Joined</th>
+                    <th className="p-3 text-left font-medium hidden sm:table-cell">Joined</th>
                     <th className="p-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -329,22 +329,29 @@ export default function AdminOrgDetailPage({
                                 <img
                                   src={m.user.image}
                                   alt=""
-                                  className="h-7 w-7 rounded-full"
+                                  className="h-7 w-7 rounded-full shrink-0"
                                 />
                               ) : (
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                                   {(m.user.name || "?")[0].toUpperCase()}
                                 </div>
                               )}
-                              <span className="font-medium">
-                                {m.user.name || "Unnamed"}
-                              </span>
-                              {isOwner && (
-                                <Crown className="h-3.5 w-3.5 text-yellow-500" />
-                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium truncate">
+                                    {m.user.name || "Unnamed"}
+                                  </span>
+                                  {isOwner && (
+                                    <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate md:hidden">
+                                  {m.user.email}
+                                </div>
+                              </div>
                             </div>
                           </td>
-                          <td className="p-3 text-muted-foreground">
+                          <td className="p-3 text-muted-foreground hidden md:table-cell">
                             {m.user.email}
                           </td>
                           <td className="p-3">
@@ -407,7 +414,7 @@ export default function AdminOrgDetailPage({
                               </Select>
                             )}
                           </td>
-                          <td className="p-3 text-muted-foreground">
+                          <td className="p-3 text-muted-foreground hidden sm:table-cell">
                             {new Date(m.createdAt).toLocaleDateString()}
                           </td>
                           <td className="p-3 text-right">

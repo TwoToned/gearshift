@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { X, Camera } from "lucide-react";
 
 import {
   maintenanceSchema,
@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import {
   Select,
   SelectContent,
@@ -65,6 +66,7 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
     queryFn: getMembers,
   });
 
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(
     initialData?.assetIds?.length
       ? initialData.assetIds
@@ -130,6 +132,25 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
     form.clearErrors("assetIds");
   }
 
+  function handleScan(value: string) {
+    const lower = value.toLowerCase();
+    // Match by asset tag (label format: "TAG — Model Name")
+    const match = assetOptions.find((opt: { value: string; label: string }) => {
+      const tag = opt.label.split(" — ")[0];
+      return tag?.toLowerCase() === lower;
+    });
+    if (match) {
+      if (selectedAssetIds.includes(match.value)) {
+        toast.info("Asset already selected");
+      } else {
+        addAsset(match.value);
+        toast.success(`Added ${match.label}`);
+      }
+    } else {
+      toast.error(`No asset found for "${value}"`);
+    }
+  }
+
   function removeAsset(assetId: string) {
     const next = selectedAssetIds.filter((id) => id !== assetId);
     setSelectedAssetIds(next);
@@ -148,39 +169,60 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
       {/* Assets */}
       <div className="space-y-2">
         <Label>Assets *</Label>
-        <ComboboxPicker
-          value=""
-          onChange={(v) => {
-            addAsset(v);
-          }}
-          options={availableOptions}
-          placeholder="Search and select assets..."
-          searchPlaceholder="Search by tag, model, or name..."
-          emptyMessage={
-            selectedAssetIds.length > 0 && availableOptions.length === 0
-              ? "All matching assets already selected."
-              : "No assets found."
-          }
-        />
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <ComboboxPicker
+              value=""
+              onChange={(v) => {
+                addAsset(v);
+              }}
+              options={availableOptions}
+              placeholder="Search and select assets..."
+              searchPlaceholder="Search by tag, model, or name..."
+              emptyMessage={
+                selectedAssetIds.length > 0 && availableOptions.length === 0
+                  ? "All matching assets already selected."
+                  : "No assets found."
+              }
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setCameraOpen((v) => !v)}
+            className={cameraOpen ? "text-primary bg-primary/10 border-primary/30" : ""}
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
+        </div>
+        {cameraOpen && (
+          <BarcodeScanner
+            open={cameraOpen}
+            onScan={handleScan}
+            onClose={() => setCameraOpen(false)}
+            title="Scan asset barcode"
+            continuous
+          />
+        )}
         {selectedAssetIds.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
+          <div className="flex flex-col gap-1.5 mt-2">
             {selectedAssetIds.map((id) => {
               const opt = assetOptions.find((o: { value: string; label: string }) => o.value === id);
               return (
-                <Badge
+                <div
                   key={id}
-                  variant="secondary"
-                  className="text-sm py-1 pl-2.5 pr-1 gap-1"
+                  className="flex items-center gap-1 rounded-md border bg-secondary text-secondary-foreground text-sm py-1 pl-2.5 pr-1"
                 >
-                  {opt?.label || id}
+                  <span className="break-words min-w-0">{opt?.label || id}</span>
                   <button
                     type="button"
                     onClick={() => removeAsset(id)}
-                    className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
+                    className="shrink-0 rounded-full p-0.5 hover:bg-foreground/10"
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </Badge>
+                </div>
               );
             })}
           </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageMeta } from "@/components/layout/page-meta";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2, Loader2, X, ScanBarcode } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2, X, ScanBarcode, Camera } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -37,6 +37,7 @@ import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import {
   Dialog,
   DialogContent,
@@ -597,15 +598,15 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
           {stagedItems.length > 0 && (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {stagedItems.map((item, i) => (
-                <div key={item.assetId} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
-                  <div>
+                <div key={item.assetId} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                  <div className="min-w-0 flex-1">
                     <span className="font-mono font-medium">{item.assetTag}</span>
-                    <span className="text-muted-foreground ml-2">{item.modelName}</span>
+                    <span className="text-muted-foreground ml-2 break-words">{item.modelName}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setStagedItems((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -704,6 +705,7 @@ function ScanInput({
 }) {
   const [search, setSearch] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Filter out already-staged assets
@@ -748,49 +750,86 @@ function ScanInput({
     [search, filtered, handleSelect],
   );
 
+  const handleCameraScan = useCallback(
+    (value: string) => {
+      const remaining = availableAssets.filter((a) => !stagedIds.has(a.id));
+      const lower = value.toLowerCase();
+      const exact = remaining.find((a) => a.assetTag.toLowerCase() === lower);
+      const partial = remaining.find(
+        (a) => a.assetTag.toLowerCase().includes(lower) || a.model.name.toLowerCase().includes(lower),
+      );
+      const match = exact || partial;
+      if (match) {
+        onAdd(match);
+        toast.success(`Added ${match.assetTag}`);
+      } else {
+        toast.error(`No matching asset for "${value}"`);
+      }
+    },
+    [availableAssets, stagedIds, onAdd],
+  );
+
   return (
-    <div className="relative">
+    <div className="space-y-2">
       <div className="relative">
-        <ScanBarcode className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          ref={inputRef}
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setShowResults(true);
-          }}
-          onFocus={() => setShowResults(true)}
-          onBlur={() => {
-            // Delay to allow click on result
-            setTimeout(() => setShowResults(false), 200);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Scan barcode or search by tag / model..."
-          className="pl-9"
-          autoFocus
-        />
-      </div>
-      {showResults && search && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-              No matching available assets.
-            </div>
-          ) : (
-            filtered.map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(asset)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground text-left"
-              >
-                <span className="font-mono font-medium">{asset.assetTag}</span>
-                <span className="text-muted-foreground">{asset.model.name}</span>
-              </button>
-            ))
-          )}
+        <div className="relative">
+          <ScanBarcode className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setShowResults(true);
+            }}
+            onFocus={() => setShowResults(true)}
+            onBlur={() => {
+              // Delay to allow click on result
+              setTimeout(() => setShowResults(false), 200);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Scan barcode or search by tag / model..."
+            className="pl-9 pr-10"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => setCameraOpen((v) => !v)}
+            className={`absolute right-2 top-2 rounded p-0.5 transition-colors ${cameraOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Camera className="h-4 w-4" />
+          </button>
         </div>
+        {showResults && search && (
+          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                No matching available assets.
+              </div>
+            ) : (
+              filtered.map((asset) => (
+                <button
+                  key={asset.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleSelect(asset)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground text-left"
+                >
+                  <span className="font-mono font-medium">{asset.assetTag}</span>
+                  <span className="text-muted-foreground">{asset.model.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+      {cameraOpen && (
+        <BarcodeScanner
+          open={cameraOpen}
+          onScan={handleCameraScan}
+          onClose={() => setCameraOpen(false)}
+          title="Scan asset barcode"
+          continuous
+        />
       )}
     </div>
   );

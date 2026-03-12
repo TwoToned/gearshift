@@ -125,5 +125,33 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger checkboxes on touch devices */
+  button[role="checkbox"] {
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  /* Minimum touch target size for interactive elements */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Safe area support for notched devices */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Standalone PWA mode adjustments */
+@media (display-mode: standalone) {
+  .pwa-top-safe {
+    padding-top: env(safe-area-inset-top);
   }
 }

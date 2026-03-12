@@ -16,6 +16,7 @@ import { getLocations } from "@/server/locations";
 import { getSuppliers } from "@/server/suppliers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,7 +161,7 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
             </div>
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Input {...form.register("assetTag")} placeholder="Asset tag" className="flex-1" />
+                <ScanInput {...form.register("assetTag")} onScan={(v) => form.setValue("assetTag", v)} scannerTitle="Scan asset tag" placeholder="Asset tag" className="flex-1" />
                 <Input {...form.register("serialNumber")} placeholder="Serial number" className="flex-1" />
                 {!isEditing && (
                   <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={addExtraAsset} title="Add another asset">
@@ -173,9 +174,11 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
               )}
               {extraAssets.map((asset, i) => (
                 <div key={i} className="flex gap-2">
-                  <Input
+                  <ScanInput
                     value={asset.tag}
                     onChange={(e) => updateExtraAsset(i, "tag", e.target.value)}
+                    onScan={(v) => updateExtraAsset(i, "tag", v)}
+                    scannerTitle="Scan asset tag"
                     placeholder="Asset tag"
                     className="flex-1"
                   />

@@ -230,14 +230,14 @@ export default function ProjectDetailPage({
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!project.isTemplate && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button variant="outline" />}
+                render={<Button variant="outline" size="sm" />}
               >
                 <FileText className="mr-2 h-4 w-4" />
-                Documents
+                <span className="hidden sm:inline">Documents</span>
                 <ChevronDown className="ml-1 h-3 w-3" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -272,6 +272,7 @@ export default function ProjectDetailPage({
           <CanDo resource="project" action="update">
             <Button
               variant="outline"
+              size="sm"
               render={<Link href={`/projects/${id}/edit`} />}
             >
               <Pencil className="mr-2 h-4 w-4" />
@@ -280,13 +281,13 @@ export default function ProjectDetailPage({
           </CanDo>
           <CanDo resource="project" action="create">
             {project.isTemplate ? (
-              <Button variant="outline" onClick={() => setDupMode("duplicate")}>
+              <Button variant="outline" size="sm" onClick={() => setDupMode("duplicate")}>
                 <Copy className="mr-2 h-4 w-4" />
                 Use Template
               </Button>
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" />}>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
                   <MoreHorizontal className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -307,6 +308,7 @@ export default function ProjectDetailPage({
               {project.status === "CANCELLED" ? (
                 <Button
                   variant="outline"
+                  size="sm"
                   className="text-destructive"
                   onClick={() => {
                     if (confirm("Permanently delete this project? This cannot be undone.")) deleteMutation.mutate();
@@ -319,6 +321,7 @@ export default function ProjectDetailPage({
               ) : (
                 <Button
                   variant="outline"
+                  size="sm"
                   className="text-destructive"
                   onClick={() => {
                     if (confirm("Cancel this project?")) archiveMutation.mutate();

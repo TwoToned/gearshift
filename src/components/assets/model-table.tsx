@@ -94,6 +94,7 @@ export function ModelTable() {
         <CanDo resource="model" action="create">
           <Button
             variant="outline"
+            className="hidden sm:inline-flex"
             onClick={async () => {
               const csv = await exportModelsCSV();
               const blob = new Blob([csv], { type: "text/csv" });
@@ -108,7 +109,7 @@ export function ModelTable() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" className="hidden sm:inline-flex" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
@@ -118,6 +119,31 @@ export function ModelTable() {
           </Button>
         </CanDo>
       </div>
+      <CanDo resource="model" action="create">
+        <div className="flex gap-2 sm:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const csv = await exportModelsCSV();
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "models.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+        </div>
+      </CanDo>
 
       {/* Table */}
       <div className="rounded-md border">

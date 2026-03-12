@@ -148,7 +148,7 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -161,9 +161,9 @@ export default function AdminUsersPage() {
               className="pl-9"
             />
           </div>
-          <Button onClick={() => setInviteOpen(true)}>
+          <Button size="sm" onClick={() => setInviteOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Invite User
+            Invite
           </Button>
         </div>
 
@@ -179,34 +179,32 @@ export default function AdminUsersPage() {
                 {((pendingInvitations || []) as any[]).map((inv: any) => (
                   <div
                     key={inv.id}
-                    className="flex items-center justify-between rounded-md border border-dashed p-3"
+                    className="flex items-center gap-3 rounded-md border border-dashed p-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{inv.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Invited to {inv.organization.name}
-                          {inv.role ? ` as ${inv.role}` : ""}
-                          {" - "}
-                          {new Date(inv.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
+                    <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{inv.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        Invited to {inv.organization.name}
+                        {inv.role ? ` as ${inv.role}` : ""}
+                        {" - "}
+                        {new Date(inv.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-destructive"
+                      className="shrink-0 text-destructive"
                       onClick={() => {
                         if (confirm(`Revoke invitation for ${inv.email}?`)) {
                           revokeMutation.mutate(inv.id);
                         }
                       }}
                     >
-                      <X className="mr-1 h-3.5 w-3.5" />
-                      Revoke
+                      <X className="h-3.5 w-3.5 sm:mr-1" />
+                      <span className="hidden sm:inline">Revoke</span>
                     </Button>
                   </div>
                 ))}
@@ -222,11 +220,11 @@ export default function AdminUsersPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium">User</th>
-                    <th className="p-3 text-left font-medium">Site Role</th>
-                    <th className="p-3 text-left font-medium">Organizations</th>
-                    <th className="p-3 text-center font-medium">2FA</th>
-                    <th className="p-3 text-center font-medium">Status</th>
-                    <th className="p-3 text-left font-medium">Joined</th>
+                    <th className="p-3 text-left font-medium">Role</th>
+                    <th className="p-3 text-left font-medium hidden lg:table-cell">Organizations</th>
+                    <th className="p-3 text-center font-medium hidden sm:table-cell">2FA</th>
+                    <th className="p-3 text-center font-medium hidden sm:table-cell">Status</th>
+                    <th className="p-3 text-left font-medium hidden md:table-cell">Joined</th>
                     <th className="p-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -249,8 +247,12 @@ export default function AdminUsersPage() {
                         <td className="p-3">
                           <div>
                             <div className="font-medium">{user.name}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                               {user.email}
+                            </div>
+                            <div className="flex gap-1 mt-1 sm:hidden">
+                              {user.banned && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Banned</Badge>}
+                              {user.twoFactorEnabled && <Badge variant="outline" className="text-[10px] px-1.5 py-0">2FA</Badge>}
                             </div>
                           </div>
                         </td>
@@ -263,7 +265,7 @@ export default function AdminUsersPage() {
                             <Badge variant="secondary">User</Badge>
                           )}
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 hidden lg:table-cell">
                           <div className="flex flex-wrap gap-1">
                             {user.members?.length === 0 ? (
                               <span className="text-xs text-muted-foreground">None</span>
@@ -288,7 +290,7 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center hidden sm:table-cell">
                           {user.twoFactorEnabled ? (
                             <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
                               On
@@ -297,7 +299,7 @@ export default function AdminUsersPage() {
                             <Badge variant="secondary">Off</Badge>
                           )}
                         </td>
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center hidden sm:table-cell">
                           {user.banned ? (
                             <Badge variant="destructive">Banned</Badge>
                           ) : (
@@ -306,7 +308,7 @@ export default function AdminUsersPage() {
                             </Badge>
                           )}
                         </td>
-                        <td className="p-3 text-muted-foreground">
+                        <td className="p-3 text-muted-foreground hidden md:table-cell">
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="p-3 text-right">

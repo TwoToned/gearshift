@@ -28,6 +28,10 @@ import {
   Container,
   BookTemplate,
   AtSign,
+  PackageCheck,
+  PackageX,
+  CreditCard,
+  Palette,
 } from "lucide-react";
 import {
   Dialog,
@@ -36,6 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { globalSearch, type SearchResult, type SearchResultType } from "@/server/search";
 import { matchPageCommands, PAGE_COMMANDS, type PageCommand } from "@/lib/page-commands";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ─── Icon maps ─────────────────────────────────────────────────────
 
@@ -66,7 +71,8 @@ const typeLabels: Record<SearchResultType, string> = {
 const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Package, Boxes, Box, CalendarRange, Container,
   FolderOpen, BookTemplate, Warehouse, Users, MapPin, Wrench,
-  ShieldCheck, BarChart3, Settings, UserCircle,
+  ShieldCheck, BarChart3, Settings, UserCircle, PackageCheck, PackageX,
+  CreditCard, Palette,
 };
 
 function normalize(s: string): string {
@@ -117,6 +123,7 @@ interface DisplayItem {
 }
 
 export function CommandSearch() {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -860,7 +867,13 @@ export function CommandSearch() {
       }
     } else if (e.key === "Enter" && visibleItems[selectedIndex]) {
       e.preventDefault();
-      navigateTo(visibleItems[selectedIndex].href);
+      const item = visibleItems[selectedIndex];
+      // On mobile, Enter drills into items with children instead of navigating
+      if (isMobile && item.hasChildren && !isDrilling && !isAtEntityMode) {
+        enterDrill(selectedIndex);
+      } else {
+        navigateTo(item.href);
+      }
     }
   };
 
@@ -897,6 +910,7 @@ export function CommandSearch() {
 
   return (
     <>
+      {/* Desktop search trigger */}
       <button
         onClick={() => setOpen(true)}
         className="hidden md:flex items-center gap-2 text-muted-foreground rounded-md border border-input bg-transparent px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
@@ -907,8 +921,16 @@ export function CommandSearch() {
           <span className="text-xs">&#8984;</span>K
         </kbd>
       </button>
+      {/* Mobile search trigger */}
+      <button
+        onClick={() => setOpen(true)}
+        className="md:hidden flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+        aria-label="Search"
+      >
+        <Search className="h-5 w-5" />
+      </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent showCloseButton={false} className="p-0 gap-0 sm:max-w-lg overflow-hidden">
+        <DialogContent showCloseButton={false} className={`p-0 gap-0 overflow-hidden ${isMobile ? "h-[100dvh] max-h-[100dvh] w-full max-w-full rounded-none border-0" : "sm:max-w-lg"}`}>
           {/* Search input bar */}
           <div className="flex items-center border-b px-3 gap-1">
             {isAtMode && !breadcrumb ? (
@@ -942,6 +964,16 @@ export function CommandSearch() {
               className="h-11 border-0 shadow-none focus-visible:ring-0 px-2"
             />
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            {/* @ button — especially useful on mobile where @ is hard to type */}
+            {!isAtMode && !isDrilling && !isAtEntityMode && (
+              <button
+                onClick={() => { setQuery("@"); inputRef.current?.focus(); }}
+                className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors font-semibold text-sm"
+                title="Navigate to page (@)"
+              >
+                @
+              </button>
+            )}
             {showExpandToggle && (
               <button
                 onClick={() => { setExpanded((prev) => !prev); setSelectedIndex(0); }}
@@ -951,10 +983,19 @@ export function CommandSearch() {
                 <ChevronsUpDown className="h-4 w-4" />
               </button>
             )}
+            {/* Mobile close button */}
+            {isMobile && (
+              <button
+                onClick={() => setOpen(false)}
+                className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Results */}
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className={`overflow-y-auto ${isMobile ? "flex-1" : "max-h-[60vh]"}`}>
             {showEmptySearch && (
               <div className="py-6 text-center text-sm text-muted-foreground">No results found.</div>
             )}
@@ -987,9 +1028,19 @@ export function CommandSearch() {
                           if (el) itemRefs.current.set(idx, el);
                           else itemRefs.current.delete(idx);
                         }}
-                        onClick={() => navigateTo(item.href)}
-                        onMouseEnter={() => setSelectedIndex(idx)}
-                        className={`flex w-full items-center gap-3 rounded-md py-1.5 text-left text-sm transition-colors ${
+                        onClick={() => {
+                          // On mobile, tapping a result with children drills in instead of navigating
+                          if (isMobile && item.hasChildren && !isDrilling && !isAtEntityMode) {
+                            setSelectedIndex(idx);
+                            enterDrill(idx);
+                          } else {
+                            navigateTo(item.href);
+                          }
+                        }}
+                        onMouseEnter={() => !isMobile && setSelectedIndex(idx)}
+                        className={`flex w-full items-center gap-3 rounded-md text-left text-sm transition-colors ${
+                          isMobile ? "py-3" : "py-1.5"
+                        } ${
                           isChild ? "pl-9 pr-3" : "px-3"
                         } ${
                           idx === selectedIndex
@@ -1015,10 +1066,13 @@ export function CommandSearch() {
                             {item.typeLabel}
                           </span>
                         )}
-                        {item.hasChildren && idx === selectedIndex && (
+                        {item.hasChildren && idx === selectedIndex && !isMobile && (
                           <kbd className="shrink-0 rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
                             Tab →
                           </kbd>
+                        )}
+                        {item.hasChildren && isMobile && (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                         )}
                       </button>
                     </div>
@@ -1040,38 +1094,49 @@ export function CommandSearch() {
 
           {/* Footer hints */}
           {(visibleItems.length > 0 || isDrilling || isAtEntityMode) && (
-            <div className="border-t px-3 py-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1">
-                <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">↑↓</kbd>
-                navigate
-              </span>
-              {!isDrilling && !isAtEntityMode && !isAtMode && (
-                <span className="flex items-center gap-1">
-                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧↑↓</kbd>
-                  skip
-                </span>
-              )}
-              <span className="flex items-center gap-1">
-                <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⏎</kbd>
-                open
-              </span>
-              {selectedHasChildren && (
-                <span className="flex items-center gap-1">
-                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Tab</kbd>
-                  drill in
-                </span>
-              )}
-              {(isDrilling || isAtEntityMode) && (
-                <span className="flex items-center gap-1">
-                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Esc</kbd>
-                  back
-                </span>
-              )}
-              {showExpandToggle && (
-                <span className="flex items-center gap-1">
-                  <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧←→</kbd>
-                  {expanded ? "collapse" : "expand"}
-                </span>
+            <div className={`border-t px-3 py-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap ${isMobile ? "pb-[calc(0.375rem+env(safe-area-inset-bottom))]" : ""}`}>
+              {isMobile ? (
+                <>
+                  <span>Tap to open</span>
+                  {(isDrilling || isAtEntityMode) && (
+                    <span>Swipe back to exit</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="flex items-center gap-1">
+                    <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">↑↓</kbd>
+                    navigate
+                  </span>
+                  {!isDrilling && !isAtEntityMode && !isAtMode && (
+                    <span className="flex items-center gap-1">
+                      <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧↑↓</kbd>
+                      skip
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⏎</kbd>
+                    open
+                  </span>
+                  {selectedHasChildren && (
+                    <span className="flex items-center gap-1">
+                      <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Tab</kbd>
+                      drill in
+                    </span>
+                  )}
+                  {(isDrilling || isAtEntityMode) && (
+                    <span className="flex items-center gap-1">
+                      <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Esc</kbd>
+                      back
+                    </span>
+                  )}
+                  {showExpandToggle && (
+                    <span className="flex items-center gap-1">
+                      <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">⇧←→</kbd>
+                      {expanded ? "collapse" : "expand"}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}

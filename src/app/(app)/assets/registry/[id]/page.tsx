@@ -154,15 +154,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
       <PageMeta title={asset ? `${asset.assetTag}${asset.customName ? ` — ${asset.customName}` : ""}` : undefined} />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
+        <div className="flex gap-4 min-w-0">
           <MediaThumbnail
             url={photoUrl}
             alt={asset.assetTag}
             size={64}
             className="flex-shrink-0"
           />
-          <div>
-          <div className="flex items-center gap-2">
+          <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{asset.assetTag}</h1>
             <Badge variant="outline" className={statusColors[asset.status] || ""}>
               {asset.status.replace("_", " ")}
@@ -171,7 +171,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               {asset.condition}
             </Badge>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground truncate">
             {asset.customName && <>{asset.customName} &middot; </>}
             <Link href={`/assets/models/${asset.modelId}`} className="hover:underline">
               {asset.model.name}
@@ -181,14 +181,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </div>
         <CanDo resource="asset" action="update">
-          <div className="flex gap-2">
-            <Button variant="outline" render={<Link href={`/assets/registry/${id}/edit`} />}>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" render={<Link href={`/assets/registry/${id}/edit`} />}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
             {asset.isActive && (
               <Button
                 variant="outline"
+                size="sm"
                 className="text-destructive"
                 onClick={() => { if (confirm("Archive this asset?")) archiveMutation.mutate(); }}
               >
@@ -198,6 +199,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
             )}
             <Button
               variant="outline"
+              size="sm"
               className="text-destructive"
               onClick={() => { if (confirm("Permanently delete this asset? This cannot be undone.")) deleteMutation.mutate(); }}
               disabled={deleteMutation.isPending}
@@ -210,15 +212,17 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       <Tabs defaultValue="details">
-        <TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <TabsList className="w-max sm:w-auto">
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="history">History ({asset.lineItems.length})</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance ({asset.maintenanceLinks.length})</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
-          <TabsTrigger value="documents">Model Documents</TabsTrigger>
-          <TabsTrigger value="qr">QR Code</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="qr">QR</TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="details" className="space-y-4 mt-4">
           <BookingCalendar entityType="asset" entityId={id} modelId={asset.modelId} initialDate={initialDate} />
@@ -328,14 +332,14 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Project</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Checked Out</TableHead>
-                    <TableHead>Returned</TableHead>
+                    <TableHead className="hidden sm:table-cell">Checked Out</TableHead>
+                    <TableHead className="hidden sm:table-cell">Returned</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -350,8 +354,8 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       <TableCell>
                         <Badge variant="outline">{li.status.replace("_", " ")}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{formatDate(li.checkedOutAt)}</TableCell>
-                      <TableCell className="text-sm">{formatDate(li.returnedAt)}</TableCell>
+                      <TableCell className="text-sm hidden sm:table-cell">{formatDate(li.checkedOutAt)}</TableCell>
+                      <TableCell className="text-sm hidden sm:table-cell">{formatDate(li.returnedAt)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -368,15 +372,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Result</TableHead>
+                    <TableHead className="hidden sm:table-cell">Date</TableHead>
+                    <TableHead className="hidden sm:table-cell">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -391,10 +395,10 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                         <TableCell>
                           <Badge variant="outline">{mr.status}</Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm hidden sm:table-cell">
                           {formatDate(mr.completedDate || mr.scheduledDate)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           {mr.result ? (
                             <Badge variant={mr.result === "PASS" ? "default" : "destructive"}>
                               {mr.result}

@@ -15,6 +15,7 @@ import { getCategories } from "@/server/categories";
 import { getLocations } from "@/server/locations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,7 +101,7 @@ export function KitForm({ initialData }: KitFormProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="assetTag">Asset Tag *</Label>
-            <Input id="assetTag" {...form.register("assetTag")} placeholder="e.g. KIT-AUD-001" />
+            <ScanInput id="assetTag" {...form.register("assetTag")} onScan={(v) => form.setValue("assetTag", v)} scannerTitle="Scan kit tag" placeholder="e.g. KIT-AUD-001" />
             {form.formState.errors.assetTag && (
               <p className="text-xs text-destructive">{form.formState.errors.assetTag.message}</p>
             )}

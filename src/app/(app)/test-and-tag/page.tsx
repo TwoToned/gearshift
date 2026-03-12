@@ -66,31 +66,31 @@ export default function TestAndTagPage() {
 
   return (
     <RequirePermission resource="testTag" action="read">
-    <div className="space-y-8 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Test & Tag</h1>
-          <p className="text-muted-foreground">Manage electrical testing and compliance</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Test & Tag</h1>
+          <p className="text-muted-foreground text-sm">Manage electrical testing and compliance</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CanDo resource="testTag" action="create">
-            <Button render={<Link href="/test-and-tag/quick-test" />}>
+            <Button size="sm" render={<Link href="/test-and-tag/quick-test" />}>
               <Zap className="mr-2 h-4 w-4" />
               Quick Test
             </Button>
-            <Button variant="outline" render={<Link href="/test-and-tag/new" />}>
+            <Button size="sm" variant="outline" render={<Link href="/test-and-tag/new" />}>
               <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
           </CanDo>
-          <Button variant="outline" render={<Link href="/test-and-tag/registry" />}>
+          <Button size="sm" variant="outline" render={<Link href="/test-and-tag/registry" />}>
             <List className="mr-2 h-4 w-4" />
             Registry
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Items</CardTitle>
@@ -163,17 +163,17 @@ export default function TestAndTagPage() {
             <AlertTriangle className="h-5 w-5 text-destructive" />
             <h2 className="text-xl font-semibold">Overdue Items</h2>
           </div>
-          <Card>
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Test Tag ID</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Last Tested</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Days Overdue</TableHead>
-                  <TableHead>Linked Asset</TableHead>
+                  <TableHead className="hidden md:table-cell">Class</TableHead>
+                  <TableHead className="hidden sm:table-cell">Last Tested</TableHead>
+                  <TableHead className="hidden sm:table-cell">Due Date</TableHead>
+                  <TableHead>Overdue</TableHead>
+                  <TableHead className="hidden lg:table-cell">Linked Asset</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -185,15 +185,15 @@ export default function TestAndTagPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{item.description}</TableCell>
-                    <TableCell>{formatClass(item.equipmentClass)}</TableCell>
-                    <TableCell>{formatDate(item.lastTestDate)}</TableCell>
-                    <TableCell>{formatDate(item.nextDueDate)}</TableCell>
+                    <TableCell className="hidden md:table-cell">{formatClass(item.equipmentClass)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(item.lastTestDate)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(item.nextDueDate)}</TableCell>
                     <TableCell>
                       <span className="font-medium text-destructive">
-                        {Math.abs(daysFromNow(item.nextDueDate))} days
+                        {Math.abs(daysFromNow(item.nextDueDate))}d
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {item.asset ? (
                         <Link href={`/assets/registry/${item.asset.id}`} className="text-primary hover:underline">
                           {item.asset.assetTag}
@@ -219,17 +219,17 @@ export default function TestAndTagPage() {
             <Clock className="h-5 w-5 text-amber-400" />
             <h2 className="text-xl font-semibold">Due Soon</h2>
           </div>
-          <Card>
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Test Tag ID</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Last Tested</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Days Until Due</TableHead>
-                  <TableHead>Linked Asset</TableHead>
+                  <TableHead className="hidden md:table-cell">Class</TableHead>
+                  <TableHead className="hidden sm:table-cell">Last Tested</TableHead>
+                  <TableHead className="hidden sm:table-cell">Due Date</TableHead>
+                  <TableHead>Due In</TableHead>
+                  <TableHead className="hidden lg:table-cell">Linked Asset</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -241,15 +241,15 @@ export default function TestAndTagPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{item.description}</TableCell>
-                    <TableCell>{formatClass(item.equipmentClass)}</TableCell>
-                    <TableCell>{formatDate(item.lastTestDate)}</TableCell>
-                    <TableCell>{formatDate(item.nextDueDate)}</TableCell>
+                    <TableCell className="hidden md:table-cell">{formatClass(item.equipmentClass)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(item.lastTestDate)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(item.nextDueDate)}</TableCell>
                     <TableCell>
                       <span className="font-medium text-amber-400">
-                        {daysFromNow(item.nextDueDate)} days
+                        {daysFromNow(item.nextDueDate)}d
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {item.asset ? (
                         <Link href={`/assets/registry/${item.asset.id}`} className="text-primary hover:underline">
                           {item.asset.assetTag}
@@ -275,15 +275,15 @@ export default function TestAndTagPage() {
             <CheckCircle className="h-5 w-5 text-green-400" />
             <h2 className="text-xl font-semibold">Recently Tested</h2>
           </div>
-          <Card>
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Test Tag ID</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Test Date</TableHead>
+                  <TableHead className="hidden sm:table-cell">Description</TableHead>
+                  <TableHead className="hidden sm:table-cell">Test Date</TableHead>
                   <TableHead>Result</TableHead>
-                  <TableHead>Tested By</TableHead>
+                  <TableHead className="hidden md:table-cell">Tested By</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,12 +294,12 @@ export default function TestAndTagPage() {
                         {record.testTagAsset?.testTagId}
                       </Link>
                     </TableCell>
-                    <TableCell>{record.testTagAsset?.description}</TableCell>
-                    <TableCell>{formatDate(record.testDate)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{record.testTagAsset?.description}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(record.testDate)}</TableCell>
                     <TableCell>
                       <StatusBadge status={record.result} />
                     </TableCell>
-                    <TableCell>{record.testerName || record.testedBy?.name || "\u2014"}</TableCell>
+                    <TableCell className="hidden md:table-cell">{record.testerName || record.testedBy?.name || "\u2014"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

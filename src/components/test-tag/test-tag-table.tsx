@@ -211,18 +211,18 @@ function TestTagTableContent() {
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Test Tag ID</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead>Equipment Class</TableHead>
-              <TableHead>Appliance Type</TableHead>
+              <TableHead className="hidden lg:table-cell">Equipment Class</TableHead>
+              <TableHead className="hidden lg:table-cell">Appliance Type</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last Tested</TableHead>
-              <TableHead>Next Due</TableHead>
-              <TableHead>Linked Asset</TableHead>
+              <TableHead className="hidden sm:table-cell">Last Tested</TableHead>
+              <TableHead className="hidden sm:table-cell">Next Due</TableHead>
+              <TableHead className="hidden md:table-cell">Linked Asset</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -251,22 +251,22 @@ function TestTagTableContent() {
                   <TableCell className="max-w-[200px] truncate">
                     {item.description}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
                     {formatEquipmentClass(item.equipmentClass)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
                     {formatApplianceType(item.applianceType)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={item.status} />
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
                     {formatDate(item.lastTestDate)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
                     {formatDate(item.nextDueDate)}
                   </TableCell>
-                  <TableCell>{getLinkedAssetLabel(item)}</TableCell>
+                  <TableCell className="hidden md:table-cell">{getLinkedAssetLabel(item)}</TableCell>
                 </TableRow>
               ))
             )}

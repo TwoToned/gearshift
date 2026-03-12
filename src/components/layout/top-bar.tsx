@@ -72,22 +72,22 @@ export function TopBar({ title }: { title?: string }) {
   }, [displayTitle, platformName]);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 pwa-top-safe">
       <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-4" />
-      <Breadcrumb>
+      <Separator orientation="vertical" className="mr-2 h-4 hidden sm:block" />
+      <Breadcrumb className="hidden sm:flex">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+            <BreadcrumbPage className="truncate max-w-[200px]">{displayTitle}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <CommandSearch />
         <Notifications />
-        <Separator orientation="vertical" className="h-4" />
+        <Separator orientation="vertical" className="h-4 hidden sm:block" />
         <OrgSwitcher />
-        <ThemeToggle />
+        <span className="hidden sm:flex"><ThemeToggle /></span>
       </div>
     </header>
   );

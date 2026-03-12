@@ -110,69 +110,40 @@ export function PermissionMatrix({
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-medium">
-                Resource
-              </th>
-              {allActions.map((action) => (
-                <th key={action.key} className="px-2 py-2 text-center font-medium whitespace-nowrap">
-                  <button
-                    type="button"
-                    onClick={() => !disabled && toggleColumn(action.key)}
-                    className="hover:text-primary cursor-pointer transition-colors"
-                    disabled={disabled}
-                  >
-                    {action.label}
-                  </button>
-                </th>
-              ))}
-              <th className="px-2 py-2 text-center font-medium">All</th>
-            </tr>
-          </thead>
-          <tbody>
-            {RESOURCES.map((resource) => {
-              const reg = PERMISSION_REGISTRY[resource];
-              const current = permissions[resource] ?? [];
-              const allRowChecked = reg.actions.every((a) => current.includes(a.key));
+      <div className="space-y-3">
+        {RESOURCES.map((resource) => {
+          const reg = PERMISSION_REGISTRY[resource];
+          const current = permissions[resource] ?? [];
+          const allRowChecked = reg.actions.every((a) => current.includes(a.key));
 
-              return (
-                <tr key={resource} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="sticky left-0 z-10 bg-background px-3 py-2 font-medium whitespace-nowrap">
-                    {reg.label}
-                  </td>
-                  {allActions.map((action) => {
-                    const hasAction = resourceHasAction(resource, action.key);
-                    return (
-                      <td key={action.key} className="px-2 py-2 text-center">
-                        {hasAction ? (
-                          <Checkbox
-                            checked={isChecked(resource, action.key)}
-                            onCheckedChange={() => toggle(resource, action.key)}
-                            disabled={disabled}
-                            className="mx-auto"
-                          />
-                        ) : (
-                          <span className="text-muted-foreground/30">—</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="px-2 py-2 text-center">
+          return (
+            <div key={resource} className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm">{reg.label}</span>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  All
+                  <Checkbox
+                    checked={allRowChecked}
+                    onCheckedChange={() => toggleRow(resource)}
+                    disabled={disabled}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                {reg.actions.map((action) => (
+                  <label key={action.key} className="flex items-center gap-1.5 text-sm cursor-pointer min-w-[5rem]">
                     <Checkbox
-                      checked={allRowChecked}
-                      onCheckedChange={() => toggleRow(resource)}
+                      checked={isChecked(resource, action.key)}
+                      onCheckedChange={() => toggle(resource, action.key)}
                       disabled={disabled}
-                      className="mx-auto"
                     />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {action.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

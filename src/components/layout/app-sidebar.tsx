@@ -40,6 +40,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { UserNav } from "./user-nav";
 
@@ -133,7 +134,12 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { name: platformName, icon: platformIcon } = usePlatformBranding();
   const { permissions, isLoading } = useCurrentRole();
+  const { isMobile, setOpenMobile } = useSidebar();
   const initials = platformName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+
+  const closeMobile = useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
 
   // Build info for version display
   const [buildLabel, setBuildLabel] = useState("");
@@ -210,7 +216,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <div className="flex items-center">
                       <SidebarMenuButton
-                        render={<Link href={item.url!} />}
+                        render={<Link href={item.url!} onClick={closeMobile} />}
                         isActive={isActive}
                         className="flex-1"
                       >
@@ -233,7 +239,7 @@ export function AppSidebar() {
                         {visibleSubs.map((sub) => (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton
-                              render={<Link href={sub.url} />}
+                              render={<Link href={sub.url} onClick={closeMobile} />}
                               isActive={pathname === sub.url || pathname.startsWith(sub.url + "/")}
                             >
                               <sub.icon className="h-4 w-4" />
@@ -247,7 +253,7 @@ export function AppSidebar() {
                 ) : (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      render={<Link href={item.url} />}
+                      render={<Link href={item.url} onClick={closeMobile} />}
                       isActive={isActive}
                     >
                       <item.icon className="h-4 w-4" />
@@ -265,7 +271,7 @@ export function AppSidebar() {
               {(hasAccess("orgSettings") || hasAccess("orgMembers")) && (
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  render={<Link href="/settings" />}
+                  render={<Link href="/settings" onClick={closeMobile} />}
                   isActive={pathname.startsWith("/settings")}
                 >
                   <Settings className="h-4 w-4" />

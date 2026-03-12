@@ -446,7 +446,7 @@ function SortableItemRow({
           </div>
         </TableCell>
         <TableCell className="text-center">{item.quantity}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right hidden md:table-cell">
           {formatCurrency(item.unitPrice as number | null)}
           {item.unitPrice != null && (
             <span className="text-xs text-muted-foreground ml-0.5">
@@ -454,11 +454,11 @@ function SortableItemRow({
             </span>
           )}
         </TableCell>
-        <TableCell className="text-center">{item.duration}</TableCell>
-        <TableCell className="text-right font-medium">
+        <TableCell className="text-center hidden lg:table-cell">{item.duration}</TableCell>
+        <TableCell className="text-right font-medium hidden sm:table-cell">
           {formatCurrency(item.lineTotal as number | null)}
         </TableCell>
-        <TableCell>
+        <TableCell className="hidden sm:table-cell">
           <Badge
             variant="outline"
             className={statusColors[item.status] || ""}
@@ -525,16 +525,16 @@ function SortableItemRow({
             <TableCell className="text-center text-sm">
               {child.quantity}
             </TableCell>
-            <TableCell className="text-right text-sm">
+            <TableCell className="text-right text-sm hidden md:table-cell">
               {formatCurrency(child.unitPrice as number | null)}
             </TableCell>
-            <TableCell className="text-center text-sm">
+            <TableCell className="text-center text-sm hidden lg:table-cell">
               {child.duration}
             </TableCell>
-            <TableCell className="text-right text-sm">
+            <TableCell className="text-right text-sm hidden sm:table-cell">
               {formatCurrency(child.lineTotal as number | null)}
             </TableCell>
-            <TableCell />
+            <TableCell className="hidden sm:table-cell" />
             <TableCell />
           </TableRow>
         ))}
@@ -616,14 +616,14 @@ function SortableGroupHeader({
                 </div>
               </TableCell>
               <TableCell className="text-center text-sm">{item.quantity}</TableCell>
-              <TableCell className="text-right text-sm">
+              <TableCell className="text-right text-sm hidden md:table-cell">
                 {formatCurrency(item.unitPrice as number | null)}
               </TableCell>
-              <TableCell className="text-center text-sm">{item.duration}</TableCell>
-              <TableCell className="text-right text-sm font-medium">
+              <TableCell className="text-center text-sm hidden lg:table-cell">{item.duration}</TableCell>
+              <TableCell className="text-right text-sm font-medium hidden sm:table-cell">
                 {formatCurrency(item.lineTotal as number | null)}
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell">
                 <Badge variant="outline" className={`text-xs ${statusColors[item.status] || ""}`}>
                   {item.status}
                 </Badge>
@@ -1001,10 +1001,10 @@ export function LineItemsPanel({
   return (
     <div className="space-y-4">
       {/* Action buttons */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => setEquipmentDialogOpen(true)}>
           <Plus className="mr-1.5 h-4 w-4" />
-          Add Equipment
+          <span className="hidden sm:inline">Add </span>Equipment
         </Button>
         <Button
           size="sm"
@@ -1012,7 +1012,7 @@ export function LineItemsPanel({
           onClick={() => setServiceDialogOpen(true)}
         >
           <Plus className="mr-1.5 h-4 w-4" />
-          Add Service / Other
+          <span className="hidden sm:inline">Add </span>Service
         </Button>
         <Button
           size="sm"
@@ -1020,7 +1020,7 @@ export function LineItemsPanel({
           onClick={() => setKitDialogOpen(true)}
         >
           <Container className="mr-1.5 h-4 w-4" />
-          Add Kit
+          <span className="hidden sm:inline">Add </span>Kit
         </Button>
         <Button
           size="sm"
@@ -1028,7 +1028,7 @@ export function LineItemsPanel({
           onClick={() => setSubhireDialogOpen(true)}
         >
           <ArrowUpRight className="mr-1.5 h-4 w-4" />
-          Add Subhire
+          <span className="hidden sm:inline">Add </span>Subhire
         </Button>
       </div>
 
@@ -1044,7 +1044,7 @@ export function LineItemsPanel({
         </Card>
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1058,14 +1058,14 @@ export function LineItemsPanel({
                     <TableHead className="w-8 px-1" />
                     <TableHead>Item</TableHead>
                     <TableHead className="text-center w-16">Qty</TableHead>
-                    <TableHead className="text-right w-28">
+                    <TableHead className="text-right w-28 hidden md:table-cell">
                       Unit Price
                     </TableHead>
-                    <TableHead className="text-center w-20">
+                    <TableHead className="text-center w-20 hidden lg:table-cell">
                       Duration
                     </TableHead>
-                    <TableHead className="text-right w-28">Total</TableHead>
-                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="text-right w-28 hidden sm:table-cell">Total</TableHead>
+                    <TableHead className="w-24 hidden sm:table-cell">Status</TableHead>
                     <TableHead className="w-16" />
                   </TableRow>
                 </TableHeader>

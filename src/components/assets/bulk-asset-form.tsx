@@ -15,6 +15,7 @@ import { getModels } from "@/server/models";
 import { getLocations } from "@/server/locations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,7 +105,7 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
           </div>
           <div className="space-y-2">
             <Label htmlFor="assetTag">Asset Tag *</Label>
-            <Input id="assetTag" {...form.register("assetTag")} placeholder="e.g. TTP-SM57" />
+            <ScanInput id="assetTag" {...form.register("assetTag")} onScan={(v) => form.setValue("assetTag", v)} scannerTitle="Scan asset tag" placeholder="e.g. TTP-SM57" />
             {form.formState.errors.assetTag && (
               <p className="text-xs text-destructive">{form.formState.errors.assetTag.message}</p>
             )}

@@ -10,6 +10,7 @@ import { createTestTagRecord } from "@/server/test-tag-records";
 import { getOrganization } from "@/server/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -500,21 +501,21 @@ function QuickTestInner() {
 
   return (
     <CanDo resource="testTag" action="create" fallback={<div className="p-8 text-center text-muted-foreground">You don&apos;t have permission to perform this action.</div>}>
-    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">QUICK TEST MODE</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <ShieldCheck className="h-6 w-6 text-primary shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">QUICK TEST</h1>
         </div>
-        <Button variant="outline" render={<Link href="/test-and-tag" />}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Exit Quick Test
+        <Button variant="outline" size="sm" render={<Link href="/test-and-tag" />}>
+          <ArrowLeft className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Exit Quick Test</span>
         </Button>
       </div>
 
       {/* Tester Name */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
         <Label htmlFor="testerName" className="whitespace-nowrap text-sm text-muted-foreground">
           Tester:
         </Label>
@@ -523,7 +524,7 @@ function QuickTestInner() {
           value={testerName}
           onChange={(e) => setTesterName(e.target.value)}
           placeholder="Tester name"
-          className="max-w-xs"
+          className="sm:max-w-xs"
         />
       </div>
 
@@ -531,7 +532,7 @@ function QuickTestInner() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex gap-3">
-            <Input
+            <ScanInput
               ref={scanInputRef}
               value={scanInput}
               onChange={(e) => setScanInput(e.target.value)}
@@ -541,6 +542,9 @@ function QuickTestInner() {
                   handleScan();
                 }
               }}
+              onScan={(value) => lookupMutation.mutate(value)}
+              scannerTitle="Scan test tag"
+              continuous
               placeholder="Scan or enter test tag ID..."
               className="text-lg"
               autoFocus
@@ -632,8 +636,8 @@ function QuickTestInner() {
         <>
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-lg">{currentItem.testTagId}</span>
                   <Badge variant="outline">{currentItem.equipmentClass.replace(/_/g, " ")}</Badge>
                   <Badge variant="outline">{currentItem.applianceType.replace(/_/g, " ")}</Badge>
@@ -678,8 +682,8 @@ function QuickTestInner() {
                 <CardTitle>Visual Inspection</CardTitle>
                 <Button size="sm" variant="outline" onClick={passAllVisual}>
                   <Check className="h-3 w-3 mr-1" />
-                  Pass All Visual
-                  <kbd className="ml-2 text-[10px] text-muted-foreground">Ctrl+Shift+P</kbd>
+                  Pass All
+                  <kbd className="ml-2 text-[10px] text-muted-foreground hidden sm:inline">Ctrl+Shift+P</kbd>
                 </Button>
               </div>
             </CardHeader>
@@ -857,9 +861,9 @@ function QuickTestInner() {
           {/* Overall Result */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Overall Result:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Overall:</span>
                   {overallResult === "PASS" ? (
                     <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-lg px-4 py-1">
                       PASS
@@ -870,7 +874,7 @@ function QuickTestInner() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center gap-3">
                   <Volume2 className="h-4 w-4 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">Audio feedback enabled</span>
                 </div>
@@ -914,7 +918,7 @@ function QuickTestInner() {
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={() => saveRecordMutation.mutate(computeOverallResult())}
               disabled={isSaving}
@@ -922,7 +926,7 @@ function QuickTestInner() {
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
               Save & Next
-              <kbd className="ml-2 text-[10px] opacity-60">Ctrl+Enter</kbd>
+              <kbd className="ml-2 text-[10px] opacity-60 hidden sm:inline">Ctrl+Enter</kbd>
             </Button>
             <Button
               variant="destructive"
@@ -930,8 +934,8 @@ function QuickTestInner() {
               disabled={isSaving}
             >
               <X className="h-4 w-4 mr-2" />
-              Save as Fail
-              <kbd className="ml-2 text-[10px] opacity-60">Ctrl+Shift+F</kbd>
+              Fail
+              <kbd className="ml-2 text-[10px] opacity-60 hidden sm:inline">Ctrl+Shift+F</kbd>
             </Button>
             <Button variant="outline" onClick={resetForm} disabled={isSaving}>
               Skip
@@ -961,14 +965,14 @@ function QuickTestInner() {
               {sessionLog.map((entry, i) => (
                 <div
                   key={`${entry.testTagId}-${i}`}
-                  className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/50"
+                  className="flex items-center justify-between gap-2 py-2 px-3 rounded-md bg-muted/50"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm">{entry.testTagId}</span>
-                    <span className="text-sm text-muted-foreground">{entry.description}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-sm shrink-0">{entry.testTagId}</span>
+                    <span className="text-sm text-muted-foreground truncate hidden sm:inline">{entry.description}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
                       {entry.testDate.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                     {entry.result === "PASS" ? (
@@ -984,8 +988,8 @@ function QuickTestInner() {
         </Card>
       )}
 
-      {/* Keyboard shortcuts help */}
-      <div className="text-xs text-muted-foreground flex flex-wrap gap-4">
+      {/* Keyboard shortcuts help — desktop only */}
+      <div className="text-xs text-muted-foreground flex-wrap gap-4 hidden sm:flex">
         <span><kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+Shift+P</kbd> Pass All Visual</span>
         <span><kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+Enter</kbd> Save & Next</span>
         <span><kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+Shift+F</kbd> Save as Fail</span>

@@ -15,6 +15,8 @@ import {
   Container,
   CircleCheck,
   Circle,
+  ClipboardList,
+  MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ScanInput } from "@/components/ui/scan-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,7 +66,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { OnlinePickList } from "@/components/warehouse/online-pick-list";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -289,6 +300,8 @@ function WarehouseProjectPage({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [returnCondition, setReturnCondition] = useState("GOOD");
   const [returnNotes, setReturnNotes] = useState("");
+  const [pickListOpen, setPickListOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Selection state
   const [selectedOut, setSelectedOut] = useState<Set<string>>(new Set());
@@ -918,11 +931,49 @@ function WarehouseProjectPage({
           <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
           {project.client && <p className="text-muted-foreground">{project.client.name}</p>}
         </div>
-        <Button variant="outline" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
-          <Printer className="mr-2 h-4 w-4" />
-          Pull Slip
-        </Button>
+        <div className="flex gap-2">
+          {/* Mobile: Pick List button shown prominently */}
+          <Button variant="outline" className="sm:hidden" onClick={() => setPickListOpen(true)}>
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Pick List
+          </Button>
+          {/* Mobile: Pull Slip as secondary */}
+          <Button variant="outline" className="sm:hidden" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
+            <Printer className="h-4 w-4" />
+          </Button>
+          {/* Desktop: Pull Slip button + more menu */}
+          <Button variant="outline" className="hidden sm:flex" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
+            <Printer className="mr-2 h-4 w-4" />
+            Pull Slip
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" className="hidden sm:flex" />}>
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setPickListOpen(true)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Online Pick List
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      {/* Online Pick List Dialog */}
+      <Dialog open={pickListOpen} onOpenChange={setPickListOpen}>
+        <DialogContent className={isMobile ? "h-[100dvh] max-h-[100dvh] w-full max-w-full rounded-none border-0 flex flex-col" : "sm:max-w-lg"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Pick List
+            </DialogTitle>
+          </DialogHeader>
+          <div className={`overflow-y-auto ${isMobile ? "flex-1" : "max-h-[70vh]"}`}>
+            <OnlinePickList projectId={projectId} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue={initialTab}>
         <TabsList>
@@ -944,16 +995,19 @@ function WarehouseProjectPage({
             <Card>
               <CardContent className="py-4">
                 <div className="flex items-center gap-3">
-                  <ScanBarcode className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <ScanBarcode className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block" />
                   <div className="flex-1">
                     <Label htmlFor="scan-checkout" className="sr-only">Scan asset tag</Label>
-                    <Input
+                    <ScanInput
                       ref={scanInputRef}
                       id="scan-checkout"
                       placeholder="Scan or enter asset tag..."
                       value={scanValue}
                       onChange={(e) => setScanValue(e.target.value)}
                       onKeyDown={handleScanKeyDown}
+                      onScan={(value) => scanMutation.mutate(value)}
+                      scannerTitle="Scan asset to check out"
+                      continuous
                       disabled={scanMutation.isPending || checkOutMutation.isPending}
                       autoFocus
                     />
@@ -961,8 +1015,11 @@ function WarehouseProjectPage({
                   <Button
                     onClick={handleCheckOutSelected}
                     disabled={selectedOutCount === 0 || checkOutMutation.isPending}
+                    className="shrink-0"
                   >
-                    Check Out{selectedOutCount > 0 ? ` (${selectedOutCount})` : ""}
+                    <span className="hidden sm:inline">Check Out</span>
+                    <span className="sm:hidden">Out</span>
+                    {selectedOutCount > 0 ? ` (${selectedOutCount})` : ""}
                   </Button>
                 </div>
               </CardContent>
@@ -1200,24 +1257,30 @@ function WarehouseProjectPage({
             <Card>
               <CardContent className="py-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <ScanBarcode className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <ScanBarcode className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block" />
                   <div className="flex-1">
                     <Label htmlFor="scan-checkin" className="sr-only">Scan asset tag</Label>
-                    <Input
+                    <ScanInput
                       ref={returnScanInputRef}
                       id="scan-checkin"
                       placeholder="Scan or enter asset tag to return..."
                       value={returnScanValue}
                       onChange={(e) => setReturnScanValue(e.target.value)}
                       onKeyDown={handleReturnScanKeyDown}
+                      onScan={(value) => returnScanMutation.mutate(value)}
+                      scannerTitle="Scan asset to return"
+                      continuous
                       disabled={returnScanMutation.isPending || checkInMutation.isPending}
                     />
                   </div>
                   <Button
                     onClick={handleReturnSelected}
                     disabled={selectedInCount === 0 || checkInMutation.isPending}
+                    className="shrink-0"
                   >
-                    Return{selectedInCount > 0 ? ` (${selectedInCount})` : ""}
+                    <span className="hidden sm:inline">Return</span>
+                    <span className="sm:hidden">In</span>
+                    {selectedInCount > 0 ? ` (${selectedInCount})` : ""}
                   </Button>
                 </div>
                 <div className="flex items-center gap-4 pl-8">
