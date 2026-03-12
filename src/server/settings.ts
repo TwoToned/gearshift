@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { sendEmail } from "@/lib/email";
 import { getPlatformName } from "@/lib/platform";
@@ -72,7 +72,7 @@ export async function updateOrganization(data: {
   name: string;
   settings: OrgSettings;
 }) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("orgSettings", "update");
 
   const updated = await prisma.organization.update({
     where: { id: organizationId },

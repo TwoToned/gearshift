@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { assetSchema, type AssetFormValues } from "@/lib/validations/asset";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
@@ -136,7 +136,7 @@ export async function getAsset(id: string) {
 }
 
 export async function createAsset(data: AssetFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "create");
   const parsed = assetSchema.parse(data);
 
   // Fetch the model to check T&T requirements
@@ -205,7 +205,7 @@ export async function createAssets(
   data: AssetFormValues,
   assets: { tag: string; serialNumber?: string }[],
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "create");
   const parsed = assetSchema.parse(data);
 
   const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
@@ -272,7 +272,7 @@ export async function createAssets(
 }
 
 export async function updateAsset(id: string, data: AssetFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "update");
   const parsed = assetSchema.parse(data);
 
   const updated = await prisma.asset.update({
@@ -315,7 +315,7 @@ export async function bulkUpdateAssets(
     locationId?: string | null;
   },
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "update");
   if (ids.length === 0) throw new Error("No assets selected");
 
   const updateData: Record<string, unknown> = {};
@@ -334,7 +334,7 @@ export async function bulkUpdateAssets(
 }
 
 export async function deleteAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "delete");
 
   const asset = await prisma.asset.findUnique({
     where: { id, organizationId },
@@ -368,7 +368,7 @@ export async function deleteAsset(id: string) {
 }
 
 export async function updateAssetNotes(id: string, notes: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "update");
   return serialize(await prisma.asset.update({
     where: { id, organizationId },
     data: { notes: notes || null },
@@ -376,7 +376,7 @@ export async function updateAssetNotes(id: string, notes: string) {
 }
 
 export async function archiveAsset(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "update");
 
   // Retire linked T&T entry if one exists
   await prisma.testTagAsset.updateMany({

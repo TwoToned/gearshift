@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import {
   projectSchema,
   type ProjectFormValues,
@@ -224,7 +224,7 @@ export async function getProject(id: string) {
 }
 
 export async function createProject(data: ProjectFormValues & { isTemplate?: boolean }) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "create");
   const parsed = projectSchema.parse(data);
 
   const isTemplate = data.isTemplate ?? false;
@@ -283,7 +283,7 @@ export async function createProject(data: ProjectFormValues & { isTemplate?: boo
 }
 
 export async function updateProject(id: string, data: ProjectFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "update");
   const parsed = projectSchema.parse(data);
 
   return serialize(
@@ -327,7 +327,7 @@ export async function updateProjectStatus(
   id: string,
   status: ProjectFormValues["status"]
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "update");
   const project = await prisma.project.findUnique({ where: { id, organizationId } });
   if (!project) throw new Error("Project not found");
   if (project.isTemplate) throw new Error("Cannot change status of a template");
@@ -344,7 +344,7 @@ export async function updateProjectNotes(
   field: "crewNotes" | "internalNotes" | "clientNotes",
   notes: string,
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "update");
   return serialize(await prisma.project.update({
     where: { id, organizationId },
     data: { [field]: notes || null },
@@ -352,7 +352,7 @@ export async function updateProjectNotes(
 }
 
 export async function archiveProject(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "update");
   return serialize(
     await prisma.project.update({
       where: { id, organizationId },
@@ -362,7 +362,7 @@ export async function archiveProject(id: string) {
 }
 
 export async function duplicateProject(sourceId: string, newProjectNumber: string, newName: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "create");
 
   const source = await prisma.project.findUnique({
     where: { id: sourceId, organizationId },
@@ -479,7 +479,7 @@ export async function duplicateProject(sourceId: string, newProjectNumber: strin
 }
 
 export async function saveAsTemplate(projectId: string, templateName: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "create");
 
   const source = await prisma.project.findUnique({
     where: { id: projectId, organizationId },
@@ -610,7 +610,7 @@ export async function getTemplates() {
 }
 
 export async function deleteTemplate(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "delete");
 
   const template = await prisma.project.findUnique({
     where: { id, organizationId },
@@ -623,7 +623,7 @@ export async function deleteTemplate(id: string) {
 }
 
 export async function deleteProject(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "delete");
 
   // Only allow deleting cancelled projects
   const project = await prisma.project.findUnique({

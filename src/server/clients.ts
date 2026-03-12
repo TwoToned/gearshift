@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { clientSchema, type ClientFormValues } from "@/lib/validations/client";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
@@ -71,7 +71,7 @@ export async function getClient(id: string) {
 }
 
 export async function createClient(data: ClientFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("client", "create");
   const parsed = clientSchema.parse(data);
 
   return serialize(await prisma.client.create({
@@ -95,7 +95,7 @@ export async function createClient(data: ClientFormValues) {
 }
 
 export async function updateClient(id: string, data: ClientFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("client", "update");
   const parsed = clientSchema.parse(data);
 
   return serialize(await prisma.client.update({
@@ -119,7 +119,7 @@ export async function updateClient(id: string, data: ClientFormValues) {
 }
 
 export async function updateClientNotes(id: string, notes: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("client", "update");
   return serialize(await prisma.client.update({
     where: { id, organizationId },
     data: { notes: notes || null },
@@ -127,7 +127,7 @@ export async function updateClientNotes(id: string, notes: string) {
 }
 
 export async function archiveClient(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("client", "update");
   return serialize(await prisma.client.update({
     where: { id, organizationId },
     data: { isActive: false },

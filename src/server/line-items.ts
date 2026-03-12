@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import {
   lineItemSchema,
   type LineItemFormValues,
@@ -9,7 +9,7 @@ import {
 import { serialize } from "@/lib/serialize";
 
 export async function addLineItem(projectId: string, data: LineItemFormValues, allowOverbook = false) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "manage_line_items");
   const parsed = lineItemSchema.parse(data);
 
   // Server-side availability enforcement for equipment
@@ -185,7 +185,7 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
 }
 
 export async function updateLineItem(id: string, data: LineItemFormValues, allowOverbook = false) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "manage_line_items");
   const parsed = lineItemSchema.parse(data);
 
   const lineTotal = calculateLineTotal(
@@ -236,7 +236,7 @@ export async function addKitLineItem(
   unitPrice?: number,
   groupName?: string,
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "manage_line_items");
 
   const kit = await prisma.kit.findUnique({
     where: { id: kitId, organizationId },
@@ -317,7 +317,7 @@ export async function addKitLineItem(
 }
 
 export async function removeLineItem(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "manage_line_items");
 
   const item = await prisma.projectLineItem.findFirst({
     where: { id, organizationId },
@@ -347,7 +347,7 @@ export async function reorderLineItems(
   itemIds: string[],
   groupUpdates?: { id: string; groupName: string | null }[],
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("project", "manage_line_items");
 
   const updates = itemIds.map((id, index) =>
     prisma.projectLineItem.update({

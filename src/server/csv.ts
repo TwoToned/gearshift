@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 
 // ─── EXPORT ─────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ interface ImportResult {
 }
 
 export async function importModelsCSV(csvContent: string): Promise<ImportResult> {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("model", "import");
   const rows = parseCSV(csvContent);
   if (rows.length === 0) throw new Error("CSV is empty");
 
@@ -253,7 +253,7 @@ export async function importModelsCSV(csvContent: string): Promise<ImportResult>
 }
 
 export async function importAssetsCSV(csvContent: string): Promise<ImportResult> {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("asset", "import");
   const rows = parseCSV(csvContent);
   if (rows.length === 0) throw new Error("CSV is empty");
 

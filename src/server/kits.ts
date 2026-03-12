@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import {
   kitSchema,
   kitSerializedItemSchema,
@@ -132,7 +132,7 @@ export async function getKit(id: string) {
 // createKit
 // ---------------------------------------------------------------------------
 export async function createKit(data: KitFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "create");
   const parsed = kitSchema.parse(data);
 
   try {
@@ -173,7 +173,7 @@ export async function createKit(data: KitFormValues) {
 // updateKit
 // ---------------------------------------------------------------------------
 export async function updateKit(id: string, data: KitFormValues) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "update");
   const parsed = kitSchema.parse(data);
 
   return serialize(
@@ -202,7 +202,7 @@ export async function updateKit(id: string, data: KitFormValues) {
 }
 
 export async function updateKitNotes(id: string, notes: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "update");
   return serialize(await prisma.kit.update({
     where: { id, organizationId },
     data: { notes: notes || null },
@@ -213,7 +213,7 @@ export async function updateKitNotes(id: string, notes: string) {
 // archiveKit – soft delete: remove all contents, then deactivate
 // ---------------------------------------------------------------------------
 export async function archiveKit(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "delete");
 
   const kit = await prisma.kit.findUnique({
     where: { id, organizationId },
@@ -266,7 +266,7 @@ export async function addSerializedItemToKit(
   kitId: string,
   data: KitSerializedItemFormValues,
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("kit", "update");
   const parsed = kitSerializedItemSchema.parse(data);
 
   const kit = await prisma.kit.findUnique({
@@ -319,7 +319,7 @@ export async function addSerializedItemsToKit(
   kitId: string,
   items: Array<{ assetId: string; position?: string }>,
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("kit", "update");
 
   if (items.length === 0) throw new Error("No items to add");
 
@@ -381,7 +381,7 @@ export async function removeSerializedItemFromKit(
   kitId: string,
   assetId: string,
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "update");
 
   const kit = await prisma.kit.findUnique({
     where: { id: kitId, organizationId },
@@ -414,7 +414,7 @@ export async function addBulkItemToKit(
   kitId: string,
   data: KitBulkItemFormValues,
 ) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("kit", "update");
   const parsed = kitBulkItemSchema.parse(data);
 
   const kit = await prisma.kit.findUnique({
@@ -467,7 +467,7 @@ export async function removeBulkItemFromKit(
   kitId: string,
   bulkItemId: string,
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("kit", "update");
 
   const kit = await prisma.kit.findUnique({
     where: { id: kitId, organizationId },

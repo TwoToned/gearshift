@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrgContext } from "@/lib/org-context";
+import { getOrgContext, requirePermission } from "@/lib/org-context";
 import {
   maintenanceSchema,
   type MaintenanceFormValues,
@@ -86,7 +86,7 @@ export async function getMaintenanceRecord(id: string) {
 }
 
 export async function createMaintenanceRecord(data: MaintenanceFormValues) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId } = await requirePermission("maintenance", "create");
   const parsed = maintenanceSchema.parse(data);
 
   const assetIds = parsed.assetIds?.length
@@ -145,7 +145,7 @@ export async function updateMaintenanceRecord(
   id: string,
   data: MaintenanceFormValues
 ) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("maintenance", "update");
   const parsed = maintenanceSchema.parse(data);
 
   const existing = await prisma.maintenanceRecord.findUnique({
@@ -222,7 +222,7 @@ export async function updateMaintenanceRecord(
 }
 
 export async function deleteMaintenanceRecord(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId } = await requirePermission("maintenance", "delete");
 
   const record = await prisma.maintenanceRecord.findUnique({
     where: { id, organizationId },
