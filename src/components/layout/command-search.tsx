@@ -124,20 +124,124 @@ export function CommandSearch() {
     return matchPageCommands(atQuery);
   }, [isAtMode, atQuery, isDrilling, isAtEntityMode]);
 
-  // Build display items for @ mode
+  // Determine the top searchable page match and any entity query text
+  const atSearchInfo = useMemo(() => {
+    if (!isAtMode || isDrilling || isAtEntityMode) return null;
+    const topMatch = atMatches[0];
+    if (!topMatch || topMatch.score < 60) return null;
+    if (!topMatch.command.searchable) return null;
+    return {
+      command: topMatch.command,
+      entityQuery: topMatch.entityQuery || "",
+    };
+  }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
+
+  // Derived values for the effect to depend on (stable primitives, not object refs)
+  const atSearchType = atSearchInfo?.command.searchType || null;
+  const atSearchEntityQuery = atSearchInfo?.entityQuery || "";
+
+  // Trigger entity search when we have a searchable page match with a query
+  useEffect(() => {
+    if (!atSearchType || !atSearchEntityQuery || atSearchEntityQuery.length < 2) {
+      setAtEntityResults([]);
+      return;
+    }
+    setAtEntityLoading(true);
+    const typeMap: Record<string, SearchResultType[]> = {
+      model: ["model"],
+      asset: ["model", "asset", "bulk-asset", "kit"],
+      kit: ["kit"],
+      project: ["project"],
+      client: ["client"],
+      location: ["location"],
+      maintenance: ["maintenance"],
+    };
+    const allowedTypes = typeMap[atSearchType] || [];
+    let aborted = false;
+    const timer = setTimeout(() => {
+      globalSearch(atSearchEntityQuery).then((data) => {
+        if (aborted) return;
+        const filtered = (data.results as SearchResult[]).filter(
+          (r) => allowedTypes.includes(r.type)
+        );
+        setAtEntityResults(filtered);
+        setSelectedIndex(0);
+      }).catch(() => {
+        if (!aborted) setAtEntityResults([]);
+      }).finally(() => {
+        if (!aborted) setAtEntityLoading(false);
+      });
+    }, 200);
+    return () => { aborted = true; clearTimeout(timer); };
+  }, [atSearchType, atSearchEntityQuery]);
+
+  // Get entity text from the top match (if any space-separated text exists)
+  const atEntityText = useMemo(() => {
+    if (!isAtMode || isDrilling || isAtEntityMode) return "";
+    const topMatch = atMatches[0];
+    if (!topMatch || topMatch.score < 60) return "";
+    return topMatch.entityQuery || "";
+  }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
+
+  // Build display items for @ mode — pages + inline entity results
   const atDisplayItems = useMemo((): DisplayItem[] => {
     if (!isAtMode || isDrilling || isAtEntityMode) return [];
-
-    // Check if any match has an entity query — if so, we need to do entity search
-    const topMatch = atMatches[0];
-    if (topMatch?.entityQuery && topMatch.command.searchable && topMatch.score >= 60) {
-      // Don't show page list — entity search will handle it
-      return [];
-    }
 
     const items: DisplayItem[] = [];
     const shown = new Set<string>();
 
+    const topMatch = atMatches[0];
+    const hasEntityQuery = atSearchInfo?.entityQuery && atSearchInfo.entityQuery.length >= 2;
+
+    // When there's entity text, show: parent page, matching child pages, then entity results
+    if (hasEntityQuery && topMatch && topMatch.score >= 60) {
+      const cmd = topMatch.command;
+      const IconComp = pageIcons[cmd.icon] || Package;
+
+      // Parent page
+      items.push({
+        id: `page-${cmd.href}`,
+        title: cmd.label,
+        subtitle: cmd.description,
+        href: cmd.href,
+        icon: IconComp,
+        hasChildren: !!cmd.children?.length || !!cmd.searchable,
+      });
+
+      // Child pages (always show — auto-select will pick the best match)
+      if (cmd.children) {
+        for (const child of cmd.children) {
+          const ChildIcon = pageIcons[child.icon] || Package;
+          items.push({
+            id: `page-${child.href}`,
+            title: child.label,
+            subtitle: child.description,
+            href: child.href,
+            icon: ChildIcon,
+            isChild: true,
+          });
+        }
+      }
+
+      // Entity results (from searchable pages)
+      if (atSearchInfo) {
+        for (const r of atEntityResults) {
+          items.push({
+            id: `${r.type}-${r.id}`,
+            title: r.title,
+            subtitle: r.subtitle,
+            href: r.href,
+            icon: typeIcons[r.type] || Package,
+            isChild: r.isChild,
+            typeLabel: r.isChild ? undefined : typeLabels[r.type],
+          });
+        }
+      }
+
+      return items;
+    }
+
+    // No entity query — show page commands with their child pages
     for (const match of atMatches) {
       const cmd = match.command;
       if (shown.has(cmd.href)) continue;
@@ -153,7 +257,7 @@ export function CommandSearch() {
         hasChildren: !!cmd.children?.length || !!cmd.searchable,
       });
 
-      // Show children of this command
+      // Show child pages of this command
       if (cmd.children) {
         for (const child of cmd.children) {
           if (shown.has(child.href)) continue;
@@ -172,84 +276,78 @@ export function CommandSearch() {
     }
 
     return items;
-  }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
+  }, [isAtMode, atMatches, isDrilling, isAtEntityMode, atSearchInfo, atEntityResults]);
 
-  // @ entity search: when user types e.g. "@project drum hire"
-  const atEntityQuery = useMemo(() => {
+  // The parent page href that was matched by the command part (before the space)
+  // This page should never be auto-selected — the user already typed it
+  const atParentHref = useMemo(() => {
     if (!isAtMode || isDrilling || isAtEntityMode) return null;
     const topMatch = atMatches[0];
-    if (topMatch?.entityQuery && topMatch.command.searchable && topMatch.score >= 60) {
-      return { command: topMatch.command, query: topMatch.entityQuery };
-    }
-    return null;
+    if (!topMatch || topMatch.score < 60) return null;
+    return topMatch.command.href;
   }, [isAtMode, atMatches, isDrilling, isAtEntityMode]);
 
-  // Trigger entity search for @ mode inline
+  // Auto-select the best matching item when there's entity text after the command
+  // e.g. "@tnt test" highlights "Quick Test", "@project template" highlights "Templates"
   useEffect(() => {
-    if (!atEntityQuery) {
-      setAtEntityResults([]);
-      return;
-    }
-    if (atEntityQuery.query.length < 2) {
-      setAtEntityResults([]);
-      return;
-    }
-    setAtEntityLoading(true);
-    const abortController = new AbortController();
-    globalSearch(atEntityQuery.query).then((data) => {
-      if (abortController.signal.aborted) return;
-      // Filter to only the relevant type
-      const typeMap: Record<string, SearchResultType[]> = {
-        model: ["model"],
-        asset: ["asset", "bulk-asset"],
-        kit: ["kit"],
-        project: ["project"],
-        client: ["client"],
-        location: ["location"],
-        maintenance: ["maintenance"],
-      };
-      const allowedTypes = typeMap[atEntityQuery.command.searchType || ""] || [];
-      const filtered = (data.results as SearchResult[]).filter(
-        (r) => allowedTypes.includes(r.type)
-      );
-      setAtEntityResults(filtered);
-      setSelectedIndex(0);
-    }).catch(() => {
-      setAtEntityResults([]);
-    }).finally(() => {
-      if (!abortController.signal.aborted) setAtEntityLoading(false);
-    });
-    return () => abortController.abort();
-  }, [atEntityQuery]);
+    if (!isAtMode || isDrilling || isAtEntityMode) return;
+    if (!atEntityText || atEntityText.length < 1) return;
+    if (atDisplayItems.length === 0) return;
 
-  // Build display items for @ entity results
-  const atEntityDisplayItems = useMemo((): DisplayItem[] => {
-    if (!atEntityQuery) return [];
-    const items: DisplayItem[] = [];
-    // Add the page itself as first item
-    const cmd = atEntityQuery.command;
-    const IconComp = pageIcons[cmd.icon] || Package;
-    items.push({
-      id: `page-${cmd.href}`,
-      title: `Go to ${cmd.label}`,
-      subtitle: cmd.description,
-      href: cmd.href,
-      icon: IconComp,
-    });
-    // Add entity results
-    for (const r of atEntityResults) {
-      items.push({
-        id: `${r.type}-${r.id}`,
-        title: r.title,
-        subtitle: r.subtitle,
-        href: r.href,
-        icon: typeIcons[r.type] || Package,
-        isChild: r.isChild,
-        typeLabel: r.isChild ? undefined : typeLabels[r.type],
-      });
+    const nq = normalize(atEntityText);
+    if (!nq) return;
+
+    const nqWords = atEntityText.trim().toLowerCase().split(/\s+/).map(w => normalize(w)).filter(Boolean);
+
+    let bestIdx = 0;
+    let bestScore = -1;
+
+    for (let i = 0; i < atDisplayItems.length; i++) {
+      const item = atDisplayItems[i];
+
+      // Skip the parent page — it was already matched by the command part
+      if (item.id === `page-${atParentHref}`) continue;
+
+      const nTitle = normalize(item.title);
+      const nSub = normalize(item.subtitle || "");
+
+      let score = 0;
+      if (nTitle === nq) score = 100;
+      else if (nTitle.startsWith(nq)) score = 80;
+      else if (nTitle.includes(nq)) score = 60;
+      else {
+        // Check if all individual words match (any order)
+        const allWordsMatch = nqWords.length > 1 && nqWords.every(w => nTitle.includes(w) || nSub.includes(w));
+        if (allWordsMatch) score = 55;
+        else if (nSub.includes(nq)) score = 40;
+        else {
+          // Single-word partial matches on title
+          const anyWordInTitle = nqWords.some(w => nTitle.includes(w));
+          if (anyWordInTitle) score = 35;
+          else {
+            // Subsequence match
+            let ti = 0;
+            for (let qi = 0; qi < nq.length && ti < nTitle.length; ti++) {
+              if (nTitle[ti] === nq[qi]) qi++;
+              if (qi === nq.length) { score = 20; break; }
+            }
+          }
+        }
+      }
+
+      // Prefer entity results over child page links
+      if (score > 0 && !item.id.startsWith("page-")) score += 2;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
     }
-    return items;
-  }, [atEntityQuery, atEntityResults]);
+
+    if (bestScore > 0) {
+      setSelectedIndex(bestIdx);
+    }
+  }, [atDisplayItems, atEntityText, atParentHref, isAtMode, isDrilling, isAtEntityMode]);
 
   // ─── @ entity drill mode (Tab on a page to search its entities) ──
 
@@ -274,37 +372,40 @@ export function CommandSearch() {
   }, [isAtEntityMode, atEntityResults, drillQuery]);
 
   // Trigger search when in @ entity drill mode
+  const atEntitySearchType = atEntityPage?.searchType || null;
   useEffect(() => {
-    if (!isAtEntityMode || drillQuery.length < 2) {
+    if (!isAtEntityMode || !atEntitySearchType || drillQuery.length < 2) {
       if (isAtEntityMode) setAtEntityResults([]);
       return;
     }
     setAtEntityLoading(true);
-    const abortController = new AbortController();
-    globalSearch(drillQuery).then((data) => {
-      if (abortController.signal.aborted) return;
-      const typeMap: Record<string, SearchResultType[]> = {
-        model: ["model"],
-        asset: ["asset", "bulk-asset"],
-        kit: ["kit"],
-        project: ["project"],
-        client: ["client"],
-        location: ["location"],
-        maintenance: ["maintenance"],
-      };
-      const allowedTypes = typeMap[atEntityPage!.searchType || ""] || [];
-      const filtered = (data.results as SearchResult[]).filter(
-        (r) => allowedTypes.includes(r.type)
-      );
-      setAtEntityResults(filtered);
-      setSelectedIndex(0);
-    }).catch(() => {
-      setAtEntityResults([]);
-    }).finally(() => {
-      if (!abortController.signal.aborted) setAtEntityLoading(false);
-    });
-    return () => abortController.abort();
-  }, [isAtEntityMode, drillQuery, atEntityPage]);
+    const typeMap: Record<string, SearchResultType[]> = {
+      model: ["model"],
+      asset: ["model", "asset", "bulk-asset", "kit"],
+      kit: ["kit"],
+      project: ["project"],
+      client: ["client"],
+      location: ["location"],
+      maintenance: ["maintenance"],
+    };
+    const allowedTypes = typeMap[atEntitySearchType] || [];
+    let aborted = false;
+    const timer = setTimeout(() => {
+      globalSearch(drillQuery).then((data) => {
+        if (aborted) return;
+        const filtered = (data.results as SearchResult[]).filter(
+          (r) => allowedTypes.includes(r.type)
+        );
+        setAtEntityResults(filtered);
+        setSelectedIndex(0);
+      }).catch(() => {
+        if (!aborted) setAtEntityResults([]);
+      }).finally(() => {
+        if (!aborted) setAtEntityLoading(false);
+      });
+    }, 200);
+    return () => { aborted = true; clearTimeout(timer); };
+  }, [isAtEntityMode, drillQuery, atEntitySearchType]);
 
   // ─── Normal search: filter drill children ────────────────────
 
@@ -351,12 +452,7 @@ export function CommandSearch() {
       return filteredDrillChildren;
     }
 
-    // @ mode with entity search results (e.g. @project drum hire)
-    if (atEntityQuery) {
-      return atEntityDisplayItems;
-    }
-
-    // @ mode showing page commands
+    // @ mode (page commands + inline entity results)
     if (isAtMode) {
       return atDisplayItems;
     }
@@ -383,8 +479,7 @@ export function CommandSearch() {
       };
     });
   }, [isAtEntityMode, atEntityDrillItems, isDrilling, filteredDrillChildren,
-      atEntityQuery, atEntityDisplayItems, isAtMode, atDisplayItems,
-      expanded, results]);
+      isAtMode, atDisplayItems, expanded, results]);
 
   // ─── Lifecycle ───────────────────────────────────────────────
 
@@ -657,7 +752,7 @@ export function CommandSearch() {
   const isLoading = loading || atEntityLoading;
   const showEmptySearch = !isAtMode && !isDrilling && !isAtEntityMode && query.length >= 2 && visibleItems.length === 0 && !isLoading;
   const showTyping = !isAtMode && !isDrilling && !isAtEntityMode && query.length < 2;
-  const showAtHint = isAtMode && !isDrilling && !isAtEntityMode && !atEntityQuery && atQuery === "" && visibleItems.length > 0;
+  const showAtHint = isAtMode && !isDrilling && !isAtEntityMode && atQuery === "" && visibleItems.length > 0;
 
   return (
     <>
@@ -732,7 +827,7 @@ export function CommandSearch() {
               <div className="p-1">
                 {showAtHint && (
                   <div className="px-3 pt-1 pb-2 text-xs text-muted-foreground">
-                    Type a page name to navigate, or add a space to search within it
+                    Type a page name to navigate · Add a space to search entities (e.g. <span className="font-medium text-primary">@project drum hire</span>)
                   </div>
                 )}
                 {visibleItems.map((item, idx) => {

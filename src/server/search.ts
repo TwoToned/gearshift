@@ -236,8 +236,7 @@ export async function globalSearch(query: string) {
     await Promise.all([
       modelIds.length > 0
         ? prisma.$queryRaw<ChildAssetRow[]>`
-            SELECT DISTINCT ON (a."modelId", a."assetTag")
-              a.id, a."assetTag", a."serialNumber", a."customName", a."modelId", a.status
+            SELECT a.id, a."assetTag", a."serialNumber", a."customName", a."modelId", a.status
             FROM "public"."asset" a
             WHERE a."modelId" = ANY(${modelIds}) AND a."isActive" = true
             ORDER BY a."modelId", a."assetTag" ASC
@@ -345,9 +344,10 @@ export async function globalSearch(query: string) {
   const modelsByCategory = groupBy(categoryModels, (m) => m.categoryId);
   const subCategoriesByParent = groupBy(childCategories, (c) => c.parentId);
 
-  const directAssetIds = new Set(assets.map((a) => a.id));
-  const directBulkIds = new Set(bulkAssets.map((b) => b.id));
-  const directModelIds = new Set(models.map((m) => m.id));
+  // Track which items appear as children under a parent, so standalone section can skip them
+  const shownAsChildAssetIds = new Set<string>();
+  const shownAsChildBulkIds = new Set<string>();
+  const shownAsChildModelIds = new Set<string>();
 
   // ─── Build results with children ─────────────────────────────
 
@@ -362,8 +362,9 @@ export async function globalSearch(query: string) {
       href: `/assets/models/${m.id}`,
       relevance: Number(m.match_quality) || 0,
     });
-    const modelAssets = (assetsByModel.get(m.id) || []).filter((a) => !directAssetIds.has(a.id));
-    for (const a of modelAssets.slice(0, 5)) {
+    const modelAssets = assetsByModel.get(m.id) || [];
+    for (const a of modelAssets) {
+      shownAsChildAssetIds.add(a.id);
       results.push({
         id: a.id, type: "asset", isChild: true,
         title: a.assetTag + (a.customName ? ` — ${a.customName}` : ""),
@@ -371,8 +372,9 @@ export async function globalSearch(query: string) {
         href: `/assets/registry/${a.id}`, relevance: 0,
       });
     }
-    const modelBulk = (bulkByModel.get(m.id) || []).filter((b) => !directBulkIds.has(b.id));
-    for (const b of modelBulk.slice(0, 2)) {
+    const modelBulk = bulkByModel.get(m.id) || [];
+    for (const b of modelBulk) {
+      shownAsChildBulkIds.add(b.id);
       results.push({
         id: b.id, type: "bulk-asset", isChild: true,
         title: b.assetTag, subtitle: `${b.totalQuantity} units`,
@@ -389,7 +391,8 @@ export async function globalSearch(query: string) {
       subtitle: k.caseType || k.description || null,
       href: `/kits/${k.id}`, relevance: Number(k.match_quality) || 0,
     });
-    for (const ki of (itemsByKit.get(k.id) || []).slice(0, 4)) {
+    for (const ki of (itemsByKit.get(k.id) || [])) {
+      if (ki.assetId) shownAsChildAssetIds.add(ki.assetId);
       results.push({
         id: ki.assetId || k.id, type: "asset", isChild: true,
         title: ki.assetTag, subtitle: ki.name,
@@ -398,10 +401,9 @@ export async function globalSearch(query: string) {
     }
   }
 
-  // Standalone assets
+  // Standalone assets (skip if already shown as child of a model/kit)
   for (const a of assets) {
-    const shown = models.some((m) => (assetsByModel.get(m.id) || []).some((ca) => ca.id === a.id));
-    if (shown) continue;
+    if (shownAsChildAssetIds.has(a.id)) continue;
     results.push({
       id: a.id, type: "asset",
       title: a.assetTag + (a.customName ? ` — ${a.customName}` : ""),
@@ -410,10 +412,9 @@ export async function globalSearch(query: string) {
     });
   }
 
-  // Standalone bulk assets
+  // Standalone bulk assets (skip if already shown as child of a model)
   for (const b of bulkAssets) {
-    const shown = models.some((m) => (bulkByModel.get(m.id) || []).some((cb) => cb.id === b.id));
-    if (shown) continue;
+    if (shownAsChildBulkIds.has(b.id)) continue;
     results.push({
       id: b.id, type: "bulk-asset",
       title: b.assetTag, subtitle: `${b.modelName} (${b.totalQuantity} units)`,
@@ -421,18 +422,8 @@ export async function globalSearch(query: string) {
     });
   }
 
-  // Standalone projects
-  for (const p of projects) {
-    const shown = clients.some((c) => (projectsByClient.get(c.id) || []).some((cp) => cp.id === p.id));
-    if (shown) continue;
-    results.push({
-      id: p.id, type: "project",
-      title: `${p.projectNumber} — ${p.name}`, subtitle: p.clientName || p.status,
-      href: `/projects/${p.id}`, relevance: Number(p.match_quality) || 0,
-    });
-  }
-
-  // Clients + child projects
+  // Clients + child projects (build first so we can track shown project IDs)
+  const shownAsChildProjectIds = new Set<string>();
   for (const c of clients) {
     results.push({
       id: c.id, type: "client",
@@ -440,13 +431,24 @@ export async function globalSearch(query: string) {
       href: `/clients/${c.id}`, relevance: Number(c.match_quality) || 0,
     });
     const cProjects = projectsByClient.get(c.id) || [];
-    for (const p of cProjects.slice(0, 5)) {
+    for (const p of cProjects) {
+      shownAsChildProjectIds.add(p.id);
       results.push({
         id: p.id, type: "project", isChild: true,
         title: `${p.projectNumber} — ${p.name}`, subtitle: p.status,
         href: `/projects/${p.id}`, relevance: 0,
       });
     }
+  }
+
+  // Standalone projects (skip if already shown as child of a client)
+  for (const p of projects) {
+    if (shownAsChildProjectIds.has(p.id)) continue;
+    results.push({
+      id: p.id, type: "project",
+      title: `${p.projectNumber} — ${p.name}`, subtitle: p.clientName || p.status,
+      href: `/projects/${p.id}`, relevance: Number(p.match_quality) || 0,
+    });
   }
 
   // Locations + child locations + child assets/kits
@@ -457,7 +459,7 @@ export async function globalSearch(query: string) {
       href: `/locations/${l.id}`, relevance: Number(l.match_quality) || 0,
     });
     // Sub-locations
-    for (const sub of (subLocationsByParent.get(l.id) || []).slice(0, 4)) {
+    for (const sub of (subLocationsByParent.get(l.id) || [])) {
       results.push({
         id: sub.id, type: "location", isChild: true,
         title: sub.name, subtitle: sub.address || null,
@@ -465,8 +467,9 @@ export async function globalSearch(query: string) {
       });
     }
     // Assets at this location
-    const locAssets = (assetsByLocation.get(l.id) || []).filter((a) => !directAssetIds.has(a.id));
-    for (const a of locAssets.slice(0, 4)) {
+    const locAssets = assetsByLocation.get(l.id) || [];
+    for (const a of locAssets) {
+      shownAsChildAssetIds.add(a.id);
       results.push({
         id: a.id, type: "asset", isChild: true,
         title: a.assetTag + (a.customName ? ` — ${a.customName}` : ""),
@@ -475,7 +478,7 @@ export async function globalSearch(query: string) {
       });
     }
     // Kits at this location
-    for (const k of (kitsByLocation.get(l.id) || []).slice(0, 3)) {
+    for (const k of (kitsByLocation.get(l.id) || [])) {
       results.push({
         id: k.id, type: "kit", isChild: true,
         title: `${k.assetTag} — ${k.name}`, subtitle: null,
@@ -492,7 +495,7 @@ export async function globalSearch(query: string) {
       href: `/assets/models?category=${cat.id}`, relevance: Number(cat.match_quality) || 0,
     });
     // Sub-categories
-    for (const sub of (subCategoriesByParent.get(cat.id) || []).slice(0, 4)) {
+    for (const sub of (subCategoriesByParent.get(cat.id) || [])) {
       results.push({
         id: sub.id, type: "category", isChild: true,
         title: sub.name, subtitle: null,
@@ -500,8 +503,9 @@ export async function globalSearch(query: string) {
       });
     }
     // Models in this category
-    const catModels = (modelsByCategory.get(cat.id) || []).filter((m) => !directModelIds.has(m.id));
-    for (const m of catModels.slice(0, 4)) {
+    const catModels = modelsByCategory.get(cat.id) || [];
+    for (const m of catModels) {
+      shownAsChildModelIds.add(m.id);
       results.push({
         id: m.id, type: "model", isChild: true,
         title: m.name + (m.modelNumber ? ` (${m.modelNumber})` : ""),
