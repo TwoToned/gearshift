@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, use, useState, useRef, useCallback, useMemo } from "react";
+import { Fragment, use, useState, useRef, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ScanBarcode,
@@ -259,12 +260,26 @@ function bulkUnitKey(lineItemId: string, unitIndex: number) {
 // Page component
 // ---------------------------------------------------------------------------
 
-export default function WarehouseProjectPage({
+export default function WarehouseProjectPageWrapper({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  return (
+    <Suspense>
+      <WarehouseProjectPage params={params} />
+    </Suspense>
+  );
+}
+
+function WarehouseProjectPage({
   params,
 }: {
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = use(params);
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "check-in" ? "check-in" : "check-out";
   const queryClient = useQueryClient();
   const scanInputRef = useRef<HTMLInputElement>(null);
   const returnScanInputRef = useRef<HTMLInputElement>(null);
@@ -909,7 +924,7 @@ export default function WarehouseProjectPage({
         </Button>
       </div>
 
-      <Tabs defaultValue="check-out">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="check-out">
             <PackageCheck className="mr-1.5 h-4 w-4" />

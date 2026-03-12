@@ -20,6 +20,12 @@ export interface PageCommand {
   searchable?: boolean;
   /** Server search type to use for entity search */
   searchType?: string;
+  /** Override href prefix for entity results (e.g. "/warehouse" makes project results link to /warehouse/{id}) */
+  searchHrefPrefix?: string;
+  /** Suffix appended to entity result hrefs (e.g. "?tab=check-in") */
+  searchHrefSuffix?: string;
+  /** Only show results with these statuses (for project filtering) */
+  searchStatusFilter?: string[];
   /** Child pages (sub-navigation items) */
   children?: PageCommand[];
 }
@@ -89,9 +95,39 @@ export const PAGE_COMMANDS: PageCommand[] = [
   {
     label: "Warehouse",
     href: "/warehouse",
-    aliases: ["warehouse", "wh", "checkout", "checkin", "scan", "dispatch"],
+    aliases: ["warehouse", "wh", "scan", "dispatch"],
     icon: "Warehouse",
     description: "Checkout, check-in, and scanning",
+    searchable: true,
+    searchType: "project",
+    searchHrefPrefix: "/warehouse",
+    searchStatusFilter: ["CONFIRMED", "PREPPING", "CHECKED_OUT", "ON_SITE", "RETURNED"],
+    children: [
+      {
+        label: "Check Out",
+        href: "/warehouse",
+        aliases: ["checkout", "checkingout", "sendout", "prep"],
+        icon: "PackageCheck",
+        description: "Check out assets to a project",
+        searchable: true,
+        searchType: "project",
+        searchHrefPrefix: "/warehouse",
+        searchHrefSuffix: "?tab=check-out",
+        searchStatusFilter: ["CONFIRMED", "PREPPING", "CHECKED_OUT", "ON_SITE", "RETURNED"],
+      },
+      {
+        label: "Check In",
+        href: "/warehouse",
+        aliases: ["checkin", "checkingin", "return", "returns", "deprep"],
+        icon: "PackageX",
+        description: "Check in returned assets",
+        searchable: true,
+        searchType: "project",
+        searchHrefPrefix: "/warehouse",
+        searchHrefSuffix: "?tab=check-in",
+        searchStatusFilter: ["CONFIRMED", "PREPPING", "CHECKED_OUT", "ON_SITE", "RETURNED"],
+      },
+    ],
   },
   {
     label: "Clients",

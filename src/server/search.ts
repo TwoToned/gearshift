@@ -23,6 +23,8 @@ export type SearchResult = {
   href: string;
   relevance: number;
   isChild?: boolean;
+  /** Status field for projects (used by warehouse filtering) */
+  status?: string;
 };
 
 function normalize(s: string): string {
@@ -437,6 +439,7 @@ export async function globalSearch(query: string) {
         id: p.id, type: "project", isChild: true,
         title: `${p.projectNumber} — ${p.name}`, subtitle: p.status,
         href: `/projects/${p.id}`, relevance: 0,
+        status: p.status,
       });
     }
   }
@@ -448,6 +451,7 @@ export async function globalSearch(query: string) {
       id: p.id, type: "project",
       title: `${p.projectNumber} — ${p.name}`, subtitle: p.clientName || p.status,
       href: `/projects/${p.id}`, relevance: Number(p.match_quality) || 0,
+      status: p.status,
     });
   }
 

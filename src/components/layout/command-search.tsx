@@ -167,6 +167,7 @@ export function CommandSearch() {
   // Derived values for the effect to depend on (stable primitives, not object refs)
   const atSearchType = atSearchInfo?.command.searchType || null;
   const atSearchEntityQuery = atSearchInfo?.entityQuery || "";
+  const atSearchStatusFilter = atSearchInfo?.command.searchStatusFilter || null;
 
   // Trigger entity search when we have a searchable page match with a query
   useEffect(() => {
@@ -185,12 +186,14 @@ export function CommandSearch() {
       maintenance: ["maintenance"],
     };
     const allowedTypes = typeMap[atSearchType] || [];
+    const statusFilter = atSearchStatusFilter;
     let aborted = false;
     const timer = setTimeout(() => {
       globalSearch(atSearchEntityQuery).then((data) => {
         if (aborted) return;
         const filtered = (data.results as SearchResult[]).filter(
           (r) => allowedTypes.includes(r.type)
+            && (!statusFilter || !r.status || statusFilter.includes(r.status))
         );
         setAtEntityResults(filtered);
         setSelectedIndex(0);
@@ -201,7 +204,7 @@ export function CommandSearch() {
       });
     }, 200);
     return () => { aborted = true; clearTimeout(timer); };
-  }, [atSearchType, atSearchEntityQuery]);
+  }, [atSearchType, atSearchEntityQuery, atSearchStatusFilter]);
 
   // Get entity text from the top match (if any space-separated text exists)
   const atEntityText = useMemo(() => {
@@ -253,12 +256,15 @@ export function CommandSearch() {
 
       // Entity results (from searchable pages)
       if (atSearchInfo) {
+        const hrefPrefix = cmd.searchHrefPrefix;
+        const hrefSuffix = cmd.searchHrefSuffix || "";
         for (const r of atEntityResults) {
+          const baseHref = hrefPrefix ? `${hrefPrefix}/${r.id}` : r.href;
           items.push({
             id: `${r.type}-${r.id}`,
             title: r.title,
             subtitle: r.subtitle,
-            href: r.href,
+            href: `${baseHref}${hrefSuffix}`,
             icon: typeIcons[r.type] || Package,
             isChild: r.isChild,
             typeLabel: r.isChild ? undefined : typeLabels[r.type],
@@ -386,21 +392,25 @@ export function CommandSearch() {
     if (drillQuery.length < 2) return items;
 
     // We'll populate from atEntityResults which are set by the effect below
+    const hrefPrefix = atEntityPage?.searchHrefPrefix;
+    const hrefSuffix = atEntityPage?.searchHrefSuffix || "";
     for (const r of atEntityResults) {
+      const baseHref = hrefPrefix ? `${hrefPrefix}/${r.id}` : r.href;
       items.push({
         id: `${r.type}-${r.id}`,
         title: r.title,
         subtitle: r.subtitle,
-        href: r.href,
+        href: `${baseHref}${hrefSuffix}`,
         icon: typeIcons[r.type] || Package,
         isChild: r.isChild,
       });
     }
     return items;
-  }, [isAtEntityMode, atEntityResults, drillQuery]);
+  }, [isAtEntityMode, atEntityResults, drillQuery, atEntityPage]);
 
   // Trigger search when in @ entity drill mode
   const atEntitySearchType = atEntityPage?.searchType || null;
+  const atEntityStatusFilter = atEntityPage?.searchStatusFilter || null;
   useEffect(() => {
     if (!isAtEntityMode || !atEntitySearchType || drillQuery.length < 2) {
       if (isAtEntityMode) setAtEntityResults([]);
@@ -417,12 +427,14 @@ export function CommandSearch() {
       maintenance: ["maintenance"],
     };
     const allowedTypes = typeMap[atEntitySearchType] || [];
+    const statusFilter = atEntityStatusFilter;
     let aborted = false;
     const timer = setTimeout(() => {
       globalSearch(drillQuery).then((data) => {
         if (aborted) return;
         const filtered = (data.results as SearchResult[]).filter(
           (r) => allowedTypes.includes(r.type)
+            && (!statusFilter || !r.status || statusFilter.includes(r.status))
         );
         setAtEntityResults(filtered);
         setSelectedIndex(0);
@@ -433,7 +445,7 @@ export function CommandSearch() {
       });
     }, 200);
     return () => { aborted = true; clearTimeout(timer); };
-  }, [isAtEntityMode, drillQuery, atEntitySearchType]);
+  }, [isAtEntityMode, drillQuery, atEntitySearchType, atEntityStatusFilter]);
 
   // ─── Normal search: filter drill children ────────────────────
 
