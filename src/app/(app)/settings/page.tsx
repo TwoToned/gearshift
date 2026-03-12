@@ -141,15 +141,51 @@ export default function SettingsPage() {
                   disabled={!canEditSettings}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="orgAddress">Address</Label>
-                <Input
-                  id="orgAddress"
-                  value={settings.address || ""}
-                  onChange={(e) => updateSetting("address", e.target.value)}
-                  placeholder="123 Main St, City"
-                  disabled={!canEditSettings}
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="orgAddress">Address</Label>
+                  <Input
+                    id="orgAddress"
+                    value={settings.address || ""}
+                    onChange={(e) => updateSetting("address", e.target.value)}
+                    placeholder="123 Main St, City"
+                    disabled={!canEditSettings}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <select
+                    id="timezone"
+                    value={settings.timezone || ""}
+                    onChange={(e) => updateSetting("timezone", e.target.value)}
+                    disabled={!canEditSettings}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Auto (browser)</option>
+                    <option value="Pacific/Auckland">Pacific/Auckland (NZST)</option>
+                    <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
+                    <option value="Australia/Brisbane">Australia/Brisbane (AEST, no DST)</option>
+                    <option value="Australia/Adelaide">Australia/Adelaide (ACST)</option>
+                    <option value="Australia/Darwin">Australia/Darwin (ACST, no DST)</option>
+                    <option value="Australia/Perth">Australia/Perth (AWST)</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                    <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+                    <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                    <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                    <option value="Europe/London">Europe/London (GMT/BST)</option>
+                    <option value="Europe/Paris">Europe/Paris (CET)</option>
+                    <option value="Europe/Berlin">Europe/Berlin (CET)</option>
+                    <option value="America/New_York">America/New_York (EST)</option>
+                    <option value="America/Chicago">America/Chicago (CST)</option>
+                    <option value="America/Denver">America/Denver (MST)</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Used for date display across the platform.
+                  </p>
+                </div>
               </div>
               <Separator />
               <div className="grid gap-4 sm:grid-cols-3">

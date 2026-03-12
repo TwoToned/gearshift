@@ -2,6 +2,7 @@
 
 import { use, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Loader2, X, ScanBarcode } from "lucide-react";
 import { toast } from "sonner";
@@ -78,7 +79,17 @@ function formatDate(date: Date | string | null | undefined) {
 
 export default function KitDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const initialDate = useMemo(() => {
+    const d = searchParams.get("date");
+    if (!d) return null;
+    const [y, m, day] = d.split("-").map(Number);
+    if (!y || !m || !day) return null;
+    const parsed = new Date(y, m - 1, day);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }, [searchParams]);
 
   // Dialog states – must be declared before any early returns
   const [showAddItem, setShowAddItem] = useState(false);
@@ -293,7 +304,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
         </CardContent>
       </Card>
 
-      <BookingCalendar entityType="kit" entityId={id} />
+      <BookingCalendar entityType="kit" entityId={id} initialDate={initialDate} />
 
       {/* Contents Card */}
       <Card>

@@ -1,10 +1,10 @@
 "use client";
 
-import { use } from "react";
+import { use, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Archive, Plus, Package, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { getModel, archiveModel } from "@/server/models";
@@ -49,7 +49,17 @@ const statusColors: Record<string, string> = {
 export default function ModelDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const initialDate = useMemo(() => {
+    const d = searchParams.get("date");
+    if (!d) return null;
+    const [y, m, day] = d.split("-").map(Number);
+    if (!y || !m || !day) return null;
+    const parsed = new Date(y, m - 1, day);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }, [searchParams]);
 
   const { data: model, isLoading } = useQuery({
     queryKey: ["model", id],
@@ -161,7 +171,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">
-          <BookingCalendar entityType="model" entityId={id} />
+          <BookingCalendar entityType="model" entityId={id} initialDate={initialDate} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">

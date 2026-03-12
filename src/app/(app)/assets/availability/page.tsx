@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -89,11 +89,43 @@ function dayIntensity(count: number): string {
   return "bg-red-500/10 dark:bg-red-500/15";
 }
 
-export default function AvailabilityPage() {
+export default function AvailabilityPageWrapper() {
+  return (
+    <Suspense>
+      <AvailabilityPage />
+    </Suspense>
+  );
+}
+
+function AvailabilityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const today = useMemo(() => new Date(), []);
-  const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+
+  // Parse ?date=YYYY-MM-DD and ?search=term query params for deep-linking from search
+  const initialDate = useMemo(() => {
+    const dateParam = searchParams.get("date");
+    if (!dateParam) return null;
+    // Parse as local date to avoid UTC off-by-one in positive UTC offsets
+    const parts = dateParam.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const parsed = new Date(parts[0], parts[1] - 1, parts[2]);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }, [searchParams]);
+
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(initialDate || today));
+  const [selectedDay, setSelectedDay] = useState<Date | null>(initialDate);
+
+  // Update when navigating to same page with a new date
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialDateTime = initialDate?.getTime();
+  useEffect(() => {
+    if (initialDate) {
+      setCurrentMonth(startOfMonth(initialDate));
+      setSelectedDay(initialDate);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDateTime]);
 
   // Query range: full calendar grid (might include days from prev/next months)
   const gridStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });

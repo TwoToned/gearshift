@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -101,18 +101,29 @@ interface BookingCalendarProps {
   entityId: string;
   /** For serialized assets: the model ID to show "model booked" days in purple */
   modelId?: string;
+  /** Optional initial date to navigate to (from search deep-link) */
+  initialDate?: Date | null;
 }
 
 export function BookingCalendar({
   entityType,
   entityId,
   modelId,
+  initialDate,
 }: BookingCalendarProps) {
   const router = useRouter();
   const today = useMemo(() => new Date(), []);
-  const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(initialDate || today));
+  const [selectedDay, setSelectedDay] = useState<Date | null>(initialDate || null);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+
+  // When initialDate changes (e.g. navigating to same page with new date param), update state
+  useEffect(() => {
+    if (initialDate) {
+      setCurrentMonth(startOfMonth(initialDate));
+      setSelectedDay(initialDate);
+    }
+  }, [initialDate?.getTime()]);
 
   const gridStart = startOfWeek(startOfMonth(currentMonth), {
     weekStartsOn: 1,

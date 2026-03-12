@@ -73,6 +73,34 @@ function normalize(s: string): string {
   return s.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }
 
+/**
+ * Try to parse a date from common formats.
+ * Supports: DD/MM/YY, DD/MM/YYYY, DD-MM-YY, DD-MM-YYYY, YYYY-MM-DD, DD.MM.YY, DD.MM.YYYY
+ * Returns a Date or null.
+ */
+function tryParseDate(input: string): Date | null {
+  const s = input.trim();
+  if (!s) return null;
+
+  // YYYY-MM-DD (ISO)
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) {
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    if (!isNaN(d.getTime()) && d.getFullYear() === +m[1]) return d;
+  }
+
+  // DD/MM/YY or DD/MM/YYYY (with /, -, or .)
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (m) {
+    let year = +m[3];
+    if (year < 100) year += 2000;
+    const d = new Date(year, +m[2] - 1, +m[1]);
+    if (!isNaN(d.getTime()) && d.getDate() === +m[1] && d.getMonth() === +m[2] - 1) return d;
+  }
+
+  return null;
+}
+
 // ─── Unified result type ───────────────────────────────────────────
 
 interface DisplayItem {
@@ -439,6 +467,87 @@ export function CommandSearch() {
       .map((s) => s.child);
   }, [isDrilling, isAtEntityMode, drillChildren, drillQuery]);
 
+  // ─── Date detection for availability shortcut ──────────────
+  // Works in both normal mode ("11/05/26") and @ mode ("@26/01/2026 drum shield")
+  const dateInfo = useMemo(() => {
+    if (isDrilling || isAtEntityMode) return null;
+
+    const raw = isAtMode ? atQuery : query;
+    const spaceIdx = raw.indexOf(" ");
+    const datePart = spaceIdx >= 0 ? raw.slice(0, spaceIdx) : raw;
+    const searchPart = spaceIdx >= 0 ? raw.slice(spaceIdx + 1).trim() : "";
+
+    const parsed = tryParseDate(datePart);
+    if (!parsed) return null;
+
+    // Format as local YYYY-MM-DD (avoid toISOString which converts to UTC)
+    const iso = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    const formatted = parsed.toLocaleDateString("en-AU", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+
+    return { date: parsed, iso, formatted, searchPart };
+  }, [query, atQuery, isAtMode, isDrilling, isAtEntityMode]);
+
+  // When date + search text, fetch matching entities
+  const [dateSearchResults, setDateSearchResults] = useState<SearchResult[]>([]);
+  const [dateSearchLoading, setDateSearchLoading] = useState(false);
+  const dateSearchQuery = dateInfo?.searchPart || "";
+
+  useEffect(() => {
+    if (!dateInfo || !dateSearchQuery || dateSearchQuery.length < 2) {
+      setDateSearchResults([]);
+      return;
+    }
+    setDateSearchLoading(true);
+    let aborted = false;
+    const timer = setTimeout(() => {
+      globalSearch(dateSearchQuery).then((data) => {
+        if (aborted) return;
+        // Only show models, assets, bulk-assets, kits
+        const filtered = (data.results as SearchResult[]).filter(
+          (r) => ["model", "asset", "bulk-asset", "kit"].includes(r.type)
+        );
+        setDateSearchResults(filtered);
+        // Auto-select first entity (index 1, after the date header)
+        if (filtered.length > 0) setSelectedIndex(1);
+      }).catch(() => {
+        if (!aborted) setDateSearchResults([]);
+      }).finally(() => {
+        if (!aborted) setDateSearchLoading(false);
+      });
+    }, 200);
+    return () => { aborted = true; clearTimeout(timer); };
+  }, [dateInfo, dateSearchQuery]);
+
+  // Build the date availability item + entity results
+  const dateItem = useMemo((): DisplayItem | null => {
+    if (!dateInfo) return null;
+    return {
+      id: `date-${dateInfo.iso}`,
+      title: `Availability for ${dateInfo.formatted}`,
+      subtitle: dateInfo.searchPart
+        ? `Showing results for "${dateInfo.searchPart}"`
+        : "View asset availability calendar",
+      href: `/assets/availability?date=${dateInfo.iso}`,
+      icon: CalendarRange,
+    };
+  }, [dateInfo]);
+
+  const dateEntityItems = useMemo((): DisplayItem[] => {
+    if (!dateInfo || !dateSearchResults.length) return [];
+    return dateSearchResults.map((r) => ({
+      id: `date-entity-${r.type}-${r.id}`,
+      title: r.title,
+      subtitle: r.subtitle,
+      // Navigate to the entity's own page with the date param
+      href: `${r.href}?date=${dateInfo.iso}`,
+      icon: typeIcons[r.type] || Package,
+      isChild: r.isChild,
+      typeLabel: r.isChild ? undefined : typeLabels[r.type],
+    }));
+  }, [dateInfo, dateSearchResults]);
+
   // ─── Build visible items based on current mode ───────────────
 
   const visibleItems = useMemo((): DisplayItem[] => {
@@ -452,22 +561,40 @@ export function CommandSearch() {
       return filteredDrillChildren;
     }
 
-    // @ mode (page commands + inline entity results)
+    // @ mode — if date detected, show date + entity results; otherwise page commands
     if (isAtMode) {
+      if (dateItem) {
+        // Date with search: show date header + matching entities
+        if (dateEntityItems.length > 0) {
+          return [dateItem, ...dateEntityItems];
+        }
+        // Date only: just the availability link
+        return [dateItem, ...atDisplayItems];
+      }
       return atDisplayItems;
     }
 
     // Normal search mode
+    const items: DisplayItem[] = [];
+
+    // Date shortcut at the top
+    if (dateItem) {
+      items.push(dateItem);
+      // If date + search text, show matching entities below
+      if (dateEntityItems.length > 0) {
+        items.push(...dateEntityItems);
+      }
+    }
+
     const normalResults = expanded
       ? results
       : results.filter((r) => !r.isChild);
 
-    return normalResults.map((r) => {
-      // Check if this result has children
+    for (const r of normalResults) {
       const fullIdx = results.indexOf(r);
       const hasKids = !r.isChild && fullIdx >= 0 && fullIdx + 1 < results.length && results[fullIdx + 1]?.isChild;
 
-      return {
+      items.push({
         id: `${r.type}-${r.id}`,
         title: r.title,
         subtitle: r.subtitle,
@@ -476,10 +603,12 @@ export function CommandSearch() {
         isChild: r.isChild,
         typeLabel: r.isChild ? undefined : typeLabels[r.type],
         hasChildren: hasKids,
-      };
-    });
+      });
+    }
+
+    return items;
   }, [isAtEntityMode, atEntityDrillItems, isDrilling, filteredDrillChildren,
-      isAtMode, atDisplayItems, expanded, results]);
+      isAtMode, atDisplayItems, expanded, results, dateItem, dateEntityItems]);
 
   // ─── Lifecycle ───────────────────────────────────────────────
 
@@ -544,8 +673,8 @@ export function CommandSearch() {
     }
     setQuery(value);
     setSelectedIndex(0);
-    // Only do server search for non-@ queries
-    if (!value.startsWith("@")) {
+    // Only do server search for non-@ queries that aren't dates
+    if (!value.startsWith("@") && !tryParseDate(value.trim())) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => doSearch(value), 250);
     }
@@ -749,7 +878,7 @@ export function CommandSearch() {
       ? { label: drillParent.title, icon: drillParent.icon }
       : null;
 
-  const isLoading = loading || atEntityLoading;
+  const isLoading = loading || atEntityLoading || dateSearchLoading;
   const showEmptySearch = !isAtMode && !isDrilling && !isAtEntityMode && query.length >= 2 && visibleItems.length === 0 && !isLoading;
   const showTyping = !isAtMode && !isDrilling && !isAtEntityMode && query.length < 2;
   const showAtHint = isAtMode && !isDrilling && !isAtEntityMode && atQuery === "" && visibleItems.length > 0;

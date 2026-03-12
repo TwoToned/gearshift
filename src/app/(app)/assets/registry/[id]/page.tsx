@@ -1,6 +1,6 @@
 "use client";
 
-import { use, Suspense, useEffect } from "react";
+import { use, Suspense, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -81,6 +81,15 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const isBulk = searchParams.get("type") === "bulk";
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const initialDate = useMemo(() => {
+    const d = searchParams.get("date");
+    if (!d) return null;
+    const [y, m, day] = d.split("-").map(Number);
+    if (!y || !m || !day) return null;
+    const parsed = new Date(y, m - 1, day);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }, [searchParams]);
 
   const assetQuery = useQuery({
     queryKey: ["asset", id],
@@ -210,7 +219,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">
-          <BookingCalendar entityType="asset" entityId={id} modelId={asset.modelId} />
+          <BookingCalendar entityType="asset" entityId={id} modelId={asset.modelId} initialDate={initialDate} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
