@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const projectSchema = z.object({
-  projectNumber: z.string().min(1, "Project code is required").max(50),
+  projectNumber: z.string().max(50).optional().default(""),
   name: z.string().min(1, "Name is required").max(200),
   clientId: z.string().optional(),
   status: z

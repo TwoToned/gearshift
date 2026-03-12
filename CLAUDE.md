@@ -208,6 +208,31 @@ No test framework is configured.
 - **Registration policies**: OPEN, INVITE_ONLY, DISABLED (configured in site admin settings).
 - **User banning**: `User.banned` field. Better Auth's `admin` plugin handles login blocking.
 
+### Project Templates
+- **Model**: `Project.isTemplate` boolean field. Templates are stored as projects but fully isolated from real project functionality.
+- **Auto-generated codes**: Templates get auto-generated codes (`TPL-0001`, etc.) via `generateTemplateCode()`. Users do not set project codes for templates.
+- **No project code on form**: `projectNumber` is optional in the Zod schema. Server validates it's present for non-templates. Template forms hide the field.
+- **Complete isolation**: Templates are excluded from ALL project queries by adding `isTemplate: false` filters:
+  - Dashboard stats (active count, overdue returns, upcoming projects)
+  - Notifications (overdue returns, upcoming projects)
+  - Reports (status counts, revenue calculations)
+  - Global search results
+  - Availability calendar
+  - Availability checks (`checkAvailability`, `checkKitAvailability`, `computeOverbookedStatus`) — template line items never block real bookings
+- **Server guards**: `updateProjectStatus()` rejects templates. `getProjectForWarehouse()` throws for templates.
+- **UI on template detail page**: Status dropdown, Documents button, Cancel/Archive/Delete buttons, Financial summary, and Dates card are all hidden.
+- **Duplication**: "Use Template" button on template detail creates a real project (via `duplicateProject`). "Save as Template" available on real projects.
+- **`recalculateProjectTotals` and `$transaction`**: Both `duplicateProject` and `saveAsTemplate` call `recalculateProjectTotals` AFTER the transaction commits (not inside), because `recalculateProjectTotals` uses the global prisma client which can't see uncommitted transaction data.
+- **Routes**: Templates list at `/projects/templates`, new template at `/projects/templates/new`. Templates use the same `ProjectForm` with `isTemplate` prop.
+- **Sidebar**: "Templates" sub-item under Projects with `BookTemplate` icon.
+
+### Invitations & No-Org Flow
+- **Invite-only registration**: Site admin can set registration policy to INVITE_ONLY. Users with valid invitations can still register.
+- **No-org page**: `src/app/(auth)/no-organization/page.tsx` — shown when user has no org memberships. Displays pending invitations with "Join" buttons, "Admin Panel" link for site admins, and sign out.
+- **Invite signup**: Registration page prefills and locks email when `invite` query param is present.
+- **Pending invitations UI**: Shown in org settings member list and site admin users page. Dashed border, "Pending" badge, revoke button.
+- **Server actions**: `src/server/invitations.ts` — `getMyPendingInvitations()`, `getInvitationEmail()`, `checkIsSiteAdmin()`.
+
 ### Client Component Patterns
 - All hooks must be called unconditionally (before any early returns) to satisfy React's Rules of Hooks.
 - Query/mutation pattern: `useQuery` for data fetching, `useMutation` for writes, `queryClient.invalidateQueries()` on success.

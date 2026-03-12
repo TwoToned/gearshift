@@ -39,6 +39,10 @@ export async function getProjectForWarehouse(projectId: string) {
     throw new Error("Project not found");
   }
 
+  if (project.isTemplate) {
+    throw new Error("Cannot perform warehouse operations on a template");
+  }
+
   return serialize(project);
 }
 

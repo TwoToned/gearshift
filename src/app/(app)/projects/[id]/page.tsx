@@ -229,42 +229,44 @@ export default function ProjectDetailPage({
           )}
         </div>
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" />}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Documents
-              <ChevronDown className="ml-1 h-3 w-3" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=quote`, "_blank")}
+          {!project.isTemplate && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="outline" />}
               >
-                Quote / Proposal
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=invoice`, "_blank")}
-              >
-                Invoice
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=pull-slip`, "_blank")}
-              >
-                Pull Slip
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=delivery-docket`, "_blank")}
-              >
-                Delivery Docket
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open(`/api/documents/${id}?type=return-sheet`, "_blank")}
-              >
-                Return Sheet
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <FileText className="mr-2 h-4 w-4" />
+                Documents
+                <ChevronDown className="ml-1 h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/${id}?type=quote`, "_blank")}
+                >
+                  Quote / Proposal
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/${id}?type=invoice`, "_blank")}
+                >
+                  Invoice
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/${id}?type=pull-slip`, "_blank")}
+                >
+                  Pull Slip
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/${id}?type=delivery-docket`, "_blank")}
+                >
+                  Delivery Docket
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/${id}?type=return-sheet`, "_blank")}
+                >
+                  Return Sheet
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <CanDo resource="project" action="update">
             <Button
               variant="outline"
@@ -275,51 +277,58 @@ export default function ProjectDetailPage({
             </Button>
           </CanDo>
           <CanDo resource="project" action="create">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" />}>
-                <MoreHorizontal className="h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setDupMode("duplicate")}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Duplicate Project
-                </DropdownMenuItem>
-                {!project.isTemplate && (
+            {project.isTemplate ? (
+              <Button variant="outline" onClick={() => setDupMode("duplicate")}>
+                <Copy className="mr-2 h-4 w-4" />
+                Use Template
+              </Button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" />}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setDupMode("duplicate")}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate Project
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setDupMode("template")}>
                     <BookTemplate className="mr-2 h-4 w-4" />
                     Save as Template
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </CanDo>
-          <CanDo resource="project" action="update">
-            {project.status === "CANCELLED" ? (
-              <Button
-                variant="outline"
-                className="text-destructive"
-                onClick={() => {
-                  if (confirm("Permanently delete this project? This cannot be undone.")) deleteMutation.mutate();
-                }}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="text-destructive"
-                onClick={() => {
-                  if (confirm("Cancel this project?")) archiveMutation.mutate();
-                }}
-                disabled={archiveMutation.isPending}
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </CanDo>
+          {!project.isTemplate && (
+            <CanDo resource="project" action="update">
+              {project.status === "CANCELLED" ? (
+                <Button
+                  variant="outline"
+                  className="text-destructive"
+                  onClick={() => {
+                    if (confirm("Permanently delete this project? This cannot be undone.")) deleteMutation.mutate();
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="text-destructive"
+                  onClick={() => {
+                    if (confirm("Cancel this project?")) archiveMutation.mutate();
+                  }}
+                  disabled={archiveMutation.isPending}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              )}
+            </CanDo>
+          )}
         </div>
       </div>
 
@@ -335,31 +344,33 @@ export default function ProjectDetailPage({
         <TabsContent value="details">
           <div className="space-y-6 pt-4">
             {/* Status */}
-            <Card>
-              <CardContent className="flex items-center gap-3 py-4">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Status:
-                </span>
-                <CanDo resource="project" action="update" fallback={
-                  <Badge variant="outline" className={statusColors[currentStatus] || ""}>
-                    {statusLabels[currentStatus] || currentStatus}
-                  </Badge>
-                }>
-                  <select
-                    value={currentStatus}
-                    onChange={(e) => statusMutation.mutate(e.target.value)}
-                    disabled={statusMutation.isPending}
-                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {allStatuses.map((s) => (
-                      <option key={s} value={s}>
-                        {statusLabels[s] || s}
-                      </option>
-                    ))}
-                  </select>
-                </CanDo>
-              </CardContent>
-            </Card>
+            {!project.isTemplate && (
+              <Card>
+                <CardContent className="flex items-center gap-3 py-4">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Status:
+                  </span>
+                  <CanDo resource="project" action="update" fallback={
+                    <Badge variant="outline" className={statusColors[currentStatus] || ""}>
+                      {statusLabels[currentStatus] || currentStatus}
+                    </Badge>
+                  }>
+                    <select
+                      value={currentStatus}
+                      onChange={(e) => statusMutation.mutate(e.target.value)}
+                      disabled={statusMutation.isPending}
+                      className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {allStatuses.map((s) => (
+                        <option key={s} value={s}>
+                          {statusLabels[s] || s}
+                        </option>
+                      ))}
+                    </select>
+                  </CanDo>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Info cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -445,58 +456,60 @@ export default function ProjectDetailPage({
               </Card>
 
               {/* Dates */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Dates
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      Rental Period
-                    </span>
-                    <span className="font-medium">
-                      {formatDate(project.rentalStartDate as string | null)} –{" "}
-                      {formatDate(project.rentalEndDate as string | null)}
-                    </span>
-                  </div>
-                  <div className="my-1 h-px bg-border" />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Load In</span>
-                    <span className="font-medium">
-                      {formatDate(project.loadInDate as string | null)}
-                      {project.loadInTime && ` ${project.loadInTime}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Load Out</span>
-                    <span className="font-medium">
-                      {formatDate(project.loadOutDate as string | null)}
-                      {project.loadOutTime && ` ${project.loadOutTime}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Event Start</span>
-                    <span className="font-medium">
-                      {formatDate(project.eventStartDate as string | null)}
-                      {project.eventStartTime &&
-                        ` ${project.eventStartTime}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Event End</span>
-                    <span className="font-medium">
-                      {formatDate(project.eventEndDate as string | null)}
-                      {project.eventEndTime && ` ${project.eventEndTime}`}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              {!project.isTemplate && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Dates
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        Rental Period
+                      </span>
+                      <span className="font-medium">
+                        {formatDate(project.rentalStartDate as string | null)} –{" "}
+                        {formatDate(project.rentalEndDate as string | null)}
+                      </span>
+                    </div>
+                    <div className="my-1 h-px bg-border" />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Load In</span>
+                      <span className="font-medium">
+                        {formatDate(project.loadInDate as string | null)}
+                        {project.loadInTime && ` ${project.loadInTime}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Load Out</span>
+                      <span className="font-medium">
+                        {formatDate(project.loadOutDate as string | null)}
+                        {project.loadOutTime && ` ${project.loadOutTime}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event Start</span>
+                      <span className="font-medium">
+                        {formatDate(project.eventStartDate as string | null)}
+                        {project.eventStartTime &&
+                          ` ${project.eventStartTime}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event End</span>
+                      <span className="font-medium">
+                        {formatDate(project.eventEndDate as string | null)}
+                        {project.eventEndTime && ` ${project.eventEndTime}`}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Financial */}
-              <Card className="sm:col-span-2 lg:col-span-3">
+              {!project.isTemplate && <Card className="sm:col-span-2 lg:col-span-3">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     <div className="flex items-center gap-1">
@@ -563,7 +576,7 @@ export default function ProjectDetailPage({
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Card>}
             </div>
 
             {/* Description */}

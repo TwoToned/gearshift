@@ -25,13 +25,14 @@ export async function getReportsSummary() {
     }),
     prisma.project.groupBy({
       by: ["status"],
-      where: { organizationId },
+      where: { organizationId, isTemplate: false },
       _count: { status: true },
     }),
     prisma.client.count({ where: { organizationId, isActive: true } }),
     prisma.project.findMany({
       where: {
         organizationId,
+        isTemplate: false,
         status: { in: ["INVOICED", "COMPLETED"] },
       },
       select: { total: true, invoicedTotal: true },

@@ -405,6 +405,7 @@ export async function checkAvailability(
       modelId,
       status: { not: "CANCELLED" },
       project: {
+        isTemplate: false,
         status: { notIn: ["CANCELLED", "RETURNED", "COMPLETED", "INVOICED"] },
         rentalStartDate: { lte: endDate },
         rentalEndDate: { gte: startDate },
@@ -553,6 +554,7 @@ export async function checkKitAvailability(
       isKitChild: false,
       status: { not: "CANCELLED" },
       project: {
+        isTemplate: false,
         status: { notIn: ["CANCELLED", "RETURNED", "COMPLETED", "INVOICED"] },
         rentalStartDate: { lte: endDate },
         rentalEndDate: { gte: startDate },

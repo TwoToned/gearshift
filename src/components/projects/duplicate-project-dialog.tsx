@@ -40,7 +40,7 @@ export function DuplicateProjectDialog({
   const isTemplate = mode === "template";
 
   const [projectNumber, setProjectNumber] = useState(
-    isTemplate ? `TPL-${sourceProject.projectNumber}` : `${sourceProject.projectNumber}-COPY`
+    `${sourceProject.projectNumber}-COPY`
   );
   const [name, setName] = useState(
     isTemplate ? `${sourceProject.name} (Template)` : `${sourceProject.name} (Copy)`
@@ -49,7 +49,7 @@ export function DuplicateProjectDialog({
   const mutation = useMutation({
     mutationFn: () =>
       isTemplate
-        ? saveAsTemplate(sourceProject.id, name, projectNumber)
+        ? saveAsTemplate(sourceProject.id, name)
         : duplicateProject(sourceProject.id, projectNumber, name),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -81,16 +81,18 @@ export function DuplicateProjectDialog({
           }}
         >
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="dup-number">Project Code *</Label>
-              <Input
-                id="dup-number"
-                value={projectNumber}
-                onChange={(e) => setProjectNumber(e.target.value)}
-                required
-                className="font-mono"
-              />
-            </div>
+            {!isTemplate && (
+              <div className="space-y-2">
+                <Label htmlFor="dup-number">Project Code *</Label>
+                <Input
+                  id="dup-number"
+                  value={projectNumber}
+                  onChange={(e) => setProjectNumber(e.target.value)}
+                  required
+                  className="font-mono"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="dup-name">Name *</Label>
               <Input

@@ -30,6 +30,7 @@ export async function getCalendarData(params: {
   const projects = await prisma.project.findMany({
     where: {
       organizationId,
+      isTemplate: false,
       status: { notIn: ["CANCELLED"] },
       rentalStartDate: { lte: end },
       rentalEndDate: { gte: start },

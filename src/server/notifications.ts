@@ -60,6 +60,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
   const overdueProjects = await prisma.project.findMany({
     where: {
       organizationId,
+      isTemplate: false,
       status: { in: ["CHECKED_OUT", "ON_SITE"] },
       rentalEndDate: { lt: now },
     },
@@ -87,6 +88,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
   const upcomingProjects = await prisma.project.findMany({
     where: {
       organizationId,
+      isTemplate: false,
       status: { in: ["CONFIRMED", "PREPPING"] },
       rentalStartDate: { gte: now, lte: soon },
     },

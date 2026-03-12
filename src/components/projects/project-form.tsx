@@ -138,20 +138,22 @@ export function ProjectForm({ initialData, isTemplate: isTemplateProp }: Project
             <CardTitle className="text-base">Project Details</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="projectNumber">Project Code *</Label>
-              <Input
-                id="projectNumber"
-                {...form.register("projectNumber")}
-                placeholder="e.g. PROJ-2026-0001"
-                className="font-mono"
-              />
-              {form.formState.errors.projectNumber && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.projectNumber.message}
-                </p>
-              )}
-            </div>
+            {!isTemplate && (
+              <div className="space-y-2">
+                <Label htmlFor="projectNumber">Project Code *</Label>
+                <Input
+                  id="projectNumber"
+                  {...form.register("projectNumber")}
+                  placeholder="e.g. PROJ-2026-0001"
+                  className="font-mono"
+                />
+                {form.formState.errors.projectNumber && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.projectNumber.message}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
               <Input

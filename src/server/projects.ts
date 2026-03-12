@@ -11,6 +11,21 @@ import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 import { recalculateProjectTotals } from "@/server/line-items";
 
+async function generateTemplateCode(organizationId: string): Promise<string> {
+  const count = await prisma.project.count({
+    where: { organizationId, isTemplate: true },
+  });
+  let code = `TPL-${String(count + 1).padStart(4, "0")}`;
+  // Ensure uniqueness
+  const existing = await prisma.project.findFirst({
+    where: { organizationId, projectNumber: code },
+  });
+  if (existing) {
+    code = `TPL-${String(count + 2).padStart(4, "0")}`;
+  }
+  return code;
+}
+
 export async function getProjects(params?: {
   search?: string;
   status?: string;
@@ -212,13 +227,23 @@ export async function createProject(data: ProjectFormValues & { isTemplate?: boo
   const { organizationId } = await getOrgContext();
   const parsed = projectSchema.parse(data);
 
+  const isTemplate = data.isTemplate ?? false;
+
+  if (!isTemplate && !parsed.projectNumber) {
+    throw new Error("Project code is required");
+  }
+
+  const projectNumber = isTemplate && !parsed.projectNumber
+    ? await generateTemplateCode(organizationId)
+    : parsed.projectNumber!;
+
   try {
     return serialize(
       await prisma.project.create({
         data: {
           organizationId,
-          isTemplate: data.isTemplate ?? false,
-          projectNumber: parsed.projectNumber,
+          isTemplate,
+          projectNumber,
         name: parsed.name,
         clientId: parsed.clientId || null,
         status: parsed.status,
@@ -303,6 +328,9 @@ export async function updateProjectStatus(
   status: ProjectFormValues["status"]
 ) {
   const { organizationId } = await getOrgContext();
+  const project = await prisma.project.findUnique({ where: { id, organizationId } });
+  if (!project) throw new Error("Project not found");
+  if (project.isTemplate) throw new Error("Cannot change status of a template");
   return serialize(
     await prisma.project.update({
       where: { id, organizationId },
@@ -352,7 +380,7 @@ export async function duplicateProject(sourceId: string, newProjectNumber: strin
   if (!source) throw new Error("Project not found");
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const newProject = await tx.project.create({
         data: {
           organizationId,
@@ -435,11 +463,13 @@ export async function duplicateProject(sourceId: string, newProjectNumber: strin
         }
       }
 
-      // Recalculate totals
-      await recalculateProjectTotals(newProject.id);
-
-      return serialize(newProject);
+      return newProject;
     });
+
+    // Recalculate totals after transaction commits
+    await recalculateProjectTotals(result.id);
+
+    return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
       throw new Error(`Project code "${newProjectNumber}" already exists`);
@@ -448,7 +478,7 @@ export async function duplicateProject(sourceId: string, newProjectNumber: strin
   }
 }
 
-export async function saveAsTemplate(projectId: string, templateName: string, templateNumber: string) {
+export async function saveAsTemplate(projectId: string, templateName: string) {
   const { organizationId } = await getOrgContext();
 
   const source = await prisma.project.findUnique({
@@ -464,8 +494,10 @@ export async function saveAsTemplate(projectId: string, templateName: string, te
 
   if (!source) throw new Error("Project not found");
 
+  const templateNumber = await generateTemplateCode(organizationId);
+
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const template = await tx.project.create({
         data: {
           organizationId,
@@ -546,13 +578,16 @@ export async function saveAsTemplate(projectId: string, templateName: string, te
         }
       }
 
-      await recalculateProjectTotals(template.id);
-
-      return serialize(template);
+      return template;
     });
+
+    // Recalculate totals after transaction commits
+    await recalculateProjectTotals(result.id);
+
+    return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
-      throw new Error(`Project code "${templateNumber}" already exists`);
+      throw new Error("Template code conflict, please try again");
     }
     throw e;
   }

@@ -30,6 +30,7 @@ export async function getDashboardStats() {
     prisma.project.count({
       where: {
         organizationId,
+        isTemplate: false,
         status: { in: ["CONFIRMED", "PREPPING", "CHECKED_OUT", "ON_SITE"] },
       },
     }),
@@ -45,6 +46,7 @@ export async function getDashboardStats() {
         organizationId,
         status: "CHECKED_OUT",
         project: {
+          isTemplate: false,
           rentalEndDate: { lt: now },
           status: { notIn: ["RETURNED", "COMPLETED", "INVOICED", "CANCELLED"] },
         },
@@ -69,6 +71,7 @@ export async function getUpcomingProjects() {
   const projects = await prisma.project.findMany({
     where: {
       organizationId,
+      isTemplate: false,
       status: { in: ["CONFIRMED", "PREPPING", "QUOTED"] },
       rentalStartDate: { gte: now },
     },

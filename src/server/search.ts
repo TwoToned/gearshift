@@ -39,6 +39,7 @@ export async function globalSearch(query: string) {
     prisma.project.findMany({
       where: {
         organizationId,
+        isTemplate: false,
         OR: [
           { name: { contains: query, mode: "insensitive" } },
           { projectNumber: { contains: query, mode: "insensitive" } },

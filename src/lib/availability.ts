@@ -66,6 +66,7 @@ export async function computeOverbookedStatus(
       modelId: { in: modelIds },
       status: { not: "CANCELLED" },
       project: {
+        isTemplate: false,
         status: {
           notIn: ["CANCELLED", "RETURNED", "COMPLETED", "INVOICED"],
         },
