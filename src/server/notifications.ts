@@ -15,7 +15,13 @@ export interface AppNotification {
 }
 
 export async function getNotifications(): Promise<AppNotification[]> {
-  const { organizationId, userId } = await getOrgContext();
+  let ctx;
+  try {
+    ctx = await getOrgContext();
+  } catch {
+    return []; // No active organization
+  }
+  const { organizationId, userId } = ctx;
   const now = new Date();
   const soon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days
   const notifications: AppNotification[] = [];

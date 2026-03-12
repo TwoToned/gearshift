@@ -370,7 +370,12 @@ export async function getMembers() {
 
 /** Get pending invitations for the current organization. */
 export async function getPendingInvitations() {
-  const { organizationId } = await getOrgContext();
+  let organizationId: string;
+  try {
+    ({ organizationId } = await getOrgContext());
+  } catch {
+    return [];
+  }
 
   const invitations = await prisma.invitation.findMany({
     where: {
