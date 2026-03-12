@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: ARCHITECTURE.md is the Source of Truth
+
+**`ARCHITECTURE.md` is the authoritative, exhaustive technical reference for this entire codebase.** It documents every feature, system, data model, API, pattern, and convention. Treat it as the bible — always consult it before making changes and **always update it** when you add, modify, or remove features. If something isn't documented in ARCHITECTURE.md, it should be. If ARCHITECTURE.md says something works a certain way, that's how it works. Keeping this document accurate and up-to-date is non-negotiable — stale documentation is worse than no documentation.
+
+When making changes:
+1. **Before**: Read the relevant sections of ARCHITECTURE.md to understand how the system currently works.
+2. **During**: Follow the patterns and conventions documented there.
+3. **After**: Update ARCHITECTURE.md to reflect any changes you've made — new routes, new server actions, changed behavior, removed features, etc.
+
 ## Project
 
 GearFlow — a multi-tenant asset and rental management platform for AV/theatre production companies. Full spec in `PROMPT.md`. Built with Next.js 16 (App Router), TypeScript strict, Tailwind CSS v4, shadcn/ui, Better Auth, PostgreSQL + Prisma.
@@ -53,7 +62,7 @@ No test framework is configured.
 - After schema changes: run `npx prisma migrate dev`, then `npx prisma generate`, then restart dev server.
 
 ### Server Actions (`src/server/`)
-- All files use `"use server"` directive. Each function calls `getOrgContext()` for org scoping.
+- All files use `"use server"` directive. Each function calls `getOrgContext()` for org scoping. Write operations use `requirePermission()` instead.
 - **Must call `serialize()`** (from `src/lib/serialize.ts`) on all return values — converts Prisma Decimal fields to numbers for client consumption.
 - Pagination pattern: accept `{ page, pageSize }`, return `{ items, total, page, pageSize, totalPages }`.
 - Error pattern: throw `new Error("message")`, caught by client mutations via `toast.error(e.message)`.
@@ -128,6 +137,16 @@ No test framework is configured.
 - Bulk detection on line items: `!!lineItem.bulkAssetId || (!lineItem.assetId && lineItem.quantity > 1)`.
 - Kit detection on line items: `!!lineItem.kitId && !lineItem.isKitChild`. Children have `isKitChild: true` and `parentLineItemId`.
 - **Kit join tables use `addedAt`** (not `createdAt`). Fields: `position`, `sortOrder`, `addedAt`, `addedById`, `notes`.
+
+### Categories
+- **Routes**: `/assets/categories` (list), `/assets/categories/[id]` (detail with models/kits tabs).
+- **Server actions**: `src/server/categories.ts` — `getCategories()`, `getCategory(id)`, `getCategoryTree()`, `createCategory()`, `updateCategory()`, `deleteCategory()`.
+- **Hierarchy**: Self-referential `parentId`. Table view shows children indented under parents.
+- **Relations**: Category → Model[], Category → Kit[], Category → children Category[].
+- **Permissions**: Uses `"model"` resource (no dedicated category permission).
+- **Sidebar**: Listed under Assets with `Tags` icon.
+- **Search**: Global search results link to `/assets/categories/[id]`. Added to PAGE_COMMANDS.
+- **Settings**: `/settings/assets` links to categories page (no longer inline manager).
 
 ### Kit System
 - Kit line items: parent row (`kitId` set, `isKitChild: false`) with child rows (`isKitChild: true`, `parentLineItemId` pointing to parent).
@@ -215,6 +234,7 @@ No test framework is configured.
 - `SortableTableHead` and `PageSizeSelect` in `src/components/ui/sortable-table-head.tsx`.
 - `useTablePreferences` hook (`src/lib/use-table-preferences.ts`) persists sort, page size, and view mode to localStorage per table key.
 - Responsive column hiding: use `hidden sm:table-cell`, `hidden md:table-cell`, `hidden lg:table-cell` to progressively show columns.
+- **Hierarchical tables**: Locations and categories indent children under parents using `paddingLeft: depth * 24` on the name cell. Tree is built client-side from flat data via `parentId` grouping.
 
 ### Test & Tag (T&T) Module
 - **Routes**: `src/app/(app)/test-and-tag/` — register, new item, quick test, reports, item detail `[id]`.
@@ -281,13 +301,14 @@ No test framework is configured.
 
 ### Adding New Features Checklist
 When implementing a new feature, ensure it integrates with existing systems:
-1. **Search**: Add to `globalSearch()` in `src/server/search.ts` and `PAGE_COMMANDS` in `src/lib/page-commands.ts`.
-2. **Permissions**: Add resource to `src/lib/permissions.ts` `rolePermissions` map. Use `requirePermission()` in server actions. Check `hasAccess()` in sidebar.
-3. **Sidebar**: Add nav item to `navItems` in `src/components/layout/app-sidebar.tsx` with `resource` for permission gating.
-4. **Top bar breadcrumbs**: Add segment label to `segmentLabels` in `src/components/layout/top-bar.tsx`.
-5. **Notifications**: If the feature has time-based events, add notification type to `src/server/notifications.ts`.
-6. **Dashboard**: Add stats/activity to `src/server/dashboard.ts` if relevant.
-7. **Templates exclusion**: If feature queries projects, add `isTemplate: false` filter.
-8. **Mobile**: Ensure responsive tables (column hiding), touch targets, overflow handling (`break-words min-w-0`).
-9. **Org scoping**: Every query must include `organizationId`. Use `getOrgContext()` or `orgWhere()`.
-10. **Serialization**: Always `serialize()` return values from server actions.
+1. **ARCHITECTURE.md**: Read it first. Update it after. This is mandatory.
+2. **Search**: Add to `globalSearch()` in `src/server/search.ts` and `PAGE_COMMANDS` in `src/lib/page-commands.ts`.
+3. **Permissions**: Add resource to `src/lib/permissions.ts` `rolePermissions` map. Use `requirePermission()` in server actions. Check `hasAccess()` in sidebar.
+4. **Sidebar**: Add nav item to `navItems` in `src/components/layout/app-sidebar.tsx` with `resource` for permission gating.
+5. **Top bar breadcrumbs**: Add segment label to `segmentLabels` in `src/components/layout/top-bar.tsx`.
+6. **Notifications**: If the feature has time-based events, add notification type to `src/server/notifications.ts`.
+7. **Dashboard**: Add stats/activity to `src/server/dashboard.ts` if relevant.
+8. **Templates exclusion**: If feature queries projects, add `isTemplate: false` filter.
+9. **Mobile**: Ensure responsive tables (column hiding), touch targets, overflow handling (`break-words min-w-0`).
+10. **Org scoping**: Every query must include `organizationId`. Use `getOrgContext()` or `orgWhere()`.
+11. **Serialization**: Always `serialize()` return values from server actions.

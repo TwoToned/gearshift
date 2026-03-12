@@ -326,7 +326,7 @@ export async function getItems({ page, pageSize, search, sort, order }) {
 | `bulk-assets.ts` | `createBulkAsset`, `updateBulkAsset`, `deleteBulkAsset`, `getBulkAssets`, `getBulkAssetById` |
 | `models.ts` | `createModel`, `updateModel`, `deleteModel`, `getModels`, `getModelById`, `getModelWithAssets` |
 | `kits.ts` | `createKit`, `updateKit`, `deleteKit`, `getKits`, `getKitById`, `addKitSerializedItems`, `removeKitSerializedItem`, `addKitBulkItems`, `removeKitBulkItem`, `checkOutKit`, `checkInKit` |
-| `categories.ts` | `createCategory`, `updateCategory`, `deleteCategory`, `getCategories`, `getCategoryHierarchy` |
+| `categories.ts` | `createCategory`, `updateCategory`, `deleteCategory`, `getCategories`, `getCategory`, `getCategoryTree` |
 | `locations.ts` | `createLocation`, `updateLocation`, `deleteLocation`, `getLocations`, `getLocationHierarchy` |
 | `suppliers.ts` | `createSupplier`, `updateSupplier`, `deleteSupplier`, `getSuppliers` |
 | `clients.ts` | `createClient`, `updateClient`, `deleteClient`, `getClients`, `getClientById` |
@@ -413,6 +413,8 @@ div.app-shell (fixed inset-0 on mobile, relative on desktop)
 | `/assets/models/new` | Create model |
 | `/assets/models/[id]` | Model detail (specs, assets, kits, media) |
 | `/assets/models/[id]/edit` | Edit model |
+| `/assets/categories` | Category list (table with indented children) |
+| `/assets/categories/[id]` | Category detail (subcategories, models & kits tabs) |
 | `/assets/availability` | Availability calendar |
 | `/kits` | Kit list |
 | `/kits/new` | Create kit |
@@ -446,7 +448,7 @@ div.app-shell (fixed inset-0 on mobile, relative on desktop)
 | `/test-and-tag/reports` | 10 report types |
 | `/reports` | Business analytics |
 | `/settings` | Settings overview |
-| `/settings/assets` | Asset tags, categories, suppliers |
+| `/settings/assets` | Asset tags, suppliers (links to categories page) |
 | `/settings/test-and-tag` | T&T ID format, defaults |
 | `/settings/billing` | Currency & tax |
 | `/settings/branding` | Logo & colors |
@@ -953,6 +955,18 @@ Template detail page hides: status dropdown, documents button, cancel/archive/de
 - Types: `WAREHOUSE, VENUE, VEHICLE, OFFSITE`
 - Hierarchical: parent/child self-join for nested warehouse zones
 - `isDefault` flag for primary warehouse location
+- **Table display**: Children indented under parents via client-side tree building from `parentId`
+
+### Categories
+- **Routes**: `/assets/categories` (list table), `/assets/categories/[id]` (detail page)
+- **Hierarchy**: Self-referential `parentId` on Category model. Table view indents children under parents.
+- **Relations**: Category → Model[], Category → Kit[], Category → children Category[]
+- **Detail page**: Subcategories grid + tabbed Models/Kits tables with counts
+- **Server actions**: `getCategories()`, `getCategory(id)`, `getCategoryTree()`, `createCategory()`, `updateCategory()`, `deleteCategory()`
+- **Permissions**: Uses `"model"` resource (no dedicated category permission resource)
+- **Sidebar**: Under Assets with `Tags` icon, `resource: "model"`
+- **Search**: Global search links to `/assets/categories/[id]`. In PAGE_COMMANDS with `searchType: "category"`
+- **Settings**: `/settings/assets` no longer embeds CategoryManager — links to `/assets/categories` instead
 
 ### Suppliers
 - Unique per org by name
@@ -1062,7 +1076,9 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ## 32. Integration Checklist for New Features
 
-When implementing a new feature, ensure it integrates with ALL existing systems:
+When implementing a new feature, ensure it integrates with ALL existing systems.
+
+**IMPORTANT: After completing any feature work, update this document (ARCHITECTURE.md) to reflect all changes — new routes, server actions, components, patterns, or removed functionality. This document must always accurately represent the current state of the codebase.**
 
 | System | What to Do |
 |--------|-----------|
@@ -1082,3 +1098,4 @@ When implementing a new feature, ensure it integrates with ALL existing systems:
 | **Media** | If entity has photos, create `{Entity}Media` join table + `MediaUploader`. |
 | **CSV** | Consider import/export if bulk data operations are useful. |
 | **Org export** | Add new table to export manifest in `src/lib/org-export.ts` and import in `src/lib/org-import.ts`. |
+| **Documentation** | Update this file (ARCHITECTURE.md) and CLAUDE.md to reflect all changes. |
