@@ -144,6 +144,14 @@
   }
 }
 
+/* iOS PWA viewport lock — prevent body scrolling on mobile */
+@media (max-width: 767px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
 /* Safe areas on iOS */
 body {
   padding-left: env(safe-area-inset-left, 0px);
