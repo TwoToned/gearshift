@@ -29,7 +29,13 @@ export async function getProjectForWarehouse(projectId: string) {
           kit: true,
           childLineItems: {
             orderBy: { sortOrder: "asc" },
-            include: { model: true, asset: true, bulkAsset: true },
+            include: {
+              model: true, asset: true, bulkAsset: true,
+              childLineItems: {
+                orderBy: { sortOrder: "asc" },
+                include: { model: true, asset: true, bulkAsset: true },
+              },
+            },
           },
         },
       },
@@ -875,6 +881,15 @@ export async function getProjectPullSheet(projectId: string) {
               model: { include: { category: true } },
               asset: { include: { location: true } },
               bulkAsset: true,
+              childLineItems: {
+                where: { status: { not: "CANCELLED" } },
+                orderBy: { sortOrder: "asc" },
+                include: {
+                  model: { include: { category: true } },
+                  asset: { include: { location: true } },
+                  bulkAsset: true,
+                },
+              },
             },
           },
         },
@@ -896,7 +911,7 @@ export async function getProjectPullSheet(projectId: string) {
   );
 
   const enrichedLineItems = project.lineItems
-    .filter((li) => !li.isKitChild) // Kit children render under their parent
+    .filter((li) => !li.isKitChild && !li.isAccessory) // Kit children and accessories render under their parent
     .map((li) => {
       const info = overbookedMap.get(li.id);
       return {

@@ -17,6 +17,7 @@ import {
   Circle,
   ClipboardList,
   MoreVertical,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -133,6 +134,8 @@ interface LineItem {
   bulkAsset: { assetTag: string } | null;
   kit: { id: string; assetTag: string; name: string } | null;
   isSubhire: boolean;
+  isAccessory: boolean;
+  accessoryLevel: string | null;
   childLineItems?: LineItem[];
 }
 
@@ -612,10 +615,23 @@ function WarehouseProjectPage({
   );
 
   // --- Selection helpers ---
+  // Get accessory child IDs for an item (for cascading selection)
+  function getChildAccessoryIds(itemId: string): string[] {
+    const item = lineItems.find((li) => li.id === itemId);
+    if (!item?.childLineItems) return [];
+    return (item.childLineItems as LineItem[]).filter((c) => c.isAccessory).map((c) => c.id);
+  }
+
   function toggleSelection(set: Set<string>, setFn: (s: Set<string>) => void, key: string) {
     const next = new Set(set);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
+    const accIds = getChildAccessoryIds(key);
+    if (next.has(key)) {
+      next.delete(key);
+      accIds.forEach((k) => next.delete(k));
+    } else {
+      next.add(key);
+      accIds.forEach((k) => next.add(k));
+    }
     setFn(next);
   }
 
@@ -653,9 +669,22 @@ function WarehouseProjectPage({
   };
 
   // --- Derived data (must be before any early returns to keep hooks stable) ---
-  const lineItems = project ? (project.lineItems || []) as unknown as LineItem[] : [];
-  // Filter out kit children — they show under their parent kit row
-  const equipmentItems = lineItems.filter((item) => item.type === "EQUIPMENT" && !item.isKitChild);
+  // Flatten all line items so we can find any item by ID (for scan lookups etc.)
+  const lineItems = useMemo(() => {
+    const topLevel = project ? (project.lineItems || []) as unknown as LineItem[] : [];
+    const all: LineItem[] = [...topLevel];
+    for (const item of topLevel) {
+      for (const child of (item.childLineItems || []) as LineItem[]) {
+        all.push(child);
+        for (const gc of (child.childLineItems || []) as LineItem[]) {
+          all.push(gc);
+        }
+      }
+    }
+    return all;
+  }, [project]);
+  // Top-level items only — children (kit items + accessories) show under their parent
+  const equipmentItems = lineItems.filter((item) => item.type === "EQUIPMENT" && !item.isKitChild && !item.isAccessory);
 
   const checkOutItemsList = equipmentItems.filter((item) => {
     if (item.status === "CANCELLED") return false;
@@ -672,14 +701,18 @@ function WarehouseProjectPage({
   const groupedOut = groupItems(checkOutItemsList);
   const groupedIn = groupCheckinItems(checkedOutItems);
 
-  // Build all selectable keys for check-out
+  // Build all selectable keys for check-out (including accessories)
   const allOutKeys = useMemo(() => {
     const keys: string[] = [];
     for (const entry of groupedOut) {
       if (entry.kind === "single") {
         keys.push(entry.item.id);
+        getChildAccessoryIds(entry.item.id).forEach((k) => keys.push(k));
       } else if (entry.kind === "serialized-group") {
-        entry.items.forEach((i) => keys.push(i.id));
+        entry.items.forEach((i) => {
+          keys.push(i.id);
+          getChildAccessoryIds(i.id).forEach((k) => keys.push(k));
+        });
       } else if (entry.kind === "kit-group") {
         keys.push(entry.item.id);
       } else {
@@ -687,15 +720,20 @@ function WarehouseProjectPage({
       }
     }
     return keys;
-  }, [groupedOut]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupedOut, lineItems]);
 
   const allInKeys = useMemo(() => {
     const keys: string[] = [];
     for (const entry of groupedIn) {
       if (entry.kind === "single") {
         keys.push(entry.item.id);
+        getChildAccessoryIds(entry.item.id).forEach((k) => keys.push(k));
       } else if (entry.kind === "serialized-group") {
-        entry.items.forEach((i) => keys.push(i.id));
+        entry.items.forEach((i) => {
+          keys.push(i.id);
+          getChildAccessoryIds(i.id).forEach((k) => keys.push(k));
+        });
       } else if (entry.kind === "kit-group") {
         keys.push(entry.item.id);
       } else {
@@ -703,7 +741,8 @@ function WarehouseProjectPage({
       }
     }
     return keys;
-  }, [groupedIn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupedIn, lineItems]);
 
   const selectedOutCount = selectedOut.size;
   const selectedInCount = selectedIn.size;
@@ -913,6 +952,68 @@ function WarehouseProjectPage({
     );
   }
 
+  // Render children rows (accessories or kit child accessories) indented under parent
+  // Uses same pattern as kit children — recursive for children-of-children
+  function renderChildren(
+    parentItem: LineItem,
+    selection: Set<string>,
+    setSelection: (s: Set<string>) => void,
+    mode: "checkout" | "checkin",
+    depth = 1,
+  ): React.ReactNode {
+    const children = ((parentItem.childLineItems || []) as LineItem[]).filter((c) => c.isAccessory);
+    if (children.length === 0) return null;
+
+    // Filter based on mode
+    const filtered = mode === "checkout"
+      ? children.filter((a) => {
+          if (a.status === "CANCELLED") return false;
+          if (a.status === "RETURNED") return true;
+          if (isBulkItem(a)) return a.checkedOutQuantity < a.quantity;
+          return a.status !== "CHECKED_OUT";
+        })
+      : children.filter((a) => {
+          if (isBulkItem(a)) return a.checkedOutQuantity > a.returnedQuantity;
+          return a.status === "CHECKED_OUT";
+        });
+
+    if (filtered.length === 0) return null;
+    const indent = 8 + depth * 4; // pl-12, pl-16, pl-20...
+
+    return filtered.map((child) => (
+      <Fragment key={child.id}>
+        <TableRow className="bg-teal-500/5">
+          <TableCell>
+            <Checkbox
+              checked={selection.has(child.id)}
+              onCheckedChange={() => toggleSelection(selection, setSelection, child.id)}
+            />
+          </TableCell>
+          <TableCell style={{ paddingLeft: `${indent * 4}px` }}>
+            <div className="flex items-center gap-1.5">
+              <Link2 className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+              <span className="text-sm text-muted-foreground">{modelDisplayName(child)}</span>
+              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-teal-500/10 text-teal-600 border-teal-500/20">
+                Acc.
+              </Badge>
+            </div>
+          </TableCell>
+          <TableCell className="font-mono text-xs text-muted-foreground">
+            {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+          </TableCell>
+          <TableCell className="text-center text-sm">{child.quantity}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>
+              {child.status}
+            </Badge>
+          </TableCell>
+        </TableRow>
+        {/* Recurse: this child may have its own accessory children */}
+        {renderChildren(child, selection, setSelection, mode, depth + 1)}
+      </Fragment>
+    ));
+  }
+
   if (isLoading) return <div className="text-muted-foreground">Loading...</div>;
   if (!project) return <div className="text-muted-foreground">Project not found.</div>;
 
@@ -1070,26 +1171,29 @@ function WarehouseProjectPage({
                               </TableCell>
                             )}
                             {isExpanded && entry.items.map((item) => (
-                              <TableRow key={item.id} className="bg-muted/30">
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedOut.has(item.id)}
-                                    onCheckedChange={() => toggleSelection(selectedOut, setSelectedOut, item.id)}
-                                  />
-                                </TableCell>
-                                <TableCell className="pl-12 text-sm text-muted-foreground">
-                                  {item.asset?.assetTag ? `${item.model?.name || "Asset"}` : "Unassigned"}
-                                </TableCell>
-                                <TableCell className="font-mono text-sm text-muted-foreground">
-                                  {item.asset?.assetTag || "—"}
-                                </TableCell>
-                                <TableCell className="text-center">1</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
-                                    {item.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
+                              <Fragment key={item.id}>
+                                <TableRow className="bg-muted/30">
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedOut.has(item.id)}
+                                      onCheckedChange={() => toggleSelection(selectedOut, setSelectedOut, item.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="pl-12 text-sm text-muted-foreground">
+                                    {item.asset?.assetTag ? `${item.model?.name || "Asset"}` : "Unassigned"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm text-muted-foreground">
+                                    {item.asset?.assetTag || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-center">1</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
+                                      {item.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                                {renderChildren(item, selectedOut, setSelectedOut, "checkout")}
+                              </Fragment>
                             ))}
                           </Fragment>
                         );
@@ -1187,30 +1291,34 @@ function WarehouseProjectPage({
                                 </Badge>
                               </TableCell>
                             </TableRow>
-                            {isExpanded && entry.children.map((child) => {
+                            {isExpanded && entry.children.filter((c) => !c.isAccessory).map((child) => {
                               const isVerified = child.assetId ? verifiedKitItems.has(child.assetId) : false;
                               return (
-                                <TableRow key={child.id} className={isVerified ? "bg-green-500/5" : "bg-muted/30"}>
-                                  <TableCell className="text-center">
-                                    {isVerified
-                                      ? <CircleCheck className="h-4 w-4 text-green-500 mx-auto" />
-                                      : <Circle className="h-4 w-4 text-muted-foreground/30 mx-auto" />
-                                    }
-                                  </TableCell>
-                                  <TableCell className="pl-12 text-sm text-muted-foreground">
-                                    {child.model?.name || child.description || "Item"}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-sm text-muted-foreground">
-                                    {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
-                                  </TableCell>
-                                  <TableCell className="text-center">{child.quantity}</TableCell>
-                                  <TableCell>
-                                    {isVerified
-                                      ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
-                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
-                                    }
-                                  </TableCell>
-                                </TableRow>
+                                <Fragment key={child.id}>
+                                  <TableRow className={isVerified ? "bg-green-500/5" : "bg-muted/30"}>
+                                    <TableCell className="text-center">
+                                      {isVerified
+                                        ? <CircleCheck className="h-4 w-4 text-green-500 mx-auto" />
+                                        : <Circle className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                                      }
+                                    </TableCell>
+                                    <TableCell className="pl-12 text-sm text-muted-foreground">
+                                      {child.model?.name || child.description || "Item"}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm text-muted-foreground">
+                                      {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-center">{child.quantity}</TableCell>
+                                    <TableCell>
+                                      {isVerified
+                                        ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
+                                        : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
+                                      }
+                                    </TableCell>
+                                  </TableRow>
+                                  {/* Kit child's accessories — same tree pattern */}
+                                  {renderChildren(child, selectedOut, setSelectedOut, "checkout", 2)}
+                                </Fragment>
                               );
                             })}
                           </Fragment>
@@ -1220,29 +1328,32 @@ function WarehouseProjectPage({
                       // --- Single item ---
                       const item = entry.item;
                       return (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedOut.has(item.id)}
-                              onCheckedChange={() => toggleSelection(selectedOut, setSelectedOut, item.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{modelDisplayName(item)}</span>
-                            {item.isSubhire && (
-                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm text-muted-foreground">
-                            {item.asset?.assetTag || item.bulkAsset?.assetTag || "—"}
-                          </TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
+                        <Fragment key={item.id}>
+                          <TableRow>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedOut.has(item.id)}
+                                onCheckedChange={() => toggleSelection(selectedOut, setSelectedOut, item.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">{modelDisplayName(item)}</span>
+                              {item.isSubhire && (
+                                <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {item.asset?.assetTag || item.bulkAsset?.assetTag || "—"}
+                            </TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
+                                {item.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                          {renderChildren(item, selectedOut, setSelectedOut, "checkout")}
+                        </Fragment>
                       );
                     })}
                   </TableBody>
@@ -1357,26 +1468,29 @@ function WarehouseProjectPage({
                               </TableCell>
                             )}
                             {isExpanded && entry.items.map((item) => (
-                              <TableRow key={item.id} className="bg-muted/30">
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedIn.has(item.id)}
-                                    onCheckedChange={() => toggleSelection(selectedIn, setSelectedIn, item.id)}
-                                  />
-                                </TableCell>
-                                <TableCell className="pl-12 text-sm text-muted-foreground">
-                                  {item.asset?.assetTag ? `${item.model?.name || "Asset"}` : "Unassigned"}
-                                </TableCell>
-                                <TableCell className="font-mono text-sm text-muted-foreground">
-                                  {item.asset?.assetTag || "—"}
-                                </TableCell>
-                                <TableCell className="text-center">1</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                                    Checked Out
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
+                              <Fragment key={item.id}>
+                                <TableRow className="bg-muted/30">
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedIn.has(item.id)}
+                                      onCheckedChange={() => toggleSelection(selectedIn, setSelectedIn, item.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="pl-12 text-sm text-muted-foreground">
+                                    {item.asset?.assetTag ? `${item.model?.name || "Asset"}` : "Unassigned"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm text-muted-foreground">
+                                    {item.asset?.assetTag || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-center">1</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
+                                      Checked Out
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                                {renderChildren(item, selectedIn, setSelectedIn, "checkin")}
+                              </Fragment>
                             ))}
                           </Fragment>
                         );
@@ -1474,30 +1588,33 @@ function WarehouseProjectPage({
                                 </Badge>
                               </TableCell>
                             </TableRow>
-                            {isExpanded && entry.children.map((child) => {
+                            {isExpanded && entry.children.filter((c) => !c.isAccessory).map((child) => {
                               const isVerified = child.assetId ? verifiedKitItems.has(child.assetId) : false;
                               return (
-                                <TableRow key={child.id} className={isVerified ? "bg-green-500/5" : "bg-muted/30"}>
-                                  <TableCell className="text-center">
-                                    {isVerified
-                                      ? <CircleCheck className="h-4 w-4 text-green-500 mx-auto" />
-                                      : <Circle className="h-4 w-4 text-muted-foreground/30 mx-auto" />
-                                    }
-                                  </TableCell>
-                                  <TableCell className="pl-12 text-sm text-muted-foreground">
-                                    {child.model?.name || child.description || "Item"}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-sm text-muted-foreground">
-                                    {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
-                                  </TableCell>
-                                  <TableCell className="text-center">{child.quantity}</TableCell>
-                                  <TableCell>
-                                    {isVerified
-                                      ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
-                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
-                                    }
-                                  </TableCell>
-                                </TableRow>
+                                <Fragment key={child.id}>
+                                  <TableRow className={isVerified ? "bg-green-500/5" : "bg-muted/30"}>
+                                    <TableCell className="text-center">
+                                      {isVerified
+                                        ? <CircleCheck className="h-4 w-4 text-green-500 mx-auto" />
+                                        : <Circle className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                                      }
+                                    </TableCell>
+                                    <TableCell className="pl-12 text-sm text-muted-foreground">
+                                      {child.model?.name || child.description || "Item"}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm text-muted-foreground">
+                                      {child.asset?.assetTag || child.bulkAsset?.assetTag || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-center">{child.quantity}</TableCell>
+                                    <TableCell>
+                                      {isVerified
+                                        ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
+                                        : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
+                                      }
+                                    </TableCell>
+                                  </TableRow>
+                                  {renderChildren(child, selectedIn, setSelectedIn, "checkin", 2)}
+                                </Fragment>
                               );
                             })}
                           </Fragment>
@@ -1509,40 +1626,43 @@ function WarehouseProjectPage({
                       const isBulk = isBulkItem(item);
                       const assetTag = item.asset?.assetTag || item.bulkAsset?.assetTag || null;
                       return (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedIn.has(item.id)}
-                              onCheckedChange={() => toggleSelection(selectedIn, setSelectedIn, item.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{modelDisplayName(item)}</span>
-                            {item.isSubhire && (
-                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm text-muted-foreground">
-                            {assetTag || "—"}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {isBulk ? (
-                              <span>
-                                <span className={item.returnedQuantity > 0 ? "font-semibold text-teal-600" : ""}>
-                                  {item.returnedQuantity}
+                        <Fragment key={item.id}>
+                          <TableRow>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedIn.has(item.id)}
+                                onCheckedChange={() => toggleSelection(selectedIn, setSelectedIn, item.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">{modelDisplayName(item)}</span>
+                              {item.isSubhire && (
+                                <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 bg-cyan-500/10 text-cyan-600 border-cyan-500/20">Subhire</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {assetTag || "—"}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {isBulk ? (
+                                <span>
+                                  <span className={item.returnedQuantity > 0 ? "font-semibold text-teal-600" : ""}>
+                                    {item.returnedQuantity}
+                                  </span>
+                                  <span className="text-muted-foreground">/{item.checkedOutQuantity}</span>
                                 </span>
-                                <span className="text-muted-foreground">/{item.checkedOutQuantity}</span>
-                              </span>
-                            ) : (
-                              <span>1</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                              Checked Out
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
+                              ) : (
+                                <span>1</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
+                                Checked Out
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                          {renderChildren(item, selectedIn, setSelectedIn, "checkin")}
+                        </Fragment>
                       );
                     })}
                   </TableBody>

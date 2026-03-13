@@ -50,6 +50,14 @@ export async function GET(
               model: { include: { category: true } },
               asset: true,
               bulkAsset: true,
+              childLineItems: {
+                orderBy: { sortOrder: "asc" },
+                include: {
+                  model: { include: { category: true } },
+                  asset: true,
+                  bulkAsset: true,
+                },
+              },
             },
           },
         },
@@ -112,12 +120,16 @@ export async function GET(
       overbookedReducedOnly: info?.reducedOnly ?? false,
       overbookedHasOverbooked: info?.hasOverbookedChildren ?? false,
       overbookedHasReduced: info?.hasReducedChildren ?? false,
-      childLineItems: (li as unknown as { childLineItems?: typeof project.lineItems }).childLineItems?.map((child) => {
+      childLineItems: (li as unknown as { childLineItems?: Array<typeof project.lineItems[0] & { childLineItems?: typeof project.lineItems }> }).childLineItems?.map((child) => {
         const childInfo = overbookedMap.get(child.id);
         return {
           ...child,
           isOverbooked: !!childInfo,
           overbookedReducedOnly: childInfo?.reducedOnly ?? false,
+          childLineItems: child.childLineItems?.map((gc) => {
+            const gcInfo = overbookedMap.get(gc.id);
+            return { ...gc, isOverbooked: !!gcInfo, overbookedReducedOnly: gcInfo?.reducedOnly ?? false };
+          }),
         };
       }),
     };

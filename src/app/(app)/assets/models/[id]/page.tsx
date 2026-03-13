@@ -35,6 +35,7 @@ import { resolveModelPhotoUrl } from "@/lib/media-utils";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
+import { ModelAccessoriesTab } from "@/components/assets/model-accessories-tab";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -172,6 +173,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
             Assets ({model.assets.length + model.bulkAssets.length})
           </TabsTrigger>
           <TabsTrigger value="specs">Specifications</TabsTrigger>
+          <TabsTrigger value="accessories">Accessories</TabsTrigger>
           <TabsTrigger value="photos">Photos ({photos.length})</TabsTrigger>
           <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
         </TabsList>
@@ -406,6 +408,10 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="accessories" className="mt-4">
+          <ModelAccessoriesTab modelId={id} />
         </TabsContent>
 
         <TabsContent value="photos" className="mt-4">

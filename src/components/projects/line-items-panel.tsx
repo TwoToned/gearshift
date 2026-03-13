@@ -15,6 +15,7 @@ import {
   ChevronRight,
   GripVertical,
   ArrowUpRight,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -353,7 +354,7 @@ function SortableItemRow({
         "Unnamed item"
       : item.description || "Unnamed item";
   const isExpanded = expandedKits.has(item.id);
-  const childItems = isKitParent ? (item.childLineItems || []) : [];
+  const allChildren = (item.childLineItems || []) as LineItem[];
 
   return (
     <React.Fragment>
@@ -403,7 +404,7 @@ function SortableItemRow({
                     <OverbookedBadge info={item.overbookedInfo} />
                   )}
                   <span className="ml-2 text-xs text-muted-foreground">
-                    {childItems.length} item{childItems.length !== 1 ? "s" : ""}
+                    {allChildren.filter((c) => !c.isAccessory).length} item{allChildren.filter((c) => !c.isAccessory).length !== 1 ? "s" : ""}
                   </span>
                 </div>
               </button>
@@ -487,58 +488,117 @@ function SortableItemRow({
           </div>
         </TableCell>
       </TableRow>
-      {isKitParent &&
-        isExpanded &&
-        (
-          childItems as Array<{
-            id: string;
-            model?: { name: string } | null;
-            description?: string | null;
-            asset?: { assetTag: string } | null;
-            quantity: number;
-            duration: number;
-            unitPrice?: unknown;
-            lineTotal?: unknown;
-            isOverbooked?: boolean;
-            overbookedInfo?: { overBy: number; totalStock: number; totalBooked: number } | null;
-          }>
-        ).map((child) => (
-          <TableRow key={child.id} className="bg-muted/10">
-            <TableCell className="w-8" />
-            <TableCell>
-              <div className="flex items-center gap-2 pl-8">
-                <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div>
-                  <span className="text-sm">
-                    {child.model?.name || child.description || "Unnamed"}
-                  </span>
-                  {child.asset?.assetTag && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      ({child.asset.assetTag})
-                    </span>
+      {/* Unified children: kit children + accessories, shown when kit is expanded or always for non-kit accessories */}
+      {allChildren
+        .filter((child) => isKitParent ? isExpanded : child.isAccessory)
+        .map((child) => {
+          const grandchildren = ((child as unknown as { childLineItems?: LineItem[] }).childLineItems || []);
+          const isAcc = !!child.isAccessory;
+          return (
+            <React.Fragment key={child.id}>
+              <TableRow className={isAcc ? "bg-teal-500/5" : "bg-muted/10"}>
+                <TableCell className="w-8" />
+                <TableCell>
+                  <div className={`flex items-center gap-2 ${isAcc ? "pl-8" : "pl-8"}`}>
+                    {isAcc ? (
+                      <Link2 className="h-3.5 w-3.5 shrink-0 text-teal-500" />
+                    ) : (
+                      <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    )}
+                    <div>
+                      <span className="text-sm">
+                        {child.model?.name || child.description || "Unnamed"}
+                      </span>
+                      {!isAcc && child.asset?.assetTag && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          ({child.asset.assetTag})
+                        </span>
+                      )}
+                      {isAcc && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 text-[10px] bg-teal-500/10 text-teal-600 border-teal-500/20"
+                        >
+                          {child.accessoryLevel === "MANDATORY" ? "Required" : "Acc."}
+                        </Badge>
+                      )}
+                      {child.isOverbooked && (
+                        <OverbookedBadge info={child.overbookedInfo} />
+                      )}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-center text-sm">
+                  {child.quantity}
+                </TableCell>
+                <TableCell className="text-right text-sm hidden md:table-cell">
+                  {formatCurrency(child.unitPrice as number | null)}
+                </TableCell>
+                <TableCell className="text-center text-sm hidden lg:table-cell">
+                  {child.duration}
+                </TableCell>
+                <TableCell className="text-right text-sm hidden sm:table-cell">
+                  {formatCurrency(child.lineTotal as number | null)}
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  {isAcc && (
+                    <Badge variant="outline" className={statusColors[child.status] || ""}>
+                      {child.status}
+                    </Badge>
                   )}
-                  {child.isOverbooked && (
-                    <OverbookedBadge info={child.overbookedInfo} />
+                </TableCell>
+                <TableCell>
+                  {isAcc && child.accessoryLevel !== "MANDATORY" && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => onDelete(child.id, false)}
+                      disabled={isDeletePending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   )}
-                </div>
-              </div>
-            </TableCell>
-            <TableCell className="text-center text-sm">
-              {child.quantity}
-            </TableCell>
-            <TableCell className="text-right text-sm hidden md:table-cell">
-              {formatCurrency(child.unitPrice as number | null)}
-            </TableCell>
-            <TableCell className="text-center text-sm hidden lg:table-cell">
-              {child.duration}
-            </TableCell>
-            <TableCell className="text-right text-sm hidden sm:table-cell">
-              {formatCurrency(child.lineTotal as number | null)}
-            </TableCell>
-            <TableCell className="hidden sm:table-cell" />
-            <TableCell />
-          </TableRow>
-        ))}
+                </TableCell>
+              </TableRow>
+              {/* Grandchildren (e.g. accessories of kit children) */}
+              {grandchildren.map((gc) => (
+                <TableRow key={gc.id} className="bg-teal-500/5">
+                  <TableCell className="w-8" />
+                  <TableCell>
+                    <div className="flex items-center gap-2 pl-12">
+                      <Link2 className="h-3 w-3 shrink-0 text-teal-500" />
+                      <div>
+                        <span className="text-xs">
+                          {gc.model?.name || gc.description || "Unnamed"}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="ml-1.5 text-[9px] px-1 py-0 bg-teal-500/10 text-teal-600 border-teal-500/20"
+                        >
+                          Acc.
+                        </Badge>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center text-xs">
+                    {gc.quantity}
+                  </TableCell>
+                  <TableCell className="text-right text-xs hidden md:table-cell">
+                    {formatCurrency(gc.unitPrice as number | null)}
+                  </TableCell>
+                  <TableCell className="text-center text-xs hidden lg:table-cell">
+                    {gc.duration}
+                  </TableCell>
+                  <TableCell className="text-right text-xs hidden sm:table-cell">
+                    {formatCurrency(gc.lineTotal as number | null)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell" />
+                  <TableCell />
+                </TableRow>
+              ))}
+            </React.Fragment>
+          );
+        })}
     </React.Fragment>
   );
 }
@@ -775,7 +835,7 @@ export function LineItemsPanel({
   }, []);
 
   const topLevelItems = useMemo(
-    () => lineItems.filter((item) => !item.isKitChild),
+    () => lineItems.filter((item) => !item.isKitChild && !item.isAccessory),
     [lineItems],
   );
 

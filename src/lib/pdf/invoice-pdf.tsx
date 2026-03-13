@@ -24,6 +24,8 @@ interface LineItem {
   overbookedHasReduced?: boolean;
   isSubhire?: boolean;
   showSubhireOnDocs?: boolean;
+  isAccessory?: boolean;
+  accessoryLevel?: string | null;
   model: { name: string; modelNumber?: string | null } | null;
   kit?: { assetTag: string; name: string } | null;
   childLineItems?: LineItem[];
@@ -79,7 +81,7 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
   const balanceDue = totalNum - depositNum;
 
   // Only include non-optional confirmed items, exclude kit children
-  const invoiceItems = project.lineItems.filter((i) => !i.isOptional && !i.isKitChild);
+  const invoiceItems = project.lineItems.filter((i) => !i.isOptional && !i.isKitChild && !i.isAccessory);
 
   const groups = new Map<string, LineItem[]>();
   for (const item of invoiceItems) {
@@ -161,7 +163,9 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                 {items.map((item, idx) => {
                   const isKit = !!item.kitId && !item.isKitChild;
                   const isItemized = isKit && item.pricingMode === "ITEMIZED";
-                  const children = isItemized ? (item.childLineItems || []) : [];
+                  const allChildren = (item.childLineItems || []).filter((c) =>
+                    isKit && !isItemized ? c.isAccessory : true
+                  );
                   return (
                     <View key={item.id}>
                       <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
@@ -205,30 +209,61 @@ export function InvoicePDF({ org, project }: InvoicePDFProps) {
                           {isItemized ? "-" : formatCurrency(item.lineTotal)}
                         </Text>
                       </View>
-                      {children.map((child) => (
-                        <View key={child.id} style={s.tableRow}>
-                          <View style={{ flex: 3, paddingLeft: 12 }}>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                              <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
-                                {child.model?.name || child.description || "-"}
-                              </Text>
-                              {child.isOverbooked && (
-                                <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
-                              )}
+                      {allChildren.map((child) => (
+                        <View key={child.id}>
+                          <View style={s.tableRow}>
+                            <View style={{ flex: 3, paddingLeft: 12 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
+                                  {child.model?.name || child.description || "-"}
+                                </Text>
+                                {child.isAccessory && (
+                                  <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                )}
+                                {child.isOverbooked && (
+                                  <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
+                                )}
+                              </View>
                             </View>
+                            <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                              {child.quantity}
+                            </Text>
+                            <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
+                              {child.unitPrice != null ? formatCurrency(child.unitPrice) : "-"}
+                            </Text>
+                            <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
+                              {child.duration}
+                            </Text>
+                            <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
+                              {formatCurrency(child.lineTotal)}
+                            </Text>
                           </View>
-                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
-                            {child.quantity}
-                          </Text>
-                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
-                            {child.unitPrice != null ? formatCurrency(child.unitPrice) : "-"}
-                          </Text>
-                          <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 8 }]}>
-                            {child.duration}
-                          </Text>
-                          <Text style={[s.tdRight, { width: 60, fontSize: 8 }]}>
-                            {formatCurrency(child.lineTotal)}
-                          </Text>
+                          {(child.childLineItems || []).map((gc) => (
+                            <View key={gc.id} style={s.tableRow}>
+                              <View style={{ flex: 3, paddingLeft: 24 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                  <Text style={[s.td, { fontSize: 7, color: "#555" }]}>
+                                    {gc.model?.name || gc.description || "-"}
+                                  </Text>
+                                  {gc.isAccessory && (
+                                    <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                  )}
+                                </View>
+                              </View>
+                              <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 7 }]}>
+                                {gc.quantity}
+                              </Text>
+                              <Text style={[s.tdRight, { width: 60, fontSize: 7 }]}>
+                                {gc.unitPrice != null ? formatCurrency(gc.unitPrice) : "-"}
+                              </Text>
+                              <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 7 }]}>
+                                {gc.duration}
+                              </Text>
+                              <Text style={[s.tdRight, { width: 60, fontSize: 7 }]}>
+                                {formatCurrency(gc.lineTotal)}
+                              </Text>
+                            </View>
+                          ))}
                         </View>
                       ))}
                     </View>

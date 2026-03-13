@@ -27,6 +27,8 @@ interface LineItem {
   overbookedHasReduced?: boolean;
   isSubhire?: boolean;
   showSubhireOnDocs?: boolean;
+  isAccessory?: boolean;
+  accessoryLevel?: string | null;
   childLineItems?: LineItem[];
 }
 
@@ -45,9 +47,9 @@ interface PullSlipPDFProps {
 
 export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
   const s = createStyles(org.branding);
-  // Filter out kit children (they'll be rendered under their parent)
+  // Filter out kit children and accessory children (they'll be rendered under their parent)
   const equipmentItems = project.lineItems.filter(
-    (i) => i.status !== "CANCELLED" && !i.isKitChild
+    (i) => i.status !== "CANCELLED" && !i.isKitChild && !i.isAccessory
   );
 
   // Group by groupName
@@ -127,7 +129,7 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
               )}
               {items.map((item, idx) => {
                 const isKit = !!item.kitId && !item.isKitChild;
-                const children = isKit ? (item.childLineItems || []) : [];
+                const allChildren = item.childLineItems || [];
                 return (
                   <View key={item.id}>
                     <View style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
@@ -160,7 +162,7 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                         )}
                       </View>
                       <Text style={[s.td, { width: 30, textAlign: "center" }]}>
-                        {isKit ? children.length : item.quantity}
+                        {isKit ? allChildren.filter((c) => !c.isAccessory).length : item.quantity}
                       </Text>
                       <Text style={[s.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
                         {isKit ? (item.kit?.assetTag || "-") : (item.asset?.assetTag || item.bulkAsset?.assetTag || "-")}
@@ -184,8 +186,9 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                         </View>
                       );
                     })()}
-                    {children.map((child) => {
+                    {allChildren.map((child) => {
                       const childName = child.model?.name || child.description || "-";
+                      const grandchildren = child.childLineItems || [];
                       return (
                         <View key={child.id}>
                           <View style={s.tableRow}>
@@ -197,6 +200,9 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                                 <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
                                   {childName}
                                 </Text>
+                                {child.isAccessory && (
+                                  <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                )}
                                 {child.isOverbooked && (
                                   <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
                                 )}
@@ -222,6 +228,32 @@ export function PullSlipPDF({ org, project }: PullSlipPDFProps) {
                               ))}
                             </View>
                           )}
+                          {grandchildren.map((gc) => (
+                            <View key={gc.id} style={s.tableRow}>
+                              <View style={[s.td, { width: 20, alignItems: "center", justifyContent: "center" }]}>
+                                <View style={{ width: 7, height: 7, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                              </View>
+                              <View style={{ flex: 3, paddingLeft: 24 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                  <Text style={[s.td, { fontSize: 7, color: "#555" }]}>
+                                    {gc.model?.name || gc.description || "-"}
+                                  </Text>
+                                  {gc.isAccessory && (
+                                    <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                  )}
+                                </View>
+                              </View>
+                              <Text style={[s.td, { width: 30, textAlign: "center", fontSize: 7 }]}>
+                                {gc.quantity}
+                              </Text>
+                              <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                                {gc.asset?.assetTag || gc.bulkAsset?.assetTag || "-"}
+                              </Text>
+                              <Text style={[s.td, { width: 70, fontSize: 7, color: "#aaa" }]}>
+                                {gc.model?.category?.name || ""}
+                              </Text>
+                            </View>
+                          ))}
                         </View>
                       );
                     })}

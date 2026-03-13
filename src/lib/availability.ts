@@ -153,6 +153,49 @@ export async function computeOverbookedStatus(
     }
   }
 
+  // Propagate overbooking from grandchildren (e.g. accessories of kit children)
+  // up to their parent items. This ensures that if a kit child's accessory is
+  // overbooked, the kit child is marked as inherited-overbooked too.
+  for (const li of lineItems) {
+    if (!li.parentLineItemId) continue; // only process items that have a parent
+
+    // Check if this item has overbooked children (grandchildren of the top-level parent)
+    const grandchildren = lineItems.filter((c) => c.parentLineItemId === li.id);
+    const overbookedGrandchildren = grandchildren.filter((c) => overbookedMap.has(c.id));
+    if (overbookedGrandchildren.length > 0 && !overbookedMap.has(li.id)) {
+      // Mark this parent (kit child) as inherited-overbooked
+      const seen = new Set<string>();
+      let totalOver = 0, totalStock = 0, effStock = 0, totalBooked = 0, totalUnavail = 0;
+      let anyReduced = false, allReduced = true;
+      for (const gc of overbookedGrandchildren) {
+        const info = overbookedMap.get(gc.id)!;
+        const mid = gc.modelId!;
+        if (!seen.has(mid)) {
+          seen.add(mid);
+          totalOver += info.overBy;
+          totalStock += info.totalStock;
+          effStock += info.effectiveStock;
+          totalBooked += info.totalBooked;
+          totalUnavail += info.unavailableAssets || 0;
+          if (info.reducedOnly) anyReduced = true;
+          else allReduced = false;
+        }
+      }
+      if (seen.size > 0 && !anyReduced) allReduced = false;
+      overbookedMap.set(li.id, {
+        overBy: totalOver,
+        totalStock,
+        effectiveStock: effStock,
+        totalBooked,
+        inherited: true,
+        unavailableAssets: totalUnavail > 0 ? totalUnavail : undefined,
+        reducedOnly: allReduced && anyReduced,
+        hasOverbookedChildren: !allReduced,
+        hasReducedChildren: anyReduced,
+      });
+    }
+  }
+
   // Also mark kit parent items as overbooked if any of their children are
   for (const li of lineItems) {
     if (li.kitId && !li.isKitChild) {

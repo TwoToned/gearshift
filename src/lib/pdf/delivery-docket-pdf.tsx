@@ -28,6 +28,8 @@ interface LineItem {
   overbookedHasReduced?: boolean;
   isSubhire?: boolean;
   showSubhireOnDocs?: boolean;
+  isAccessory?: boolean;
+  accessoryLevel?: string | null;
   childLineItems?: LineItem[];
 }
 
@@ -67,7 +69,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
   const s = createStyles(org.branding);
   // Only items that are actually checked out right now, exclude kit children
   const deliveredItems = project.lineItems.filter((i) => {
-    if (i.isKitChild) return false;
+    if (i.isKitChild || i.isAccessory) return false;
     if (isBulk(i)) return i.checkedOutQuantity > 0;
     return i.status === "CHECKED_OUT";
   });
@@ -180,7 +182,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                     rowNum++;
                     const bulk = isBulk(item);
                     const isKit = !!item.kitId && !item.isKitChild;
-                    const children = isKit ? (item.childLineItems || []) : [];
+                    const allChildren = item.childLineItems || [];
                     const itemName = isKit
                       ? (item.description || item.kit?.name || "Kit")
                       : item.model
@@ -215,7 +217,7 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                             )}
                           </View>
                           <Text style={[s.td, { width: 40, textAlign: "center" }]}>
-                            {isKit ? children.length : bulk ? item.checkedOutQuantity : 1}
+                            {isKit ? allChildren.filter((c) => !c.isAccessory).length : bulk ? item.checkedOutQuantity : 1}
                           </Text>
                           <Text style={[s.td, { width: 80, fontSize: 8, fontFamily: "Courier" }]}>
                             {isKit ? (item.kit?.assetTag || "-") : bulk ? "-" : (item.asset?.assetTag || "-")}
@@ -224,30 +226,62 @@ export function DeliveryDocketPDF({ org, project }: DeliveryDocketPDFProps) {
                             <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
                           </View>
                         </View>
-                        {children.map((child) => (
-                          <View key={child.id} style={s.tableRow}>
-                            <Text style={[s.td, { width: 24 }]}> </Text>
-                            <View style={{ flex: 3, paddingLeft: 12 }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                                <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
-                                  {child.model?.name || child.description || "-"}
+                        {allChildren.map((child) => {
+                          const grandchildren = child.childLineItems || [];
+                          return (
+                            <View key={child.id}>
+                              <View style={s.tableRow}>
+                                <Text style={[s.td, { width: 24 }]}> </Text>
+                                <View style={{ flex: 3, paddingLeft: 12 }}>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Text style={[s.td, { fontSize: 8, color: "#555" }]}>
+                                      {child.model?.name || child.description || "-"}
+                                    </Text>
+                                    {child.isAccessory && (
+                                      <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                    )}
+                                    {child.isOverbooked && (
+                                      <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
+                                    )}
+                                  </View>
+                                </View>
+                                <Text style={[s.td, { width: 40, textAlign: "center", fontSize: 8 }]}>
+                                  {child.quantity}
                                 </Text>
-                                {child.isOverbooked && (
-                                  <Text style={{ fontSize: 6, color: child.overbookedReducedOnly ? "#7c3aed" : "#dc2626", backgroundColor: child.overbookedReducedOnly ? "#ede9fe" : "#fee2e2", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>{child.overbookedReducedOnly ? "REDUCED STOCK" : "OVERBOOKED"}</Text>
-                                )}
+                                <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                                  {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
+                                </Text>
+                                <View style={[s.td, { width: 50, alignItems: "center", justifyContent: "center" }]}>
+                                  <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                                </View>
                               </View>
+                              {grandchildren.map((gc) => (
+                                <View key={gc.id} style={s.tableRow}>
+                                  <Text style={[s.td, { width: 24 }]}> </Text>
+                                  <View style={{ flex: 3, paddingLeft: 24 }}>
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                      <Text style={[s.td, { fontSize: 7, color: "#555" }]}>
+                                        {gc.model?.name || gc.description || "-"}
+                                      </Text>
+                                      {gc.isAccessory && (
+                                        <Text style={{ fontSize: 5, color: "#0d9488", backgroundColor: "#ccfbf1", paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, fontFamily: "Helvetica-Bold" }}>ACCESSORY</Text>
+                                      )}
+                                    </View>
+                                  </View>
+                                  <Text style={[s.td, { width: 40, textAlign: "center", fontSize: 7 }]}>
+                                    {gc.quantity}
+                                  </Text>
+                                  <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
+                                    {gc.asset?.assetTag || gc.bulkAsset?.assetTag || "-"}
+                                  </Text>
+                                  <View style={[s.td, { width: 50, alignItems: "center", justifyContent: "center" }]}>
+                                    <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
+                                  </View>
+                                </View>
+                              ))}
                             </View>
-                            <Text style={[s.td, { width: 40, textAlign: "center", fontSize: 8 }]}>
-                              {child.quantity}
-                            </Text>
-                            <Text style={[s.td, { width: 80, fontSize: 7, fontFamily: "Courier", color: "#555" }]}>
-                              {child.asset?.assetTag || child.bulkAsset?.assetTag || "-"}
-                            </Text>
-                            <View style={[s.td, { width: 50, alignItems: "center", justifyContent: "center" }]}>
-                            <View style={{ width: 8, height: 8, borderWidth: 0.75, borderColor: "#333", borderRadius: 1 }} />
-                          </View>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     );
                   })}

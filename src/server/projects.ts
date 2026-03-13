@@ -194,7 +194,13 @@ export async function getProject(id: string) {
           kit: true,
           supplier: true,
           childLineItems: {
-            include: { model: true, asset: true, bulkAsset: true },
+            include: {
+              model: true, asset: true, bulkAsset: true,
+              childLineItems: {
+                include: { model: true, asset: true, bulkAsset: true },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -228,6 +234,10 @@ export async function getProject(id: string) {
           ...child,
           isOverbooked: !!childInfo,
           overbookedInfo: childInfo ?? null,
+          childLineItems: child.childLineItems?.map((grandchild) => {
+            const gcInfo = overbookedMap.get(grandchild.id);
+            return { ...grandchild, isOverbooked: !!gcInfo, overbookedInfo: gcInfo ?? null };
+          }),
         };
       }),
     };

@@ -241,7 +241,7 @@ export default function PullSheetPage({
                     const assetTag = asset?.assetTag || bulkAsset?.assetTag || null;
                     const overbookedInfo = item.overbookedInfo as { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null;
                     const isKit = !!(item.kitId) && !(item.isKitChild);
-                    const children = isKit ? ((item.childLineItems || []) as Array<Record<string, unknown>>) : [];
+                    const allChildren = (item.childLineItems || []) as Array<Record<string, unknown>>;
                     const qty = item.quantity as number;
                     const itemName = isKit
                       ? (item.description as string) || kit?.name || "Kit"
@@ -264,7 +264,7 @@ export default function PullSheetPage({
                             {overbookedInfo && <PullSheetOverbookedBadge info={overbookedInfo} />}
                           </TableCell>
                           <TableCell className="text-center">
-                            {isKit ? children.length : qty}
+                            {isKit ? allChildren.filter((c) => !c.isAccessory).length : qty}
                           </TableCell>
                           <TableCell className="font-mono text-sm text-muted-foreground">
                             {isKit ? (kit?.assetTag || "—") : (assetTag || "—")}
@@ -273,47 +273,81 @@ export default function PullSheetPage({
                             {asset?.location?.name || "—"}
                           </TableCell>
                         </TableRow>
-                        {/* Kit children */}
-                        {children.map((child) => {
-                          const childModel = child.model as { name: string; modelNumber?: string | null } | null;
-                          const childAsset = child.asset as { assetTag: string; location?: { name: string } | null } | null;
-                          const childBulk = child.bulkAsset as { assetTag: string } | null;
-                          const childName = childModel?.name || (child.description as string) || "-";
-                          const childQty = child.quantity as number;
-                          const childOverbookedInfo = child.overbookedInfo as { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null;
+                        {/* All children (kit items + accessories) — unified tree */}
+                        {allChildren.map((child) => {
+                          const cModel = child.model as { name: string; modelNumber?: string | null } | null;
+                          const cAsset = child.asset as { assetTag: string; location?: { name: string } | null } | null;
+                          const cBulk = child.bulkAsset as { assetTag: string } | null;
+                          const cName = cModel?.name || (child.description as string) || "-";
+                          const cQty = child.quantity as number;
+                          const cOverbookedInfo = child.overbookedInfo as { overBy: number; totalStock: number; totalBooked: number; inherited?: boolean } | null;
+                          const isAcc = !!child.isAccessory;
+                          // Grandchildren (e.g. accessories of kit children)
+                          const grandchildren = ((child.childLineItems || []) as Array<Record<string, unknown>>);
 
                           return (
                             <React.Fragment key={child.id as string}>
                               <TableRow>
                                 <TableCell className="text-center">
-                                  <Square className="h-3.5 w-3.5 text-muted-foreground print:text-black" />
+                                  <Square className={`${isAcc ? "h-3 w-3 text-muted-foreground/50" : "h-3.5 w-3.5 text-muted-foreground"} print:text-black`} />
                                 </TableCell>
                                 <TableCell className="pl-8">
-                                  <span className="text-sm text-muted-foreground">{childName}</span>
-                                  {childOverbookedInfo && <PullSheetOverbookedBadge info={childOverbookedInfo} />}
+                                  <span className={`${isAcc ? "text-xs" : "text-sm"} text-muted-foreground`}>{cName}</span>
+                                  {isAcc && (
+                                    <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 bg-teal-500/10 text-teal-600 border-teal-500/20 print:border-teal-600 print:text-teal-600">Acc.</Badge>
+                                  )}
+                                  {cOverbookedInfo && <PullSheetOverbookedBadge info={cOverbookedInfo} />}
                                 </TableCell>
-                                <TableCell className="text-center text-sm">{childQty}</TableCell>
+                                <TableCell className="text-center text-sm">{cQty}</TableCell>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
-                                  {childAsset?.assetTag || childBulk?.assetTag || "—"}
+                                  {cAsset?.assetTag || cBulk?.assetTag || "—"}
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">
-                                  {childAsset?.location?.name || "—"}
+                                  {cAsset?.location?.name || "—"}
                                 </TableCell>
                               </TableRow>
-                              {/* Quantity expansion for kit children with qty > 1 */}
-                              {childQty > 1 && Array.from({ length: childQty }).map((_, i) => (
+                              {/* Per-unit expansion */}
+                              {cQty > 1 && Array.from({ length: cQty }).map((_, i) => (
                                 <TableRow key={`${child.id}-${i}`}>
                                   <TableCell className="text-center">
                                     <Square className="h-3 w-3 text-muted-foreground/50 print:text-black" />
                                   </TableCell>
                                   <TableCell className="pl-12">
-                                    <span className="text-xs text-muted-foreground">{childName} - {i + 1}</span>
+                                    <span className="text-xs text-muted-foreground">{cName} - {i + 1}</span>
                                   </TableCell>
                                   <TableCell />
                                   <TableCell />
                                   <TableCell />
                                 </TableRow>
                               ))}
+                              {/* Grandchildren (accessories of kit children) */}
+                              {grandchildren.map((gc) => {
+                                const gcModel = gc.model as { name: string; modelNumber?: string | null } | null;
+                                const gcAsset = gc.asset as { assetTag: string; location?: { name: string } | null } | null;
+                                const gcBulk = gc.bulkAsset as { assetTag: string } | null;
+                                const gcName = gcModel?.name || (gc.description as string) || "-";
+                                const gcQty = gc.quantity as number;
+                                return (
+                                  <TableRow key={gc.id as string}>
+                                    <TableCell className="text-center">
+                                      <Square className="h-3 w-3 text-muted-foreground/50 print:text-black" />
+                                    </TableCell>
+                                    <TableCell className="pl-12">
+                                      <span className="text-xs text-muted-foreground">{gcName}</span>
+                                      {!!(gc.isAccessory) && (
+                                        <Badge variant="outline" className="ml-1.5 text-[9px] px-1 py-0 bg-teal-500/10 text-teal-600 border-teal-500/20 print:border-teal-600 print:text-teal-600">Acc.</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-center text-xs">{gcQty}</TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">
+                                      {gcAsset?.assetTag || gcBulk?.assetTag || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                      {gcAsset?.location?.name || "—"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </React.Fragment>
                           );
                         })}
