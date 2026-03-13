@@ -3,6 +3,7 @@
 ## Org Settings (`Organization.metadata` JSON)
 ```json
 {
+  "country": "AU",
   "assetTagPrefix": "TTP",
   "assetTagDigits": 5,
   "assetTagCounter": 42,

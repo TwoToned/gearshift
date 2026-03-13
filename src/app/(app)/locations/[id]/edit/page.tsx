@@ -24,6 +24,8 @@ export default function EditLocationPage({ params }: { params: Promise<{ id: str
     id: location.id,
     name: location.name,
     address: location.address || "",
+    latitude: location.latitude ?? null,
+    longitude: location.longitude ?? null,
     type: location.type as LocationFormValues["type"],
     isDefault: location.isDefault,
     notes: location.notes || "",

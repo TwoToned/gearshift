@@ -35,6 +35,8 @@ export default function EditSupplierPage({ params }: { params: Promise<{ id: str
         phone: supplier.phone || "",
         website: supplier.website || "",
         address: supplier.address || "",
+        latitude: supplier.latitude ?? null,
+        longitude: supplier.longitude ?? null,
         notes: supplier.notes || "",
         accountNumber: supplier.accountNumber || "",
         paymentTerms: supplier.paymentTerms || "",

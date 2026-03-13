@@ -11,7 +11,9 @@ import { clientSchema, type ClientFormValues } from "@/lib/validations/client";
 import { createClient, updateClient } from "@/server/clients";
 import { getOrgTags } from "@/server/tags";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { useOrgCountry } from "@/lib/use-org-country";
 import { TagInput } from "@/components/ui/tag-input";
+import { AddressInput } from "@/components/ui/address-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +29,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
   const isEditing = !!initialData;
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
+  const orgCountry = useOrgCountry();
 
   const { data: orgTags } = useQuery({
     queryKey: ["org-tags", orgId],
@@ -42,7 +45,11 @@ export function ClientForm({ initialData }: ClientFormProps) {
       contactEmail: "",
       contactPhone: "",
       billingAddress: "",
+      billingLatitude: null,
+      billingLongitude: null,
       shippingAddress: "",
+      shippingLatitude: null,
+      shippingLongitude: null,
       taxId: "",
       paymentTerms: "",
       defaultDiscount: undefined,
@@ -121,12 +128,62 @@ export function ClientForm({ initialData }: ClientFormProps) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="billingAddress">Billing Address</Label>
-            <Textarea id="billingAddress" {...form.register("billingAddress")} placeholder="Billing address" rows={2} />
+            <Label>Billing Address</Label>
+            <Controller
+              name="billingAddress"
+              control={form.control}
+              render={({ field }) => (
+                <AddressInput
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onPlaceSelect={(place) => {
+                    if (place) {
+                      form.setValue("billingLatitude", place.latitude);
+                      form.setValue("billingLongitude", place.longitude);
+                    } else {
+                      form.setValue("billingLatitude", null);
+                      form.setValue("billingLongitude", null);
+                    }
+                  }}
+                  initialCoordinates={
+                    form.watch("billingLatitude") != null && form.watch("billingLongitude") != null
+                      ? { latitude: form.watch("billingLatitude") as number, longitude: form.watch("billingLongitude") as number }
+                      : null
+                  }
+                  placeholder="Billing address"
+                  countryCode={orgCountry}
+                />
+              )}
+            />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="shippingAddress">Shipping Address</Label>
-            <Textarea id="shippingAddress" {...form.register("shippingAddress")} placeholder="Shipping address (if different)" rows={2} />
+            <Label>Shipping Address</Label>
+            <Controller
+              name="shippingAddress"
+              control={form.control}
+              render={({ field }) => (
+                <AddressInput
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onPlaceSelect={(place) => {
+                    if (place) {
+                      form.setValue("shippingLatitude", place.latitude);
+                      form.setValue("shippingLongitude", place.longitude);
+                    } else {
+                      form.setValue("shippingLatitude", null);
+                      form.setValue("shippingLongitude", null);
+                    }
+                  }}
+                  initialCoordinates={
+                    form.watch("shippingLatitude") != null && form.watch("shippingLongitude") != null
+                      ? { latitude: form.watch("shippingLatitude") as number, longitude: form.watch("shippingLongitude") as number }
+                      : null
+                  }
+                  placeholder="Shipping address (if different)"
+                  countryCode={orgCountry}
+                />
+              )}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="taxId">ABN</Label>

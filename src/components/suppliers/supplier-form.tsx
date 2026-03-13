@@ -11,7 +11,9 @@ import { supplierSchema, type SupplierFormValues } from "@/lib/validations/suppl
 import { createSupplier, updateSupplier } from "@/server/suppliers";
 import { getOrgTags } from "@/server/tags";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { useOrgCountry } from "@/lib/use-org-country";
 import { TagInput } from "@/components/ui/tag-input";
+import { AddressInput } from "@/components/ui/address-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +29,7 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
   const isEditing = !!initialData;
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
+  const orgCountry = useOrgCountry();
 
   const { data: orgTags } = useQuery({
     queryKey: ["org-tags", orgId],
@@ -42,6 +45,8 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
       phone: "",
       website: "",
       address: "",
+      latitude: null,
+      longitude: null,
       notes: "",
       accountNumber: "",
       paymentTerms: "",
@@ -107,8 +112,33 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
             <Input id="website" {...form.register("website")} placeholder="https://example.com" />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="address">Address</Label>
-            <Textarea id="address" {...form.register("address")} placeholder="Supplier address" rows={2} />
+            <Label>Address</Label>
+            <Controller
+              name="address"
+              control={form.control}
+              render={({ field }) => (
+                <AddressInput
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onPlaceSelect={(place) => {
+                    if (place) {
+                      form.setValue("latitude", place.latitude);
+                      form.setValue("longitude", place.longitude);
+                    } else {
+                      form.setValue("latitude", null);
+                      form.setValue("longitude", null);
+                    }
+                  }}
+                  initialCoordinates={
+                    form.watch("latitude") != null && form.watch("longitude") != null
+                      ? { latitude: form.watch("latitude") as number, longitude: form.watch("longitude") as number }
+                      : null
+                  }
+                  placeholder="Supplier address"
+                  countryCode={orgCountry}
+                />
+              )}
+            />
           </div>
         </CardContent>
       </Card>

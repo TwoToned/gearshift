@@ -13,6 +13,7 @@ import {
   Container,
   FolderOpen,
 } from "lucide-react";
+import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -129,6 +130,14 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </CanDo>
       </div>
+
+      {/* Address Map */}
+      <AddressDisplay
+        address={location.address}
+        latitude={location.latitude}
+        longitude={location.longitude}
+        label={location.name}
+      />
 
       {/* Info Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

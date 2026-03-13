@@ -37,6 +37,7 @@ export interface OrgSettings {
   email?: string;
   website?: string;
   address?: string;
+  country?: string;
   timezone?: string;
   currency?: string;
   taxRate?: number;
