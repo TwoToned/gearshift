@@ -94,6 +94,7 @@ export async function globalSearch(query: string) {
             OR similarity(m.name, ${q}) > ${trigramThreshold}
             OR similarity(COALESCE(m.manufacturer, ''), ${q}) > ${trigramThreshold}
             OR similarity(COALESCE(m."modelNumber", ''), ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(m.tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, m.name ASC
         LIMIT 15
@@ -110,6 +111,7 @@ export async function globalSearch(query: string) {
             OR lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR lower(regexp_replace("assetTag", '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(name, ${q}) > ${trigramThreshold} OR similarity("assetTag", ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, name ASC LIMIT 10
       `,
@@ -133,6 +135,7 @@ export async function globalSearch(query: string) {
             OR lower(regexp_replace(m.name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(a."assetTag", ${q}) > ${trigramThreshold} OR similarity(m.name, ${q}) > ${trigramThreshold}
             OR similarity(COALESCE(a."customName", ''), ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(a.tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, a."assetTag" ASC LIMIT 10
       `,
@@ -147,6 +150,7 @@ export async function globalSearch(query: string) {
             OR lower(regexp_replace(b."assetTag", '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR lower(regexp_replace(m.name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(b."assetTag", ${q}) > ${trigramThreshold} OR similarity(m.name, ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(b.tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, b."assetTag" ASC LIMIT 10
       `,
@@ -166,6 +170,7 @@ export async function globalSearch(query: string) {
             OR lower(regexp_replace(p.name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR lower(regexp_replace(p."projectNumber", '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(p.name, ${q}) > ${trigramThreshold} OR similarity(p."projectNumber", ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(p.tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, p.name ASC LIMIT 10
       `,
@@ -180,6 +185,7 @@ export async function globalSearch(query: string) {
             OR COALESCE("contactEmail", '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(name, ${q}) > ${trigramThreshold} OR similarity(COALESCE("contactName", ''), ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, name ASC LIMIT 10
       `,
@@ -193,6 +199,7 @@ export async function globalSearch(query: string) {
             name ILIKE ${ilikePattern} OR COALESCE(address, '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(name, ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, name ASC LIMIT 5
       `,
@@ -208,6 +215,7 @@ export async function globalSearch(query: string) {
             OR COALESCE(c.description, '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(c.name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(c.name, ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(c.tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, c.name ASC LIMIT 5
       `,
@@ -221,6 +229,7 @@ export async function globalSearch(query: string) {
             title ILIKE ${ilikePattern} OR COALESCE(description, '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(title, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(title, ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, title ASC LIMIT 3
       `,

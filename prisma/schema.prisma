@@ -405,6 +405,7 @@ model Category {
   description    String?
   icon           String?
   sortOrder      Int          @default(0)
+  tags           String[]     @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -445,6 +446,7 @@ model Model {
   maintenanceIntervalDays    Int?
   assetType               AssetType    @default(SERIALIZED)
   barcodeLabelTemplate    String?
+  tags                    String[]     @default([])
   isActive                Boolean      @default(true)
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
@@ -511,6 +513,7 @@ model Kit {
   purchaseDate        DateTime?
   purchasePrice       Decimal?       @db.Decimal(10, 2)
   customFieldValues   Json?
+  tags                String[]       @default([])
   isActive            Boolean        @default(true)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -601,6 +604,7 @@ model Asset {
   barcode             String?
   qrCode              String?
   images              String[]       @default([])
+  tags                String[]       @default([])
   isActive            Boolean        @default(true)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -643,6 +647,7 @@ model BulkAsset {
   status              BulkAssetStatus @default(ACTIVE)
   reorderThreshold    Int?
   notes               String?
+  tags                String[]        @default([])
   isActive            Boolean         @default(true)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
@@ -674,6 +679,7 @@ model Location {
   parent         Location?    @relation("LocationHierarchy", fields: [parentId], references: [id])
   children       Location[]   @relation("LocationHierarchy")
   notes          String?
+  tags           String[]     @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -711,6 +717,7 @@ model MaintenanceRecord {
   attachments    String[]          @default([])
   result         MaintenanceResult?
   nextDueDate    DateTime?
+  tags           String[]          @default([])
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

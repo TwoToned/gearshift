@@ -65,6 +65,7 @@ export default function MaintenanceDetailPage({
     nextDueDate: r.nextDueDate
       ? new Date(r.nextDueDate as string).toISOString().split("T")[0]
       : "",
+    tags: (r.tags as string[]) ?? [],
   };
 
   return (

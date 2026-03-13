@@ -24,6 +24,8 @@ import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateClient } from "@/components/clients/quick-create-client";
 import { QuickCreateLocation } from "@/components/assets/quick-create-location";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 
 interface ProjectFormProps {
   initialData?: ProjectFormValues & { id: string; isTemplate?: boolean };
@@ -105,6 +107,11 @@ export function ProjectForm({ initialData, isTemplate: isTemplateProp }: Project
   const { data: locationsData } = useQuery({
     queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
+  });
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
   });
 
   const locationOptions = (locationsData?.locations || []).map((l) => ({
@@ -215,6 +222,21 @@ export function ProjectForm({ initialData, isTemplate: isTemplateProp }: Project
                 {...form.register("description")}
                 placeholder="Brief description of the project"
                 rows={3}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Tags</Label>
+              <Controller
+                name="tags"
+                control={form.control}
+                render={({ field }) => (
+                  <TagInput
+                    value={field.value ?? []}
+                    onChange={field.onChange}
+                    suggestions={orgTags}
+                    placeholder="Add tags..."
+                  />
+                )}
               />
             </div>
           </CardContent>

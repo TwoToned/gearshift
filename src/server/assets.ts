@@ -164,6 +164,7 @@ export async function createAsset(data: AssetFormValues) {
         qrCode: parsed.assetTag,
         images: parsed.images,
         isActive: parsed.isActive,
+        tags: parsed.tags,
       },
     });
     // Advance the counter now that the asset is actually created
@@ -233,6 +234,7 @@ export async function createAssets(
           qrCode: tag,
           images: parsed.images,
           isActive: parsed.isActive,
+          tags: parsed.tags,
         },
       })
     )
@@ -295,6 +297,7 @@ export async function updateAsset(id: string, data: AssetFormValues) {
       barcode: parsed.barcode || parsed.assetTag,
       images: parsed.images,
       isActive: parsed.isActive,
+      tags: parsed.tags,
     },
   });
 

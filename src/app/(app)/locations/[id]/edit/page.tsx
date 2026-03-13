@@ -28,6 +28,7 @@ export default function EditLocationPage({ params }: { params: Promise<{ id: str
     isDefault: location.isDefault,
     notes: location.notes || "",
     parentId: location.parentId || null,
+    tags: location.tags ?? [],
   };
 
   return (

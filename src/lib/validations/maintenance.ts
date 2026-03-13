@@ -31,6 +31,7 @@ export const maintenanceSchema = z.object({
   cost: z.coerce.number().min(0).optional(),
   partsUsed: z.string().max(2000).optional(),
   result: z.enum(["PASS", "FAIL", "CONDITIONAL"]).optional(),
+  tags: z.array(z.string()).default([]),
   nextDueDate: z
     .union([z.literal(""), z.coerce.date()])
     .optional()

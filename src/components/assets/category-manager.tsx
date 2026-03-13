@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, ChevronRight, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/server/categories";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +38,11 @@ export function CategoryManager() {
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
+  });
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
   });
 
   const form = useForm<CategoryFormValues>({
@@ -73,7 +80,7 @@ export function CategoryManager() {
   });
 
   function resetForm() {
-    form.reset({ name: "", description: "", icon: "", sortOrder: 0 });
+    form.reset({ name: "", description: "", icon: "", sortOrder: 0, tags: [] });
     setEditingId(null);
     setParentId(null);
     setDialogOpen(false);
@@ -95,6 +102,7 @@ export function CategoryManager() {
       description: cat.description || "",
       icon: cat.icon || "",
       sortOrder: cat.sortOrder,
+      tags: cat.tags ?? [],
     });
     setDialogOpen(true);
   }
@@ -144,6 +152,21 @@ export function CategoryManager() {
               <div className="space-y-2">
                 <Label htmlFor="cat-desc">Description</Label>
                 <Textarea id="cat-desc" {...form.register("description")} placeholder="Optional description" rows={2} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <Controller
+                  name="tags"
+                  control={form.control}
+                  render={({ field }) => (
+                    <TagInput
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      suggestions={orgTags}
+                      placeholder="Add tags..."
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cat-sort">Sort Order</Label>

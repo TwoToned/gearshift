@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { createLocation, updateLocation, getLocations } from "@/server/locations";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +44,11 @@ export function LocationForm({ initialData }: LocationFormProps) {
   const allLocations = (locationsData?.locations || []).filter(
     (l) => l.id !== initialData?.id
   );
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
+  });
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationSchema),
@@ -127,6 +134,22 @@ export function LocationForm({ initialData }: LocationFormProps) {
           <div className="space-y-2">
             <Label>Notes</Label>
             <Textarea {...form.register("notes")} rows={3} placeholder="Additional details about this location..." />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
+            />
           </div>
 
           <div className="flex items-center gap-2">

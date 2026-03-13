@@ -8,8 +8,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Controller } from "react-hook-form";
 import { bulkAssetSchema, type BulkAssetFormValues } from "@/lib/validations/asset";
 import { createBulkAsset, updateBulkAsset } from "@/server/bulk-assets";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { peekNextAssetTags } from "@/server/settings";
 import { getModels } from "@/server/models";
 import { getLocations } from "@/server/locations";
@@ -45,6 +48,11 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
+  });
 
   const form = useForm<BulkAssetFormValues>({
     resolver: zodResolver(bulkAssetSchema),
@@ -162,6 +170,26 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
         <CardContent className="pt-6">
           <Label htmlFor="notes">Notes</Label>
           <Textarea id="notes" {...form.register("notes")} placeholder="Any additional notes" rows={3} className="mt-2" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 

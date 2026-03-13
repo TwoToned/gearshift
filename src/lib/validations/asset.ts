@@ -18,6 +18,7 @@ export const assetSchema = z.object({
   barcode: z.string().max(100).optional(),
   images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
+  tags: z.array(z.string()).default([]),
 });
 
 export type AssetFormValues = z.input<typeof assetSchema>;
@@ -32,6 +33,7 @@ export const bulkAssetSchema = z.object({
   reorderThreshold: z.coerce.number().int().min(0).optional(),
   notes: z.string().max(2000).optional(),
   isActive: z.boolean().default(true),
+  tags: z.array(z.string()).default([]),
 });
 
 export type BulkAssetFormValues = z.input<typeof bulkAssetSchema>;
@@ -43,6 +45,7 @@ export const locationSchema = z.object({
   isDefault: z.boolean().default(false),
   parentId: z.string().nullable().optional(),
   notes: z.string().max(1000).optional(),
+  tags: z.array(z.string()).default([]),
 });
 
 export type LocationFormValues = z.input<typeof locationSchema>;

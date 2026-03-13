@@ -157,6 +157,7 @@ export async function createKit(data: KitFormValues) {
         barcode: parsed.assetTag,
         qrCode: parsed.assetTag,
         isActive: parsed.isActive,
+        tags: parsed.tags,
       },
     });
     await reserveAssetTags(1);
@@ -196,6 +197,7 @@ export async function updateKit(id: string, data: KitFormValues) {
         image: parsed.image,
         images: parsed.images,
         isActive: parsed.isActive,
+        tags: parsed.tags,
       },
     }),
   );

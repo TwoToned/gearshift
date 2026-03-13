@@ -8,8 +8,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Controller } from "react-hook-form";
 import { kitSchema, type KitFormValues } from "@/lib/validations/kit";
 import { createKit, updateKit } from "@/server/kits";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { peekNextAssetTags } from "@/server/settings";
 import { getCategories } from "@/server/categories";
 import { getLocations } from "@/server/locations";
@@ -44,6 +47,11 @@ export function KitForm({ initialData }: KitFormProps) {
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
+  });
 
   const form = useForm<KitFormValues>({
     resolver: zodResolver(kitSchema),
@@ -240,6 +248,21 @@ export function KitForm({ initialData }: KitFormProps) {
               {...form.register("notes")}
               placeholder="Any additional notes"
               rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
             />
           </div>
         </CardContent>
