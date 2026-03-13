@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Container, Check, Loader2 } from "lucide-react";
 import { getProjectPullSheet } from "@/server/warehouse";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 function getStorageKey(projectId: string) {
   return `picklist-checks-${projectId}`;
@@ -30,9 +31,11 @@ interface OnlinePickListProps {
 
 export function OnlinePickList({ projectId }: OnlinePickListProps) {
   const [checked, setChecked] = useState<Set<string>>(() => loadChecked(projectId));
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["warehouse-pullsheet", projectId],
+    queryKey: ["warehouse-pullsheet", orgId, projectId],
     queryFn: () => getProjectPullSheet(projectId),
   });
 

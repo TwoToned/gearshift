@@ -3,14 +3,17 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getOrganization } from "@/server/settings";
 import { generatePrimaryPalette } from "@/lib/color-utils";
 import type { OrgBranding } from "@/server/settings";
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const { data: org } = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: getOrganization,
   });
 

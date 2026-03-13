@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const typeLabels: Record<string, string> = {
   REPAIR: "Repair",
@@ -55,14 +56,16 @@ interface MaintenanceFormProps {
 export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
   const router = useRouter();
   const isEdit = !!initialData;
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: assets } = useQuery({
-    queryKey: ["maintenance-assets"],
+    queryKey: ["maintenance-assets", orgId],
     queryFn: getAssetsForMaintenanceSelect,
   });
 
   const { data: members } = useQuery({
-    queryKey: ["members"],
+    queryKey: ["members", orgId],
     queryFn: getMembers,
   });
 

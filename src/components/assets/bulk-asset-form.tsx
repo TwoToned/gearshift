@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateLocation } from "./quick-create-location";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface BulkAssetFormProps {
   initialData?: BulkAssetFormValues & { id: string };
@@ -31,14 +32,16 @@ export function BulkAssetForm({ initialData, preselectedModelId }: BulkAssetForm
   const router = useRouter();
   const isEditing = !!initialData;
   const [showCreateLocation, setShowCreateLocation] = useState(false);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models", { isActive: true, assetType: "BULK", pageSize: 200 }],
+    queryKey: ["models", orgId, { isActive: true, assetType: "BULK", pageSize: 200 }],
     queryFn: () => getModels({ assetType: "BULK", pageSize: 200 }),
   });
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];

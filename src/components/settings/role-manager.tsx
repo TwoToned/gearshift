@@ -18,6 +18,7 @@ import { NotViewer } from "@/components/auth/permission-gate";
 import { RoleEditorDialog, ROLE_COLORS } from "./role-editor-dialog";
 import { PermissionMatrix } from "./permission-matrix";
 import { getCustomRoles, deleteCustomRole, duplicateCustomRole } from "@/server/custom-roles";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   rolePermissions,
   roleLabels,
@@ -78,11 +79,13 @@ function BuiltInRoleCard({ role }: { role: string }) {
 
 export function RoleManager() {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<CustomRoleData | null>(null);
 
   const { data: customRoles, isLoading } = useQuery({
-    queryKey: ["custom-roles"],
+    queryKey: ["custom-roles", orgId],
     queryFn: getCustomRoles,
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { isReadOnly, type Resource, type PermissionMap } from "./permissions";
 
 interface RoleData {
@@ -16,8 +17,10 @@ async function fetchCurrentRole(): Promise<RoleData> {
 }
 
 export function useCurrentRole() {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const { data, isLoading } = useQuery({
-    queryKey: ["current-role"],
+    queryKey: ["current-role", orgId],
     queryFn: fetchCurrentRole,
     staleTime: 60_000,
   });

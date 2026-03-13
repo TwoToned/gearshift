@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateSupplier } from "@/components/assets/quick-create-supplier";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface EditLineItemDialogProps {
   projectId: string;
@@ -70,10 +71,12 @@ export function EditLineItemDialog({
   onOpenChange,
 }: EditLineItemDialogProps) {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [showCreateSupplier, setShowCreateSupplier] = useState(false);
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", orgId],
     queryFn: () => getSuppliers(),
     enabled: open && !!lineItem?.isSubhire,
   });
@@ -113,6 +116,7 @@ export function EditLineItemDialog({
   const { data: availability } = useQuery({
     queryKey: [
       "availability",
+      orgId,
       lineItem?.modelId,
       rentalStartDate?.toISOString(),
       rentalEndDate?.toISOString(),

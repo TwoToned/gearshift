@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { resolveModelPhotoUrl } from "@/lib/media-utils";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const kitStatusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -38,9 +39,11 @@ const kitStatusColors: Record<string, string> = {
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: category, isLoading } = useQuery({
-    queryKey: ["category", id],
+    queryKey: ["category", orgId, id],
     queryFn: () => getCategory(id),
   });
 

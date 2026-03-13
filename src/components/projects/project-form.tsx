@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateClient } from "@/components/clients/quick-create-client";
 import { QuickCreateLocation } from "@/components/assets/quick-create-location";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface ProjectFormProps {
   initialData?: ProjectFormValues & { id: string; isTemplate?: boolean };
@@ -39,6 +40,8 @@ function formatDateForInput(date: unknown): string {
 export function ProjectForm({ initialData, isTemplate: isTemplateProp }: ProjectFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const isEditing = !!initialData;
   const isTemplate = isTemplateProp ?? initialData?.isTemplate ?? false;
   const [quickCreateClientOpen, setQuickCreateClientOpen] = useState(false);
@@ -89,7 +92,7 @@ export function ProjectForm({ initialData, isTemplate: isTemplateProp }: Project
   });
 
   const { data: clientsData } = useQuery({
-    queryKey: ["clients", { pageSize: 200 }],
+    queryKey: ["clients", orgId, { pageSize: 200 }],
     queryFn: () => getClients({ pageSize: 200 }),
   });
 
@@ -100,7 +103,7 @@ export function ProjectForm({ initialData, isTemplate: isTemplateProp }: Project
   }));
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
 

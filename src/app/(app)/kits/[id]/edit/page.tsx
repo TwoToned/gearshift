@@ -5,12 +5,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getKit } from "@/server/kits";
 import { KitForm } from "@/components/kits/kit-form";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 export default function EditKitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: kit, isLoading } = useQuery({
-    queryKey: ["kit", id],
+    queryKey: ["kit", orgId, id],
     queryFn: () => getKit(id),
   });
 

@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   Table,
   TableBody,
@@ -112,6 +113,8 @@ export function BookingCalendar({
   initialDate,
 }: BookingCalendarProps) {
   const router = useRouter();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const today = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(initialDate || today));
   const [selectedDay, setSelectedDay] = useState<Date | null>(initialDate || null);
@@ -136,7 +139,7 @@ export function BookingCalendar({
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["bookings", entityType, entityId, format(currentMonth, "yyyy-MM")],
+    queryKey: ["bookings", orgId, entityType, entityId, format(currentMonth, "yyyy-MM")],
     queryFn: async () => {
       if (entityType === "model") {
         return getModelBookings(entityId, dateRange);
@@ -152,7 +155,7 @@ export function BookingCalendar({
 
   // For serialized assets: also fetch model-level bookings to show "model booked" days
   const { data: modelData } = useQuery({
-    queryKey: ["bookings", "model-context", modelId, format(currentMonth, "yyyy-MM")],
+    queryKey: ["bookings", orgId, "model-context", modelId, format(currentMonth, "yyyy-MM")],
     queryFn: () => getModelBookings(modelId!, dateRange),
     enabled: entityType === "asset" && !!modelId,
   });

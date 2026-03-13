@@ -26,6 +26,7 @@ import {
 import { ShieldCheck, ArrowLeft, Check, X, Volume2, Loader2 } from "lucide-react";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -144,10 +145,12 @@ function QuickTestInner() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   // Org settings for default tester name, etc.
   const orgQuery = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: () => getOrganization(),
     staleTime: 60_000,
   });

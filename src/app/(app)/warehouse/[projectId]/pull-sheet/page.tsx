@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Printer, Square, Container } from "lucide-react";
 
 import { getProjectPullSheet } from "@/server/warehouse";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -132,9 +133,11 @@ export default function PullSheetPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["warehouse-pullsheet", projectId],
+    queryKey: ["warehouse-pullsheet", orgId, projectId],
     queryFn: () => getProjectPullSheet(projectId),
   });
 

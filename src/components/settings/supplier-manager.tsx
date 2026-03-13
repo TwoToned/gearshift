@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 import { supplierSchema, type SupplierFormValues } from "@/lib/validations/asset";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   getSuppliers,
   createSupplier,
@@ -43,9 +44,11 @@ export function SupplierManager() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: suppliers, isLoading } = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", orgId],
     queryFn: getSuppliers,
   });
 

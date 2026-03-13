@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCanDo } from "@/lib/use-permissions";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
@@ -42,9 +43,11 @@ export default function CategoriesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [parentId, setParentId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
   });
 

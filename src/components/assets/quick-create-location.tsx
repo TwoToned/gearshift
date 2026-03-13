@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { useActiveOrganization } from "@/lib/auth-client";
 import { createLocation, getLocations } from "@/server/locations";
 import {
   Dialog,
@@ -29,9 +30,11 @@ export function QuickCreateLocation({ open, onOpenChange, onCreated }: QuickCrea
   const [type, setType] = useState<"WAREHOUSE" | "VENUE" | "VEHICLE" | "OFFSITE">("WAREHOUSE");
   const [parentId, setParentId] = useState("");
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
     staleTime: 0,
   });

@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, ChevronRight, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/server/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,9 +30,11 @@ export function CategoryManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [parentId, setParentId] = useState<string | null>(null);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
   });
 

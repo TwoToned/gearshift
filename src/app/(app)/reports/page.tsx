@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getReportsSummary } from "@/server/reports";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const assetStatusLabels: Record<string, string> = {
   AVAILABLE: "Available",
@@ -45,8 +46,11 @@ const maintenanceStatusLabels: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["reports-summary"],
+    queryKey: ["reports-summary", orgId],
     queryFn: getReportsSummary,
   });
 

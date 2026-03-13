@@ -33,7 +33,7 @@ import {
   DoorOpen,
   Loader2,
 } from "lucide-react";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession, useActiveOrganization } from "@/lib/auth-client";
 import {
   getProfile,
   updateProfile,
@@ -47,6 +47,8 @@ import {
 export default function AccountPage() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [name, setName] = useState("");
   const [nameLoaded, setNameLoaded] = useState(false);
 
@@ -68,17 +70,17 @@ export default function AccountPage() {
   } | null>(null);
 
   const profileQuery = useQuery({
-    queryKey: ["profile"],
+    queryKey: ["profile", orgId],
     queryFn: getProfile,
   });
 
   const orgsQuery = useQuery({
-    queryKey: ["user-organizations"],
+    queryKey: ["user-organizations", orgId],
     queryFn: getUserOrganizations,
   });
 
   const sessionsQuery = useQuery({
-    queryKey: ["active-sessions"],
+    queryKey: ["active-sessions", orgId],
     queryFn: getActiveSessions,
   });
 

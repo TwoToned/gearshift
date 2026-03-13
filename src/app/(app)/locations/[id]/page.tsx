@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getLocation, deleteLocation, updateLocationNotes } from "@/server/locations";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { addLocationMedia, removeLocationMedia } from "@/server/location-media";
@@ -63,9 +64,11 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: location, isLoading } = useQuery({
-    queryKey: ["location", id],
+    queryKey: ["location", orgId, id],
     queryFn: () => getLocation(id),
   });
 
@@ -362,7 +365,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
         <TabsContent value="notes" className="mt-4">
           <NotesEditor
             initialNotes={location.notes || ""}
-            queryKey={["location", id]}
+            queryKey={["location", orgId, id]}
             onSave={(notes) => updateLocationNotes(id, notes)}
             placeholder="Add notes about this location..."
           />
@@ -379,7 +382,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                 entityId={id}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
                 existingMedia={(location.media || []).map((m: MediaItem) => m)}
-                queryKey={["location", id]}
+                queryKey={["location", orgId, id]}
                 onUploadComplete={async (fileUpload) => {
                   await addLocationMedia({
                     locationId: id,

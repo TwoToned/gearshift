@@ -4,13 +4,16 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getClient } from "@/server/clients";
 import { ClientForm } from "@/components/clients/client-form";
+import { useActiveOrganization } from "@/lib/auth-client";
 import type { ClientFormValues } from "@/lib/validations/client";
 
 export default function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: client, isLoading } = useQuery({
-    queryKey: ["client", id],
+    queryKey: ["client", orgId, id],
     queryFn: () => getClient(id),
   });
 

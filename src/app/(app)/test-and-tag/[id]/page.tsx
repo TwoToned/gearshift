@@ -10,6 +10,7 @@ import { Zap, Pencil, ArchiveX, Trash2, Loader2 } from "lucide-react";
 import { getTestTagAsset, retireTestTagAsset, deleteTestTagAsset } from "@/server/test-tag-assets";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,9 +74,11 @@ export default function TestTagDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: item, isLoading, error } = useQuery({
-    queryKey: ["test-tag-asset", id],
+    queryKey: ["test-tag-asset", orgId, id],
     queryFn: () => getTestTagAsset(id),
   });
 

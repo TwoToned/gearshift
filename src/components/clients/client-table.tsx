@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Plus } from "lucide-react";
 
 import { getClients } from "@/server/clients";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
@@ -39,9 +40,11 @@ export function ClientTable() {
     useTablePreferences("clients", { sortBy: "name", sortOrder: "asc" });
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", { search, type, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["clients", orgId, { search, type, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getClients({
       search: search || undefined,
       type: type || undefined,

@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateLocation } from "@/components/assets/quick-create-location";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface KitFormProps {
   initialData?: KitFormValues & { id: string };
@@ -30,14 +31,16 @@ export function KitForm({ initialData }: KitFormProps) {
   const router = useRouter();
   const isEditing = !!initialData;
   const [showCreateLocation, setShowCreateLocation] = useState(false);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
   });
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];

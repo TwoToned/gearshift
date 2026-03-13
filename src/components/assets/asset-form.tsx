@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateLocation } from "./quick-create-location";
 import { QuickCreateSupplier } from "./quick-create-supplier";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface AssetFormProps {
   initialData?: AssetFormValues & { id: string };
@@ -35,20 +36,22 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [showCreateSupplier, setShowCreateSupplier] = useState(false);
   const [extraAssets, setExtraAssets] = useState<{ tag: string; serialNumber: string }[]>([]);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models", { isActive: true, assetType: "SERIALIZED", pageSize: 200 }],
+    queryKey: ["models", orgId, { isActive: true, assetType: "SERIALIZED", pageSize: 200 }],
     queryFn: () => getModels({ assetType: "SERIALIZED", pageSize: 200 }),
   });
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", orgId],
     queryFn: () => getSuppliers(),
   });
 

@@ -38,6 +38,7 @@ import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   Dialog,
   DialogContent,
@@ -100,20 +101,22 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
   const [addBulkAssetId, setAddBulkAssetId] = useState("");
   const [addBulkQuantity, setAddBulkQuantity] = useState(1);
   const [addBulkPosition, setAddBulkPosition] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: kit, isLoading } = useQuery({
-    queryKey: ["kit", id],
+    queryKey: ["kit", orgId, id],
     queryFn: () => getKit(id),
   });
 
   const { data: availableAssets = [] } = useQuery({
-    queryKey: ["available-assets-for-kit"],
+    queryKey: ["available-assets-for-kit", orgId],
     queryFn: () => getAvailableAssetsForKit(),
     enabled: showAddItem,
   });
 
   const { data: availableBulkAssets = [] } = useQuery({
-    queryKey: ["available-bulk-assets-for-kit"],
+    queryKey: ["available-bulk-assets-for-kit", orgId],
     queryFn: () => getAvailableBulkAssetsForKit(),
     enabled: showAddBulkItem,
   });
@@ -139,7 +142,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
     },
     onSuccess: () => {
       toast.success("Status updated");
-      queryClient.invalidateQueries({ queryKey: ["kit", id] });
+      queryClient.invalidateQueries({ queryKey: ["kit", orgId, id] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -152,8 +155,8 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
       ),
     onSuccess: () => {
       toast.success(`${stagedItems.length} item${stagedItems.length > 1 ? "s" : ""} added to kit`);
-      queryClient.invalidateQueries({ queryKey: ["kit", id] });
-      queryClient.invalidateQueries({ queryKey: ["available-assets-for-kit"] });
+      queryClient.invalidateQueries({ queryKey: ["kit", orgId, id] });
+      queryClient.invalidateQueries({ queryKey: ["available-assets-for-kit", orgId] });
       setShowAddItem(false);
       setStagedItems([]);
     },
@@ -164,7 +167,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
     mutationFn: (assetId: string) => removeSerializedItemFromKit(id, assetId),
     onSuccess: () => {
       toast.success("Item removed from kit");
-      queryClient.invalidateQueries({ queryKey: ["kit", id] });
+      queryClient.invalidateQueries({ queryKey: ["kit", orgId, id] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -178,8 +181,8 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
       }),
     onSuccess: () => {
       toast.success("Bulk item added to kit");
-      queryClient.invalidateQueries({ queryKey: ["kit", id] });
-      queryClient.invalidateQueries({ queryKey: ["available-bulk-assets-for-kit"] });
+      queryClient.invalidateQueries({ queryKey: ["kit", orgId, id] });
+      queryClient.invalidateQueries({ queryKey: ["available-bulk-assets-for-kit", orgId] });
       setShowAddBulkItem(false);
       setAddBulkAssetId("");
       setAddBulkQuantity(1);
@@ -192,7 +195,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
     mutationFn: (bulkItemId: string) => removeBulkItemFromKit(id, bulkItemId),
     onSuccess: () => {
       toast.success("Bulk item removed from kit");
-      queryClient.invalidateQueries({ queryKey: ["kit", id] });
+      queryClient.invalidateQueries({ queryKey: ["kit", orgId, id] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -544,7 +547,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
             entityId={id}
             accept="image/*"
             existingMedia={kitPhotos}
-            queryKey={["kit", id]}
+            queryKey={["kit", orgId, id]}
             onUploadComplete={async (fileUpload) => {
               await addKitMedia({
                 kitId: id,
@@ -565,7 +568,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
       {/* Notes */}
       <NotesEditor
         initialNotes={kit.notes || ""}
-        queryKey={["kit", id]}
+        queryKey={["kit", orgId, id]}
         onSave={(notes) => updateKitNotes(id, notes)}
         placeholder="Add notes about this kit..."
       />

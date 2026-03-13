@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 
 import { getProjects, getProjectIssueFlags } from "@/server/projects";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   Tooltip,
   TooltipTrigger,
@@ -99,9 +100,11 @@ export function ProjectTable() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["projects", { search, status, type, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["projects", orgId, { search, status, type, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getProjects({
         search: search || undefined,

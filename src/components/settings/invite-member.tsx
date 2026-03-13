@@ -17,6 +17,7 @@ import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { addMemberByEmail } from "@/server/settings";
 import { getCustomRoles } from "@/server/custom-roles";
+import { useActiveOrganization } from "@/lib/auth-client";
 import type { PermissionMap } from "@/lib/permissions";
 
 const builtInRoles = [
@@ -34,11 +35,13 @@ interface CustomRoleData {
 
 export function InviteMember() {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
 
   const { data: customRoles } = useQuery({
-    queryKey: ["custom-roles"],
+    queryKey: ["custom-roles", orgId],
     queryFn: getCustomRoles,
   });
 

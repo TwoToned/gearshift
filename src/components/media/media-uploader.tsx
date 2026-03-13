@@ -62,7 +62,7 @@ interface MediaUploaderProps {
   onRemove: (mediaId: string) => Promise<void>;
   onSetPrimary?: (mediaId: string) => Promise<void>;
   onReorder?: (orderedIds: string[]) => Promise<void>;
-  queryKey: string[];
+  queryKey: unknown[];
 }
 
 function formatFileSize(bytes: number): string {

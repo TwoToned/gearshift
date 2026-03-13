@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { getMaintenanceRecord, deleteMaintenanceRecord } from "@/server/maintenance";
 import { MaintenanceForm } from "@/components/maintenance/maintenance-form";
 import { Button } from "@/components/ui/button";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import type { MaintenanceFormValues } from "@/lib/validations/maintenance";
@@ -20,9 +21,11 @@ export default function MaintenanceDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: record, isLoading } = useQuery({
-    queryKey: ["maintenance", id],
+    queryKey: ["maintenance", orgId, id],
     queryFn: () => getMaintenanceRecord(id),
   });
 

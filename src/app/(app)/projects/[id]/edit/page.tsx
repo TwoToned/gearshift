@@ -4,6 +4,7 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProject } from "@/server/projects";
 import { ProjectForm } from "@/components/projects/project-form";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import type { ProjectFormValues } from "@/lib/validations/project";
@@ -21,9 +22,11 @@ export default function EditProjectPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: project, isLoading } = useQuery({
-    queryKey: ["project", id],
+    queryKey: ["project", orgId, id],
     queryFn: () => getProject(id),
   });
 

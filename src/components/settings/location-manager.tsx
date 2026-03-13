@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, MapPin, Star, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   getLocations,
   createLocation,
@@ -58,9 +59,11 @@ export function LocationManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [parentId, setParentId] = useState<string | null>(null);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: locationsData, isLoading } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations;

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
@@ -58,6 +59,8 @@ function formatDate(date: string | Date | null | undefined): string {
 function TestTagTableContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -80,6 +83,7 @@ function TestTagTableContent() {
   const { data, isLoading } = useQuery({
     queryKey: [
       "test-tag-assets",
+      orgId,
       { search: debouncedSearch, status, equipmentClass, applianceType, assetLink, page, pageSize },
     ],
     queryFn: () =>

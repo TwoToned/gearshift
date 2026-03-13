@@ -76,6 +76,7 @@ import { AddEquipmentDialog } from "./add-equipment-dialog";
 import { AddServiceDialog } from "./add-service-dialog";
 import { AddSubhireDialog } from "./add-subhire-dialog";
 import { EditLineItemDialog } from "./edit-line-item-dialog";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface LineItemsPanelProps {
   projectId: string;
@@ -667,13 +668,16 @@ export function LineItemsPanel({
     }),
   );
 
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const { data: project } = useQuery({
-    queryKey: ["project", projectId],
+    queryKey: ["project", orgId, projectId],
     queryFn: () => getProject(projectId),
   });
 
   const { data: kitsData } = useQuery({
-    queryKey: ["kits"],
+    queryKey: ["kits", orgId],
     queryFn: () => getKits({ pageSize: 200 }),
     enabled: kitDialogOpen,
   });
@@ -681,6 +685,7 @@ export function LineItemsPanel({
   const { data: kitAvailability } = useQuery({
     queryKey: [
       "kit-availability",
+      orgId,
       selectedKitId,
       rentalStartDate?.toISOString(),
       rentalEndDate?.toISOString(),
@@ -704,7 +709,7 @@ export function LineItemsPanel({
     mutationFn: (id: string) => removeLineItem(id),
     onSuccess: () => {
       toast.success("Line item removed");
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, projectId] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -723,7 +728,7 @@ export function LineItemsPanel({
     onSuccess: () => {
       if (kitGroupName) addExtraGroup(kitGroupName);
       toast.success("Kit added to project");
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, projectId] });
       setKitDialogOpen(false);
       setSelectedKitId("");
       setKitPricingMode("KIT_PRICE");
@@ -743,10 +748,10 @@ export function LineItemsPanel({
     }) => reorderLineItems(projectId, itemIds, groupUpdates),
     onError: (e) => {
       toast.error("Failed to reorder: " + e.message);
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, projectId] });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, projectId] });
     },
   });
 

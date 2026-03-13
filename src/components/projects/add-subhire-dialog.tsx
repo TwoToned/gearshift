@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
 import { QuickCreateSupplier } from "@/components/assets/quick-create-supplier";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 interface AddSubhireDialogProps {
   projectId: string;
@@ -44,10 +45,12 @@ export function AddSubhireDialog({
   onOpenChange,
 }: AddSubhireDialogProps) {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [showCreateSupplier, setShowCreateSupplier] = useState(false);
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", orgId],
     queryFn: () => getSuppliers(),
     enabled: open,
   });
