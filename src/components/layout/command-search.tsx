@@ -32,6 +32,7 @@ import {
   PackageX,
   CreditCard,
   Palette,
+  Truck,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,6 +54,7 @@ const typeIcons: Record<SearchResultType, React.ComponentType<{ className?: stri
   client: Users,
   location: MapPin,
   category: Layers,
+  supplier: Truck,
   maintenance: Wrench,
 };
 
@@ -63,6 +65,7 @@ const typeLabels: Record<SearchResultType, string> = {
   "bulk-asset": "Bulk Asset",
   project: "Project",
   client: "Client",
+  supplier: "Supplier",
   location: "Location",
   category: "Category",
   maintenance: "Maintenance",
@@ -72,7 +75,7 @@ const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Package, Boxes, Box, CalendarRange, Container,
   FolderOpen, BookTemplate, Warehouse, Users, MapPin, Wrench,
   ShieldCheck, BarChart3, Settings, UserCircle, PackageCheck, PackageX,
-  CreditCard, Palette,
+  CreditCard, Palette, Truck,
 };
 
 function normalize(s: string): string {
@@ -191,6 +194,7 @@ export function CommandSearch() {
       client: ["client"],
       location: ["location"],
       maintenance: ["maintenance"],
+      supplier: ["supplier"],
     };
     const allowedTypes = typeMap[atSearchType] || [];
     const statusFilter = atSearchStatusFilter;
@@ -432,6 +436,7 @@ export function CommandSearch() {
       client: ["client"],
       location: ["location"],
       maintenance: ["maintenance"],
+      supplier: ["supplier"],
     };
     const allowedTypes = typeMap[atEntitySearchType] || [];
     const statusFilter = atEntityStatusFilter;

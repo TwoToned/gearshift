@@ -28,6 +28,8 @@ const segmentLabels: Record<string, string> = {
   templates: "Templates",
   warehouse: "Warehouse",
   clients: "Clients",
+  suppliers: "Suppliers",
+  orders: "Orders",
   locations: "Locations",
   maintenance: "Maintenance",
   "test-and-tag": "Test & Tag",

@@ -294,6 +294,12 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
               allowClear
             />
           </div>
+          {form.watch("supplierId") && (
+            <div className="space-y-2">
+              <Label htmlFor="purchaseOrderNumber">Purchase Order #</Label>
+              <Input id="purchaseOrderNumber" {...form.register("purchaseOrderNumber")} placeholder="e.g. PO-2024-001" />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="warrantyExpiry">Warranty Expiry</Label>
             <Input id="warrantyExpiry" type="date" {...form.register("warrantyExpiry")} />

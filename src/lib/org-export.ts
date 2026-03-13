@@ -43,6 +43,9 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets,
     testTagAssets,
     testTagRecords,
+    modelAccessories,
+    supplierOrders,
+    supplierOrderItems,
     activityLogs,
     fileUploads,
     modelMedia,
@@ -73,6 +76,11 @@ export async function exportOrganization(orgId: string) {
     }),
     prisma.testTagAsset.findMany({ where: { organizationId: orgId } }),
     prisma.testTagRecord.findMany({ where: { organizationId: orgId } }),
+    prisma.modelAccessory.findMany({ where: { organizationId: orgId } }),
+    prisma.supplierOrder.findMany({ where: { organizationId: orgId } }),
+    prisma.supplierOrderItem.findMany({
+      where: { order: { organizationId: orgId } },
+    }),
     prisma.activityLog.findMany({ where: { organizationId: orgId } }),
     prisma.fileUpload.findMany({ where: { organizationId: orgId } }),
     prisma.modelMedia.findMany({ where: { organizationId: orgId } }),
@@ -107,6 +115,7 @@ export async function exportOrganization(orgId: string) {
   collectUserIds(testTagRecords as unknown as Record<string, unknown>[], ["testedById"]);
   collectUserIds(kitSerializedItems as unknown as Record<string, unknown>[], ["addedById"]);
   collectUserIds(kitBulkItems as unknown as Record<string, unknown>[], ["addedById"]);
+  collectUserIds(supplierOrders as unknown as Record<string, unknown>[], ["createdById"]);
   collectUserIds(activityLogs as unknown as Record<string, unknown>[], ["userId"]);
   collectUserIds(fileUploads as unknown as Record<string, unknown>[], ["uploadedById"]);
 
@@ -143,6 +152,9 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets: clean(maintenanceRecordAssets) as Record<string, unknown>[],
     testTagAssets: clean(testTagAssets) as Record<string, unknown>[],
     testTagRecords: clean(testTagRecords) as Record<string, unknown>[],
+    modelAccessories: clean(modelAccessories) as Record<string, unknown>[],
+    supplierOrders: clean(supplierOrders) as Record<string, unknown>[],
+    supplierOrderItems: clean(supplierOrderItems) as Record<string, unknown>[],
     activityLogs: clean(activityLogs) as Record<string, unknown>[],
     fileUploads: clean(fileUploads) as Record<string, unknown>[],
     modelMedia: clean(modelMedia) as Record<string, unknown>[],

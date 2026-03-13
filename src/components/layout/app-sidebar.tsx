@@ -21,6 +21,7 @@ import {
   BookTemplate,
   ChevronRight,
   Tags,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -98,6 +99,12 @@ const navItems: NavItem[] = [
     url: "/clients",
     icon: Users,
     resource: "client",
+  },
+  {
+    title: "Suppliers",
+    url: "/suppliers",
+    icon: Truck,
+    resource: "supplier",
   },
   {
     title: "Locations",

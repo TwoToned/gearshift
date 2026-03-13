@@ -11,6 +11,7 @@ export type SearchResultType =
   | "bulk-asset"
   | "project"
   | "client"
+  | "supplier"
   | "location"
   | "category"
   | "maintenance";
@@ -41,6 +42,7 @@ type ProjectRow = { id: string; projectNumber: string; name: string; status: str
 type ClientRow = { id: string; name: string; contactName: string | null; contactEmail: string | null; match_quality: number };
 type LocationRow = { id: string; name: string; address: string | null; match_quality: number };
 type CategoryRow = { id: string; name: string; description: string | null; modelCount: number; match_quality: number };
+type SupplierRow = { id: string; name: string; contactName: string | null; accountNumber: string | null; match_quality: number };
 type MaintenanceRow = { id: string; title: string; status: string; match_quality: number };
 
 // Child row types
@@ -68,7 +70,7 @@ export async function globalSearch(query: string) {
 
   if (nq.length < 1) return { results: [] };
 
-  const [models, kits, assets, bulkAssets, projects, clients, locations, categories, maintenance] =
+  const [models, kits, assets, bulkAssets, projects, clients, suppliers, locations, categories, maintenance] =
     await Promise.all([
       prisma.$queryRaw<ModelRow[]>`
         SELECT m.id, m.name, m.manufacturer, m."modelNumber",
@@ -183,6 +185,22 @@ export async function globalSearch(query: string) {
           AND (
             name ILIKE ${ilikePattern} OR COALESCE("contactName", '') ILIKE ${ilikePattern}
             OR COALESCE("contactEmail", '') ILIKE ${ilikePattern}
+            OR lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
+            OR similarity(name, ${q}) > ${trigramThreshold} OR similarity(COALESCE("contactName", ''), ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
+          )
+        ORDER BY match_quality DESC, name ASC LIMIT 10
+      `,
+
+      prisma.$queryRaw<SupplierRow[]>`
+        SELECT id, name, "contactName", "accountNumber",
+               GREATEST(similarity(lower(name), ${ql}), similarity(lower(COALESCE("contactName", '')), ${ql})) AS match_quality
+        FROM "public"."supplier"
+        WHERE "organizationId" = ${organizationId} AND "isActive" = true
+          AND (
+            name ILIKE ${ilikePattern} OR COALESCE("contactName", '') ILIKE ${ilikePattern}
+            OR COALESCE("accountNumber", '') ILIKE ${ilikePattern}
+            OR COALESCE(email, '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(name, ${q}) > ${trigramThreshold} OR similarity(COALESCE("contactName", ''), ${q}) > ${trigramThreshold}
             OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
@@ -461,6 +479,15 @@ export async function globalSearch(query: string) {
       title: `${p.projectNumber} — ${p.name}`, subtitle: p.clientName || p.status,
       href: `/projects/${p.id}`, relevance: Number(p.match_quality) || 0,
       status: p.status,
+    });
+  }
+
+  // Suppliers
+  for (const s of suppliers) {
+    results.push({
+      id: s.id, type: "supplier",
+      title: s.name, subtitle: [s.contactName, s.accountNumber ? `Acct: ${s.accountNumber}` : null].filter(Boolean).join(" · ") || null,
+      href: `/suppliers/${s.id}`, relevance: Number(s.match_quality) || 0,
     });
   }
 

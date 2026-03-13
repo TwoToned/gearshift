@@ -975,8 +975,28 @@ Template detail page hides: status dropdown, documents button, cancel/archive/de
 - **Settings**: `/settings/assets` no longer embeds CategoryManager — links to `/assets/categories` instead
 
 ### Suppliers
-- Unique per org by name
-- Referenced by: assets (purchase supplier), line items (subhire supplier)
+- **Routes**: `/suppliers` (list), `/suppliers/[id]` (detail), `/suppliers/[id]/edit`, `/suppliers/new`, `/suppliers/[id]/orders/new`
+- **Fields**: name (required), contactName, email, phone, website, address, notes, accountNumber, paymentTerms, defaultLeadTime, tags, isActive
+- **Server actions**: `src/server/suppliers.ts` — `getSuppliers()`, `getSuppliersPaginated()`, `getSupplierById()`, `getSupplierAssets()`, `getSupplierSubhires()`, `createSupplier()`, `updateSupplier()`, `deleteSupplier()`
+- **Permissions**: `"supplier"` resource with full CRUD. Owner/admin: all, manager: create/read/update, member/viewer: read
+- **Sidebar**: Between Clients and Locations with `Truck` icon, `resource: "supplier"`
+- **Search**: Global search matches name, contactName, accountNumber, email, tags. Added to PAGE_COMMANDS with `searchType: "supplier"`
+- **Detail page**: Info cards (Contact, Account Details, Summary), tags display, notes section, 3 tabs (Orders, Assets, Subhires)
+- **Delete guards**: Cannot delete supplier with linked assets, line items, or orders
+- **Tags**: Normalized to lowercase on save. `TagInput` on form
+- **Settings migration**: `/settings/assets` now links to `/suppliers` instead of inline SupplierManager
+
+### Supplier Orders (Purchase Orders)
+- **Models**: `SupplierOrder` and `SupplierOrderItem` for tracking purchases and subhire POs
+- **Enums**: `SupplierOrderType` (PURCHASE, SUBHIRE, REPAIR, OTHER), `SupplierOrderStatus` (DRAFT, SUBMITTED, CONFIRMED, PARTIAL, RECEIVED, CANCELLED)
+- **Server actions**: `src/server/supplier-orders.ts` — full CRUD for orders and items
+- **Order fields**: orderNumber (unique per org), type, status, dates (orderDate, expectedDate, receivedDate), financials (subtotal, taxAmount, total as Decimal), supplierId, projectId, createdById, notes
+- **Order items**: description, quantity, unitPrice, lineTotal (auto-calculated), modelId (optional), assetId (optional), notes, sortOrder
+- **Auto-calculations**: `recalculateOrderTotals()` sums item lineTotals, applies 10% GST
+- **Status shortcuts**: `updateSupplierOrderStatus()` — setting to RECEIVED auto-sets receivedDate
+- **Asset integration**: `purchaseOrderNumber` field on Asset, `supplierOrderId` FK linking asset to order
+- **Line item integration**: `subhireOrderNumber` field on ProjectLineItem, `supplierOrderId` FK linking line item to order
+- **Org export/import**: Both `supplierOrders` and `supplierOrderItems` included in manifest. Import order: after Projects (due to projectId FK)
 
 ---
 
@@ -1236,7 +1256,53 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ---
 
-## 36. Integration Checklist for New Features
+## 36. Accessories & Auto-Pulls
+
+### Data Model
+- **`ModelAccessory`**: Join table linking a parent model to an accessory model. Fields: `parentModelId`, `accessoryModelId`, `quantity` (per parent unit), `level` (`AccessoryLevel` enum), `notes`, `sortOrder`. Unique constraint on `(parentModelId, accessoryModelId)`.
+- **`AccessoryLevel` enum**: `MANDATORY` (always auto-added, cannot remove without removing parent), `OPTIONAL` (auto-added but user can remove), `RECOMMENDED` (not auto-added, shown as suggestion).
+- **`ProjectLineItem` fields**: `isAccessory` (Boolean, default false), `accessoryLevel` (AccessoryLevel?), `manualOverride` (Boolean, default false — set when user manually changes qty, prevents auto-scaling).
+
+### Server Actions
+- `src/server/model-accessories.ts`: `getModelAccessories(modelId)`, `addModelAccessory(parentModelId, data)`, `updateModelAccessory(id, data)`, `removeModelAccessory(id)`, `reorderModelAccessories(parentModelId, orderedIds)`.
+- Circular reference detection: BFS walk up to 3 levels deep from the proposed accessory model to check if the parent model appears as a descendant.
+- **Live propagation**: Changes to `ModelAccessory` definitions automatically propagate to all active (non-finished, non-template) projects:
+  - `addModelAccessory`: Creates accessory child line items on all projects that have the parent model.
+  - `updateModelAccessory`: Scales quantity and updates level on existing non-manually-overridden accessory line items.
+  - `removeModelAccessory`: Deletes non-manually-overridden accessory line items (and their grandchildren) from active projects.
+  - All propagation functions recalculate project totals after changes.
+
+### Auto-Pull Logic (`src/server/line-items.ts`)
+- **`addLineItem`**: After creating a line item for an equipment model, queries `ModelAccessory` for that model. Creates child line items for MANDATORY and OPTIONAL accessories with `isAccessory: true`, `parentLineItemId` set. Cascades up to 3 levels. Returns `recommendedAccessories` array for RECOMMENDED items (UI can show toast).
+- **`addKitLineItem`**: After creating kit parent + kit children, queries each kit child's model for accessories and calls `autoAddAccessories` for each. Kit child accessories become grandchildren of the kit parent.
+- **`updateLineItem`**: When parent quantity changes, scales non-`manualOverride` accessory children proportionally using the base ratio from `ModelAccessory.quantity`.
+- **`removeLineItem`**: Cascade deletes all accessory children (`isAccessory: true`) when parent is removed.
+- **Duplicate merging**: If an accessory model already exists on the project as a standalone line item, increments its quantity instead of creating a new row.
+
+### Unified Tree Rendering
+- **Children are children**: Accessories use the same `parentLineItemId`/`childLineItems` relation as kit children. All rendering code uses a single unified `allChildren = item.childLineItems || []` array.
+- **Three levels**: Parent item -> children (kit items or accessories) -> grandchildren (accessories of kit children).
+- **All 5 PDFs**: Use unified `allChildren` rendering with `isAccessory` badge where applicable. Grandchildren rendered at deeper indent.
+- **Quote/Invoice special case**: For KIT_PRICE kits, `allChildren` is filtered to only accessories (kit children without individual prices are hidden).
+- **Warehouse page**: Recursive `renderChildren()` function handles all child types uniformly.
+- **Pull sheet**: Single `allChildren` array for both kit items and accessories.
+- **Line items panel**: Unified rendering with teal background for accessories, standard background for kit children. Grandchildren rendered at deeper indent.
+
+### Overbooking
+- `computeOverbookedStatus()` propagates overbooking from grandchildren (kit child accessories) up to kit children (as inherited), then from kit children up to kit parents.
+- Accessories consume stock like any other line item and are checked for overbooking.
+
+### UI
+- **Model detail page**: "Accessories" tab (`ModelAccessoriesTab` component) showing table of accessory relationships with inline editing for quantity and level. "Add Accessory" dialog with model picker (excludes self and already-added models).
+- **Line items panel**: All children rendered uniformly under parent. Accessories get teal background tint and "Required"/"Acc." badge. Mandatory accessories cannot be individually deleted.
+- **Validation schema**: `src/lib/validations/model-accessory.ts`.
+
+### Org Export/Import
+- `ModelAccessory` added to export manifest and import (after Models, before Kits). Import remaps `parentModelId` and `accessoryModelId` via model ID map.
+
+---
+
+## 37. Integration Checklist for New Features
 
 When implementing a new feature, ensure it integrates with ALL existing systems.
 

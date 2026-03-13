@@ -26,6 +26,9 @@ export interface OrgExportManifest {
   maintenanceRecordAssets: Record<string, unknown>[];
   testTagAssets: Record<string, unknown>[];
   testTagRecords: Record<string, unknown>[];
+  modelAccessories: Record<string, unknown>[];
+  supplierOrders: Record<string, unknown>[];
+  supplierOrderItems: Record<string, unknown>[];
   activityLogs: Record<string, unknown>[];
   fileUploads: Record<string, unknown>[];
   modelMedia: Record<string, unknown>[];

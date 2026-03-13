@@ -44,6 +44,7 @@ model User {
   backupCodes             BackupCode[]
   activityLogs            ActivityLog[]
   passkeys                Passkey[]
+  supplierOrders          SupplierOrder[]
 
   @@map("user")
 }
@@ -120,6 +121,7 @@ model Organization {
   projectLineItems   ProjectLineItem[]
   scanLogs           AssetScanLog[]
   suppliers          Supplier[]
+  supplierOrders     SupplierOrder[]
   kits               Kit[]
   kitSerializedItems KitSerializedItem[]
   kitBulkItems       KitBulkItem[]
@@ -133,6 +135,7 @@ model Organization {
   testTagAssets      TestTagAsset[]
   testTagRecords     TestTagRecord[]
   activityLogs       ActivityLog[]
+  modelAccessories   ModelAccessory[]
 
   @@map("organization")
 }
@@ -382,6 +385,28 @@ enum FailureAction {
   REFERRED_TO_ELECTRICIAN
 }
 
+enum AccessoryLevel {
+  MANDATORY
+  OPTIONAL
+  RECOMMENDED
+}
+
+enum SupplierOrderType {
+  PURCHASE
+  SUBHIRE
+  REPAIR
+  LABOUR
+  OTHER
+}
+
+enum SupplierOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
 enum ProjectMediaType {
   FLOOR_PLAN
   QUOTE
@@ -459,35 +484,121 @@ model Model {
   lineItems  ProjectLineItem[]
   media      ModelMedia[]
 
+  parentAccessories   ModelAccessory[] @relation("ParentAccessories")
+  accessoryOf         ModelAccessory[] @relation("AccessoryOf")
+  supplierOrderItems  SupplierOrderItem[]
+
   @@index([organizationId])
   @@index([categoryId])
   @@index([isActive])
   @@map("model")
 }
 
+// ─── Model Accessory ──────────────────────────────────────────────────────────
+
+model ModelAccessory {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  parentModelId   String
+  parentModel     Model          @relation("ParentAccessories", fields: [parentModelId], references: [id], onDelete: Cascade)
+
+  accessoryModelId String
+  accessoryModel  Model          @relation("AccessoryOf", fields: [accessoryModelId], references: [id], onDelete: Cascade)
+
+  quantity        Int            @default(1)
+  level           AccessoryLevel
+  notes           String?
+  sortOrder       Int            @default(0)
+
+  @@unique([parentModelId, accessoryModelId])
+  @@index([organizationId])
+  @@index([parentModelId])
+  @@map("model_accessory")
+}
+
 // ─── Supplier ───────────────────────────────────────────────────────────────
 
 model Supplier {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  contactName    String?
-  email          String?
-  phone          String?
-  website        String?
-  address        String?
-  notes          String?
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  contactName     String?
+  email           String?
+  phone           String?
+  website         String?
+  address         String?
+  notes           String?
+  accountNumber   String?
+  paymentTerms    String?
+  defaultLeadTime String?
+  tags            String[]     @default([])
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   assets    Asset[]
   lineItems ProjectLineItem[]
+  orders    SupplierOrder[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("supplier")
+}
+
+// ─── Supplier Orders ────────────────────────────────────────────────────────
+
+model SupplierOrder {
+  id              String              @id @default(cuid())
+  organizationId  String
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierId      String
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  orderNumber     String
+  type            SupplierOrderType
+  status          SupplierOrderStatus @default(DRAFT)
+  orderDate       DateTime?
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  subtotal        Decimal?            @db.Decimal(10, 2)
+  taxAmount       Decimal?            @db.Decimal(10, 2)
+  total           Decimal?            @db.Decimal(10, 2)
+  projectId       String?
+  project         Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  notes           String?
+  createdById     String?
+  createdBy       User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items           SupplierOrderItem[]
+  assets          Asset[]
+  lineItems       ProjectLineItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, supplierId])
+  @@index([organizationId, orderNumber])
+  @@map("supplier_order")
+}
+
+model SupplierOrderItem {
+  id          String         @id @default(cuid())
+  orderId     String
+  order       SupplierOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int            @default(1)
+  unitPrice   Decimal?       @db.Decimal(10, 2)
+  lineTotal   Decimal?       @db.Decimal(10, 2)
+  modelId     String?
+  model       Model?         @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  assetId     String?
+  asset       Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  notes       String?
+  sortOrder   Int            @default(0)
+
+  @@index([orderId])
+  @@map("supplier_order_item")
 }
 
 // ─── Kit (Physical Container) ────────────────────────────────────────────────
@@ -597,6 +708,9 @@ model Asset {
   purchaseSupplier    String?
   supplierId          String?
   supplier            Supplier?      @relation(fields: [supplierId], references: [id])
+  purchaseOrderNumber String?
+  supplierOrderId     String?
+  supplierOrder       SupplierOrder? @relation(fields: [supplierOrderId], references: [id], onDelete: SetNull)
   warrantyExpiry      DateTime?
   notes               String?
   locationId          String?
@@ -616,11 +730,12 @@ model Asset {
   kit                Kit?           @relation(fields: [kitId], references: [id])
   kitItem            KitSerializedItem?
 
-  maintenanceLinks   MaintenanceRecordAsset[]
-  lineItems          ProjectLineItem[]
-  scanLogs           AssetScanLog[]
-  media              AssetMedia[]
-  testTagAsset       TestTagAsset?
+  maintenanceLinks    MaintenanceRecordAsset[]
+  lineItems           ProjectLineItem[]
+  scanLogs            AssetScanLog[]
+  media               AssetMedia[]
+  testTagAsset        TestTagAsset?
+  supplierOrderItems  SupplierOrderItem[]
 
   @@unique([organizationId, assetTag])
   @@index([organizationId])
@@ -628,6 +743,7 @@ model Asset {
   @@index([modelId])
   @@index([locationId])
   @@index([supplierId])
+  @@index([supplierOrderId])
   @@index([kitId])
   @@index([isActive])
   @@map("asset")
@@ -820,9 +936,10 @@ model Project {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  lineItems ProjectLineItem[]
-  scanLogs  AssetScanLog[]
-  media     ProjectMedia[]
+  lineItems      ProjectLineItem[]
+  scanLogs       AssetScanLog[]
+  media          ProjectMedia[]
+  supplierOrders SupplierOrder[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId])
@@ -878,12 +995,18 @@ model ProjectLineItem {
   returnedBy      User?          @relation("ReturnedBy", fields: [returnedById], references: [id])
   returnCondition ReturnCondition?
   returnNotes     String?
-  isSubhire       Boolean        @default(false)
-  showSubhireOnDocs Boolean      @default(false)
-  supplierId      String?
-  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  isAccessory       Boolean        @default(false)
+  accessoryLevel    AccessoryLevel?
+  manualOverride    Boolean        @default(false)
+  isSubhire         Boolean        @default(false)
+  showSubhireOnDocs Boolean        @default(false)
+  supplierId        String?
+  supplier          Supplier?      @relation(fields: [supplierId], references: [id])
+  subhireOrderNumber String?
+  supplierOrderId   String?
+  supplierOrder     SupplierOrder? @relation(fields: [supplierOrderId], references: [id], onDelete: SetNull)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   @@index([organizationId])
   @@index([projectId])
@@ -893,6 +1016,7 @@ model ProjectLineItem {
   @@index([kitId])
   @@index([parentLineItemId])
   @@index([supplierId])
+  @@index([supplierOrderId])
   @@map("project_line_item")
 }
 

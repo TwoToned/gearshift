@@ -180,6 +180,7 @@ export async function createAsset(data: AssetFormValues) {
         purchasePrice: parsed.purchasePrice,
         purchaseSupplier: parsed.purchaseSupplier,
         supplierId: parsed.supplierId || null,
+        purchaseOrderNumber: parsed.purchaseOrderNumber || null,
         warrantyExpiry: parsed.warrantyExpiry,
         notes: parsed.notes,
         locationId: parsed.locationId || null,

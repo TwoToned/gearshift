@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Re-export supplier schema from its dedicated file for backward compatibility
+export { supplierSchema, type SupplierFormValues } from "./supplier";
+
 export const assetSchema = z.object({
   modelId: z.string().min(1, "Model is required"),
   assetTag: z.string().min(1, "Asset tag is required").max(50),
@@ -11,6 +14,7 @@ export const assetSchema = z.object({
   purchasePrice: z.union([z.literal(""), z.coerce.number().min(0)]).optional().transform(v => v === "" ? undefined : v),
   purchaseSupplier: z.string().max(200).optional(),
   supplierId: z.string().optional(),
+  purchaseOrderNumber: z.string().max(100).optional(),
   warrantyExpiry: z.union([z.literal(""), z.coerce.date()]).optional().transform(v => v === "" ? undefined : v),
   notes: z.string().max(2000).optional(),
   locationId: z.string().optional(),
@@ -50,14 +54,3 @@ export const locationSchema = z.object({
 
 export type LocationFormValues = z.input<typeof locationSchema>;
 
-export const supplierSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200),
-  contactName: z.string().max(200).optional(),
-  email: z.string().email().max(200).optional().or(z.literal("")),
-  phone: z.string().max(50).optional(),
-  website: z.string().max(500).optional(),
-  address: z.string().max(500).optional(),
-  notes: z.string().max(2000).optional(),
-});
-
-export type SupplierFormValues = z.input<typeof supplierSchema>;
