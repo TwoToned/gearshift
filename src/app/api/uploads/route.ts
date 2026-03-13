@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOrganization } from "@/lib/auth-server";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { uploadToS3, ensureBucket } from "@/lib/storage";
 import { generateThumbnail, isImageMimeType, thumbExtension } from "@/lib/thumbnails";
@@ -30,6 +31,9 @@ const MAX_SIZE_MB = parseInt(process.env.UPLOAD_MAX_SIZE_MB || "50", 10);
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  const csrfError = validateCsrfOrigin(request);
+  if (csrfError) return csrfError;
+
   let session;
   try {
     session = await requireOrganization();

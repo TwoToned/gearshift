@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSiteAdminApi } from "@/lib/admin-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { importOrganization } from "@/lib/org-import";
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const { userId } = await requireSiteAdminApi();
 
