@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { SortOrder } from "@/components/ui/sortable-table-head";
 import type { FilterValue } from "@/lib/table-utils";
+
+type SortOrder = "asc" | "desc";
 
 const STORAGE_PREFIX = "gearflow-table-";
 

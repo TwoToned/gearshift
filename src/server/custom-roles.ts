@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import {
-  rolePermissions,
-  isBuiltInRole,
   RESOURCES,
   type PermissionMap,
 } from "@/lib/permissions";
@@ -43,12 +41,6 @@ export async function getCustomRole(id: string) {
     ...role,
     permissions: JSON.parse(role.permissions) as PermissionMap,
   });
-}
-
-/** Get the permission template for a built-in role (for "start from" dropdown) */
-export async function getBuiltInRolePermissions(role: string) {
-  if (!isBuiltInRole(role)) throw new Error("Not a built-in role");
-  return rolePermissions[role] ?? {};
 }
 
 // ─── Write ──────────────────────────────────────────────────────────────────
