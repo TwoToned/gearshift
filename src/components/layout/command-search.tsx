@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Package,
   FolderOpen,
@@ -33,6 +33,23 @@ import {
   CreditCard,
   Palette,
   Truck,
+  Slash,
+  FileText,
+  ClipboardList,
+  Pencil,
+  Copy,
+  Upload,
+  Download,
+  QrCode,
+  ScrollText,
+  ScanBarcode,
+  PackagePlus,
+  LogOut,
+  CheckCircle,
+  CircleCheck,
+  CircleX,
+  StickyNote,
+  Share2,
 } from "lucide-react";
 import {
   Dialog,
@@ -41,6 +58,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { globalSearch, type SearchResult, type SearchResultType } from "@/server/search";
 import { matchPageCommands, PAGE_COMMANDS, type PageCommand } from "@/lib/page-commands";
+import { matchSlashCommands, extractEntityId, type SlashCommand } from "@/lib/slash-commands";
+import { signOut } from "@/lib/auth-client";
+import { useCurrentRole } from "@/lib/use-permissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // ─── Icon maps ─────────────────────────────────────────────────────
@@ -75,7 +95,9 @@ const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Package, Boxes, Box, CalendarRange, Container,
   FolderOpen, BookTemplate, Warehouse, Users, MapPin, Wrench,
   ShieldCheck, BarChart3, Settings, UserCircle, PackageCheck, PackageX,
-  CreditCard, Palette, Truck,
+  CreditCard, Palette, Truck, FileText, ClipboardList, Pencil, Copy,
+  Upload, Download, QrCode, ScrollText, ScanBarcode, PackagePlus,
+  LogOut, CheckCircle, CircleCheck, CircleX, StickyNote, Share2,
 };
 
 function normalize(s: string): string {
@@ -146,13 +168,95 @@ export function CommandSearch() {
   const [atEntityLoading, setAtEntityLoading] = useState(false);
 
   const router = useRouter();
+  const pathname = usePathname();
+  const { permissions } = useCurrentRole();
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   const isDrilling = drillParent !== null;
   const isAtMode = query.startsWith("@");
+  const isSlashMode = query.startsWith("/") && !isDrilling;
   const isAtEntityMode = atEntityPage !== null;
+
+  // ─── / mode: slash commands ───────────────────────────────────
+
+  const slashQuery = isSlashMode ? query.slice(1) : "";
+  const slashMatches = useMemo(() => {
+    if (!isSlashMode || isDrilling || isAtEntityMode) return [];
+    return matchSlashCommands(slashQuery, pathname, permissions);
+  }, [isSlashMode, slashQuery, pathname, permissions, isDrilling, isAtEntityMode]);
+
+  const slashDisplayItems = useMemo((): DisplayItem[] => {
+    if (!isSlashMode || isDrilling || isAtEntityMode) return [];
+
+    // Group: page-specific commands first, then global
+    const pageSpecific: DisplayItem[] = [];
+    const global: DisplayItem[] = [];
+
+    for (const match of slashMatches) {
+      const cmd = match.command;
+      const IconComp = pageIcons[cmd.icon] || Package;
+      const item: DisplayItem = {
+        id: `slash-${cmd.id}`,
+        title: cmd.label,
+        subtitle: cmd.description,
+        href: "", // Slash commands use action execution, not direct navigation
+        icon: IconComp,
+        typeLabel: match.isPageSpecific ? undefined : "Global",
+      };
+      if (match.isPageSpecific) {
+        pageSpecific.push(item);
+      } else {
+        global.push(item);
+      }
+    }
+
+    return [...pageSpecific, ...global];
+  }, [isSlashMode, slashMatches, isDrilling, isAtEntityMode]);
+
+  const executeSlashCommand = useCallback((cmd: SlashCommand) => {
+    const entityId = extractEntityId(pathname);
+    setOpen(false);
+
+    switch (cmd.action.type) {
+      case "navigate": {
+        const path = cmd.action.path.replace(":id", entityId || "");
+        router.push(path);
+        break;
+      }
+      case "navigate_section": {
+        const el = document.getElementById(cmd.action.hash);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
+        break;
+      }
+      case "open_dialog": {
+        window.dispatchEvent(
+          new CustomEvent("slash-command", { detail: { dialog: cmd.action.dialog } })
+        );
+        break;
+      }
+      case "generate_document": {
+        if (entityId) {
+          window.open(`/api/documents/${entityId}?type=${cmd.action.docType}`, "_blank");
+        }
+        break;
+      }
+      case "trigger": {
+        // Handle logout specially — no need to dispatch an event
+        if (cmd.action.event === "logout") {
+          signOut();
+          return;
+        }
+        window.dispatchEvent(
+          new CustomEvent("slash-command", { detail: { event: cmd.action.event } })
+        );
+        break;
+      }
+    }
+  }, [pathname, router]);
 
   // ─── @ mode: build page command results ──────────────────────
 
@@ -575,6 +679,11 @@ export function CommandSearch() {
   // ─── Build visible items based on current mode ───────────────
 
   const visibleItems = useMemo((): DisplayItem[] => {
+    // / slash command mode
+    if (isSlashMode && !isDrilling && !isAtEntityMode) {
+      return slashDisplayItems;
+    }
+
     // @ entity drill mode (Tab on a page)
     if (isAtEntityMode) {
       return atEntityDrillItems;
@@ -631,7 +740,7 @@ export function CommandSearch() {
     }
 
     return items;
-  }, [isAtEntityMode, atEntityDrillItems, isDrilling, filteredDrillChildren,
+  }, [isSlashMode, slashDisplayItems, isAtEntityMode, atEntityDrillItems, isDrilling, filteredDrillChildren,
       isAtMode, atDisplayItems, expanded, results, dateItem, dateEntityItems]);
 
   // ─── Lifecycle ───────────────────────────────────────────────
@@ -697,8 +806,8 @@ export function CommandSearch() {
     }
     setQuery(value);
     setSelectedIndex(0);
-    // Only do server search for non-@ queries that aren't dates
-    if (!value.startsWith("@") && !tryParseDate(value.trim())) {
+    // Only do server search for non-@ non-/ queries that aren't dates
+    if (!value.startsWith("@") && !value.startsWith("/") && !tryParseDate(value.trim())) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => doSearch(value), 250);
     }
@@ -873,6 +982,12 @@ export function CommandSearch() {
     } else if (e.key === "Enter" && visibleItems[selectedIndex]) {
       e.preventDefault();
       const item = visibleItems[selectedIndex];
+      // Slash command mode: execute the command action
+      if (isSlashMode && item.id.startsWith("slash-")) {
+        const match = slashMatches.find((m) => `slash-${m.command.id}` === item.id);
+        if (match) executeSlashCommand(match.command);
+        return;
+      }
       // On mobile, Enter drills into items with children instead of navigating
       if (isMobile && item.hasChildren && !isDrilling && !isAtEntityMode) {
         enterDrill(selectedIndex);
@@ -886,6 +1001,17 @@ export function CommandSearch() {
 
   const getSectionLabel = (idx: number): string | null => {
     if (isDrilling || isAtEntityMode || isAtMode) return null;
+
+    // Slash mode: show "Page Actions" / "Global" section headers
+    if (isSlashMode) {
+      const item = visibleItems[idx];
+      const label = item.typeLabel === "Global" ? "Global" : "Page Actions";
+      if (idx === 0) return label;
+      const prev = visibleItems[idx - 1];
+      const prevLabel = prev.typeLabel === "Global" ? "Global" : "Page Actions";
+      return prevLabel !== label ? label : null;
+    }
+
     const item = visibleItems[idx];
     if (item.isChild || !item.typeLabel) return null;
     for (let i = idx - 1; i >= 0; i--) {
@@ -909,9 +1035,10 @@ export function CommandSearch() {
       : null;
 
   const isLoading = loading || atEntityLoading || dateSearchLoading;
-  const showEmptySearch = !isAtMode && !isDrilling && !isAtEntityMode && query.length >= 2 && visibleItems.length === 0 && !isLoading;
-  const showTyping = !isAtMode && !isDrilling && !isAtEntityMode && query.length < 2;
+  const showEmptySearch = !isAtMode && !isSlashMode && !isDrilling && !isAtEntityMode && query.length >= 2 && visibleItems.length === 0 && !isLoading;
+  const showTyping = !isAtMode && !isSlashMode && !isDrilling && !isAtEntityMode && query.length < 2;
   const showAtHint = isAtMode && !isDrilling && !isAtEntityMode && atQuery === "" && visibleItems.length > 0;
+  const showSlashHint = isSlashMode && slashQuery === "" && visibleItems.length > 0;
 
   return (
     <>
@@ -938,7 +1065,9 @@ export function CommandSearch() {
         <DialogContent showCloseButton={false} className={`p-0 gap-0 overflow-hidden ${isMobile ? "h-[100dvh] max-h-[100dvh] w-full max-w-full rounded-none border-0" : "sm:max-w-lg"}`} style={isMobile ? { paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } : undefined}>
           {/* Search input bar */}
           <div className="flex items-center border-b px-3 gap-1">
-            {isAtMode && !breadcrumb ? (
+            {isSlashMode ? (
+              <Slash className="h-4 w-4 shrink-0 text-primary" />
+            ) : isAtMode && !breadcrumb ? (
               <AtSign className="h-4 w-4 shrink-0 text-primary" />
             ) : (
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -964,20 +1093,29 @@ export function CommandSearch() {
                   ? `Search ${atEntityPage?.label}...`
                   : isDrilling
                     ? `Filter ${drillParent?.title}...`
-                    : "Search... (@ for pages)"
+                    : "Search... (@ pages, / actions)"
               }
               className="h-11 border-0 shadow-none focus-visible:ring-0 px-2"
             />
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-            {/* @ button — especially useful on mobile where @ is hard to type */}
-            {!isAtMode && !isDrilling && !isAtEntityMode && (
-              <button
-                onClick={() => { setQuery("@"); inputRef.current?.focus(); }}
-                className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors font-semibold text-sm"
-                title="Navigate to page (@)"
-              >
-                @
-              </button>
+            {/* @ and / buttons — especially useful on mobile where these are hard to type */}
+            {!isAtMode && !isSlashMode && !isDrilling && !isAtEntityMode && (
+              <>
+                <button
+                  onClick={() => { setQuery("/"); inputRef.current?.focus(); }}
+                  className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors font-semibold text-sm"
+                  title="Page actions (/)"
+                >
+                  /
+                </button>
+                <button
+                  onClick={() => { setQuery("@"); inputRef.current?.focus(); }}
+                  className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors font-semibold text-sm"
+                  title="Navigate to page (@)"
+                >
+                  @
+                </button>
+              </>
             )}
             {showExpandToggle && (
               <button
@@ -1017,6 +1155,11 @@ export function CommandSearch() {
                     Type a page name to navigate · Add a space to search entities (e.g. <span className="font-medium text-primary">@project drum hire</span>)
                   </div>
                 )}
+                {showSlashHint && (
+                  <div className="px-3 pt-1 pb-2 text-xs text-muted-foreground">
+                    Type a command name to filter (e.g. <span className="font-medium text-primary">/quote</span>)
+                  </div>
+                )}
                 {visibleItems.map((item, idx) => {
                   const sectionLabel = getSectionLabel(idx);
                   const isChild = item.isChild && !isDrilling && !isAtEntityMode;
@@ -1034,6 +1177,12 @@ export function CommandSearch() {
                           else itemRefs.current.delete(idx);
                         }}
                         onClick={() => {
+                          // Slash command: execute the action
+                          if (isSlashMode && item.id.startsWith("slash-")) {
+                            const match = slashMatches.find((m) => `slash-${m.command.id}` === item.id);
+                            if (match) executeSlashCommand(match.command);
+                            return;
+                          }
                           // On mobile, tapping a result with children drills in instead of navigating
                           if (isMobile && item.hasChildren && !isDrilling && !isAtEntityMode) {
                             setSelectedIndex(idx);
@@ -1066,7 +1215,12 @@ export function CommandSearch() {
                             </div>
                           )}
                         </div>
-                        {!isChild && item.typeLabel && !isAtMode && (
+                        {isSlashMode && item.id.startsWith("slash-") && (
+                          <span className="shrink-0 rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            /{slashMatches.find((m) => `slash-${m.command.id}` === item.id)?.command.command}
+                          </span>
+                        )}
+                        {!isChild && item.typeLabel && !isAtMode && !isSlashMode && (
                           <span className="shrink-0 text-xs text-muted-foreground/60">
                             {item.typeLabel}
                           </span>
@@ -1087,7 +1241,7 @@ export function CommandSearch() {
             )}
             {showTyping && (
               <div className="py-6 text-center text-sm text-muted-foreground">
-                Type to search... or <span className="font-medium text-primary">@</span> to navigate
+                Type to search... <span className="font-medium text-primary">@</span> pages · <span className="font-medium text-primary">/</span> actions
               </div>
             )}
             {isAtEntityMode && drillQuery.length < 2 && (
