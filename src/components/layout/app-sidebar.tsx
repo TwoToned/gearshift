@@ -282,8 +282,7 @@ export function AppSidebar() {
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
-              {(hasAccess("orgSettings") || hasAccess("orgMembers")) && (
-              <SidebarMenuItem>
+              <SidebarMenuItem className={(hasAccess("orgSettings") || hasAccess("orgMembers")) ? "" : "hidden"}>
                 <SidebarMenuButton
                   render={<Link href="/settings" onClick={closeMobile} />}
                   isActive={pathname.startsWith("/settings")}
@@ -292,7 +291,6 @@ export function AppSidebar() {
                   <span>Settings</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

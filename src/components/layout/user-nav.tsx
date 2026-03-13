@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { LogOut, User, ChevronsUpDown, Shield } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { getProfile } from "@/server/user-profile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,14 @@ export function UserNav() {
   const user = session?.user;
   const isSiteAdmin = (user as Record<string, unknown>)?.role === "admin";
 
+  // Fetch profile for up-to-date avatar (session cookie cache may be stale)
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    staleTime: 60_000,
+  });
+  const userImage = profile?.image || user?.image;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -35,7 +44,7 @@ export function UserNav() {
         }
       >
         <UserAvatar
-          user={{ name: user?.name, image: user?.image }}
+          user={{ name: user?.name, image: userImage }}
           size="sm"
           className="rounded-lg"
         />

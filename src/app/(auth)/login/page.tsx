@@ -157,51 +157,47 @@ export default function LoginPage() {
         <CardDescription>Sign in to your {platformName} account</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Social login buttons */}
-        {hasSocial && (
-          <>
-            <div className="grid gap-2">
-              {socialProviders.includes("google") && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => handleSocialLogin("google")}
-                  disabled={!!socialLoading || loading}
-                >
-                  {socialLoading === "google" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <GoogleIcon className="mr-2 h-4 w-4" />
-                  )}
-                  Continue with Google
-                </Button>
+        {/* Social login buttons — always rendered, hidden via CSS to avoid React DOM mismatch */}
+        <div className={hasSocial ? "grid gap-2" : "hidden"}>
+          {socialProviders.includes("google") && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => handleSocialLogin("google")}
+              disabled={!!socialLoading || loading}
+            >
+              {socialLoading === "google" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <GoogleIcon className="mr-2 h-4 w-4" />
               )}
-              {socialProviders.includes("microsoft") && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => handleSocialLogin("microsoft")}
-                  disabled={!!socialLoading || loading}
-                >
-                  {socialLoading === "microsoft" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <MicrosoftIcon className="mr-2 h-4 w-4" />
-                  )}
-                  Continue with Microsoft
-                </Button>
+              Continue with Google
+            </Button>
+          )}
+          {socialProviders.includes("microsoft") && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => handleSocialLogin("microsoft")}
+              disabled={!!socialLoading || loading}
+            >
+              {socialLoading === "microsoft" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <MicrosoftIcon className="mr-2 h-4 w-4" />
               )}
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-          </>
-        )}
+              Continue with Microsoft
+            </Button>
+          )}
+        </div>
+        <div className={hasSocial ? "relative" : "hidden"}>
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
+        </div>
 
         {/* Email/password form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -249,7 +245,7 @@ export default function LoginPage() {
           Sign in with Passkey
         </Button>
       </CardContent>
-      {regOpen && (
+      {regOpen ? (
         <CardFooter className="justify-center">
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
@@ -258,7 +254,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   );
 }

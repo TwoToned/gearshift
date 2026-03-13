@@ -58,6 +58,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${dmSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <ThemeProvider>
           <QueryProvider>{children}</QueryProvider>
