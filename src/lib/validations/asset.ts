@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-// Re-export supplier schema from its dedicated file for backward compatibility
-export { supplierSchema, type SupplierFormValues } from "./supplier";
-
 export const assetSchema = z.object({
   modelId: z.string().min(1, "Model is required"),
   assetTag: z.string().min(1, "Asset tag is required").max(50),

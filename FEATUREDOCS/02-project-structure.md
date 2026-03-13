@@ -22,7 +22,7 @@ src/
 │   ├── media/            # MediaUploader, MediaThumbnail, MediaLightbox
 │   ├── projects/         # ProjectForm, LineItemsPanel, AddEquipmentDialog, documents
 │   ├── providers/        # ThemeProvider, QueryProvider, BrandingProvider
-│   ├── settings/         # InviteMember, MemberList, RoleManager, PermissionMatrix, SupplierManager
+│   ├── settings/         # InviteMember, MemberList, RoleManager, PermissionMatrix
 │   ├── suppliers/        # Supplier forms, tables
 │   ├── test-tag/         # TestTagTable, BatchCreateDialog
 │   ├── ui/               # Base components: Button, Card, Dialog, Sheet, Table, BarcodeScanner, ComboboxPicker, etc.
