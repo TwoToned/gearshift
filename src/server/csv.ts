@@ -30,6 +30,7 @@ export async function exportModelsCSV() {
     "requiresTestAndTag",
     "testAndTagIntervalDays",
     "maintenanceIntervalDays",
+    "tags",
   ];
 
   const rows = models.map((m) => [
@@ -47,6 +48,7 @@ export async function exportModelsCSV() {
     m.requiresTestAndTag ? "true" : "false",
     m.testAndTagIntervalDays?.toString() || "",
     m.maintenanceIntervalDays?.toString() || "",
+    m.tags?.join(";") || "",
   ]);
 
   return escapeCSV(headers, rows);
@@ -80,6 +82,7 @@ export async function exportAssetsCSV() {
     "supplierName",
     "warrantyExpiry",
     "notes",
+    "tags",
   ];
 
   const rows = assets.map((a) => [
@@ -97,6 +100,7 @@ export async function exportAssetsCSV() {
     a.supplier?.name || "",
     a.warrantyExpiry ? a.warrantyExpiry.toISOString().split("T")[0] : "",
     a.notes || "",
+    a.tags?.join(";") || "",
   ]);
 
   return escapeCSV(headers, rows);
@@ -126,6 +130,7 @@ export async function exportBulkAssetsCSV() {
     "reorderThreshold",
     "locationName",
     "notes",
+    "tags",
   ];
 
   const rows = bulkAssets.map((ba) => [
@@ -140,6 +145,7 @@ export async function exportBulkAssetsCSV() {
     ba.reorderThreshold?.toString() || "",
     ba.location?.name || "",
     ba.notes || "",
+    ba.tags?.join(";") || "",
   ]);
 
   return escapeCSV(headers, rows);
@@ -205,6 +211,7 @@ export async function importModelsCSV(csvContent: string): Promise<ImportResult>
         requiresTestAndTag: get("requirestestandtag") === "true",
         testAndTagIntervalDays: parseInt(get("testandtagintervaldays")) || null,
         maintenanceIntervalDays: parseInt(get("maintenanceintervaldays")) || null,
+        tags: parseTags(get("tags")),
       };
 
       // Check if model already exists by name + manufacturer + modelNumber
@@ -232,6 +239,7 @@ export async function importModelsCSV(csvContent: string): Promise<ImportResult>
             requiresTestAndTag: data.requiresTestAndTag,
             testAndTagIntervalDays: data.testAndTagIntervalDays ?? existing.testAndTagIntervalDays,
             maintenanceIntervalDays: data.maintenanceIntervalDays ?? existing.maintenanceIntervalDays,
+            ...(data.tags.length > 0 ? { tags: data.tags } : {}),
           },
         });
         result.updated++;
@@ -335,6 +343,8 @@ export async function importAssetsCSV(csvContent: string): Promise<ImportResult>
       const supplierName = get("suppliername") || get("supplier_name") || get("supplier");
       const supplierId = supplierName ? supplierMap.get(supplierName.toLowerCase()) || null : null;
 
+      const tags = parseTags(get("tags"));
+
       // Check if asset tag already exists
       const existing = await prisma.asset.findFirst({
         where: { organizationId, assetTag },
@@ -354,6 +364,7 @@ export async function importAssetsCSV(csvContent: string): Promise<ImportResult>
             purchasePrice: parseDecimal(get("purchaseprice") || get("purchase_price")) ?? existing.purchasePrice,
             warrantyExpiry: parseDate(get("warrantyexpiry") || get("warranty_expiry")) ?? existing.warrantyExpiry,
             notes: get("notes") || existing.notes,
+            ...(tags.length > 0 ? { tags } : {}),
           },
         });
         result.updated++;
@@ -373,6 +384,7 @@ export async function importAssetsCSV(csvContent: string): Promise<ImportResult>
             purchasePrice: parseDecimal(get("purchaseprice") || get("purchase_price")),
             warrantyExpiry: parseDate(get("warrantyexpiry") || get("warranty_expiry")),
             notes: get("notes") || null,
+            tags,
           },
         });
         result.created++;
@@ -481,4 +493,9 @@ function parseDate(value: string): Date | null {
   if (!value) return null;
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
+}
+
+function parseTags(value: string): string[] {
+  if (!value) return [];
+  return value.split(";").map((t) => t.trim().toLowerCase()).filter(Boolean);
 }

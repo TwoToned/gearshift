@@ -234,19 +234,20 @@ export default function MaintenancePage() {
               <SortableTableHead sortKey="scheduledDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Scheduled</SortableTableHead>
               <SortableTableHead sortKey="completedDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Completed</SortableTableHead>
               <SortableTableHead sortKey="result" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Result</SortableTableHead>
+              <TableHead className="hidden lg:table-cell">Tags</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                <TableCell colSpan={10} className="text-center text-muted-foreground">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : records.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                <TableCell colSpan={10} className="text-center text-muted-foreground">
                   No maintenance records found.
                 </TableCell>
               </TableRow>
@@ -332,6 +333,15 @@ export default function MaintenancePage() {
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {(record.tags as string[] | undefined)?.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <CanDo resource="maintenance" action="delete">

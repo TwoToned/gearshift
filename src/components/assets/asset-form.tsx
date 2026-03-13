@@ -8,8 +8,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { Controller } from "react-hook-form";
 import { assetSchema, type AssetFormValues } from "@/lib/validations/asset";
 import { createAsset, createAssets, updateAsset } from "@/server/assets";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { peekNextAssetTags } from "@/server/settings";
 import { getModels } from "@/server/models";
 import { getLocations } from "@/server/locations";
@@ -53,6 +56,11 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers", orgId],
     queryFn: () => getSuppliers(),
+  });
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
   });
 
   const form = useForm<AssetFormValues>({
@@ -297,6 +305,26 @@ export function AssetForm({ initialData, preselectedModelId }: AssetFormProps) {
         <CardContent className="pt-6">
           <Label htmlFor="notes">Notes</Label>
           <Textarea id="notes" {...form.register("notes")} placeholder="Any additional notes" rows={3} className="mt-2" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 

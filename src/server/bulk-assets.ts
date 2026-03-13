@@ -115,6 +115,7 @@ export async function createBulkAsset(data: BulkAssetFormValues) {
         reorderThreshold: parsed.reorderThreshold,
         notes: parsed.notes,
         isActive: parsed.isActive,
+        tags: parsed.tags,
       },
     });
     await reserveAssetTags(1);
@@ -151,6 +152,7 @@ export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
       reorderThreshold: parsed.reorderThreshold,
       notes: parsed.notes,
       isActive: parsed.isActive,
+      tags: parsed.tags,
     },
   }));
 }

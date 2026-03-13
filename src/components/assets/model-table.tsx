@@ -20,6 +20,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -159,18 +160,19 @@ export function ModelTable() {
               <SortableTableHead sortKey="assetType" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
               <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Assets</SortableTableHead>
               <SortableTableHead sortKey="defaultRentalPrice" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Rental $/day</SortableTableHead>
+              <TableHead className="hidden lg:table-cell">Tags</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : models.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No models found.{" "}
                   <Link href="/assets/models/new" className="text-primary hover:underline">
                     Create one
@@ -216,6 +218,15 @@ export function ModelTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     {model.defaultRentalPrice ? `$${Number(model.defaultRentalPrice).toFixed(2)}` : "—"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {model.tags?.map((tag: string) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

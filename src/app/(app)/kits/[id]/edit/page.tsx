@@ -47,6 +47,7 @@ export default function EditKitPage({ params }: { params: Promise<{ id: string }
           image: kit.image || undefined,
           images: kit.images || [],
           isActive: kit.isActive,
+          tags: kit.tags ?? [],
         }}
       />
     </div>

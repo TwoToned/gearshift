@@ -17,6 +17,7 @@ export const kitSchema = z.object({
   image: z.string().optional(),
   images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
+  tags: z.array(z.string()).default([]),
 });
 
 export type KitFormValues = z.input<typeof kitSchema>;

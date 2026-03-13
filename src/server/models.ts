@@ -119,6 +119,7 @@ export async function createModel(data: ModelFormValues) {
       assetType: parsed.assetType,
       barcodeLabelTemplate: parsed.barcodeLabelTemplate,
       isActive: parsed.isActive,
+      tags: parsed.tags,
     },
   });
 
@@ -158,6 +159,7 @@ export async function updateModel(id: string, data: ModelFormValues) {
       assetType: parsed.assetType,
       barcodeLabelTemplate: parsed.barcodeLabelTemplate,
       isActive: parsed.isActive,
+      tags: parsed.tags,
     },
   });
 

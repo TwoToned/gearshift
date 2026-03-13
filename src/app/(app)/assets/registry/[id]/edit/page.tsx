@@ -56,6 +56,7 @@ function EditAssetContent({ params }: { params: Promise<{ id: string }> }) {
       reorderThreshold: ba.reorderThreshold ?? undefined,
       notes: ba.notes || "",
       isActive: ba.isActive,
+      tags: ba.tags ?? [],
     };
 
     return (
@@ -96,6 +97,7 @@ function EditAssetContent({ params }: { params: Promise<{ id: string }> }) {
     barcode: asset.barcode || "",
     images: asset.images || [],
     isActive: asset.isActive,
+    tags: asset.tags ?? [],
   };
 
   return (

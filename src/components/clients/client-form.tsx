@@ -1,14 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { clientSchema, type ClientFormValues } from "@/lib/validations/client";
 import { createClient, updateClient } from "@/server/clients";
+import { getOrgTags } from "@/server/tags";
+import { useActiveOrganization } from "@/lib/auth-client";
+import { TagInput } from "@/components/ui/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +25,13 @@ interface ClientFormProps {
 export function ClientForm({ initialData }: ClientFormProps) {
   const router = useRouter();
   const isEditing = !!initialData;
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
+  });
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -145,10 +155,25 @@ export function ClientForm({ initialData }: ClientFormProps) {
         <CardHeader>
           <CardTitle className="text-base">Additional</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea id="notes" {...form.register("notes")} placeholder="Any additional notes" rows={3} />
+          </div>
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
+            />
           </div>
         </CardContent>
       </Card>

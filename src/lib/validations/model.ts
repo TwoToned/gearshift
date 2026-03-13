@@ -24,6 +24,7 @@ export const modelSchema = z.object({
   assetType: z.enum(["SERIALIZED", "BULK"]).default("SERIALIZED"),
   barcodeLabelTemplate: z.string().optional(),
   isActive: z.boolean().default(true),
+  tags: z.array(z.string()).default([]),
 });
 
 export type ModelFormValues = z.input<typeof modelSchema>;

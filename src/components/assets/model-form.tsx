@@ -8,10 +8,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Controller } from "react-hook-form";
 import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { createModel, updateModel } from "@/server/models";
 import { getCategories } from "@/server/categories";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +65,11 @@ export function ModelForm({ initialData }: ModelFormProps) {
   const { data: categories = [] } = useQuery({
     queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
+  });
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
   });
 
   const form = useForm<ModelFormValues>({
@@ -142,6 +150,21 @@ export function ModelForm({ initialData }: ModelFormProps) {
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" {...form.register("description")} placeholder="Optional description" rows={3} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Tags</Label>
+            <Controller
+              name="tags"
+              control={form.control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={orgTags}
+                  placeholder="Add tags..."
+                />
+              )}
+            />
           </div>
         </CardContent>
       </Card>

@@ -294,16 +294,17 @@ export function AssetTable() {
                 <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
                 <SortableTableHead sortKey="condition" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Condition</SortableTableHead>
                 <SortableTableHead sortKey="location" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Location</SortableTableHead>
+                <TableHead className="hidden lg:table-cell">Tags</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell>
                 </TableRow>
               ) : assets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No assets found.
                   </TableCell>
                 </TableRow>
@@ -358,6 +359,15 @@ export function AssetTable() {
                     <TableCell className="text-muted-foreground">
                       {asset.location?.name || "—"}
                     </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {asset.tags?.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -378,16 +388,17 @@ export function AssetTable() {
                 <SortableTableHead sortKey="totalQuantity" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Total</SortableTableHead>
                 <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
                 <SortableTableHead sortKey="location" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Location</SortableTableHead>
+                <TableHead className="hidden lg:table-cell">Tags</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell>
                 </TableRow>
               ) : (bulkQuery.data?.bulkAssets || []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No bulk assets found.
                   </TableCell>
                 </TableRow>
@@ -416,6 +427,15 @@ export function AssetTable() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {asset.location?.name || "—"}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {asset.tags?.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

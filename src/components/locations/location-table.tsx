@@ -16,6 +16,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -138,16 +139,17 @@ export function LocationTable() {
               <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden sm:table-cell">Type</SortableTableHead>
               <SortableTableHead sortKey="address" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden md:table-cell">Address</SortableTableHead>
               <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Assets</SortableTableHead>
+              <TableHead className="hidden lg:table-cell">Tags</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell>
+                <TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell>
               </TableRow>
             ) : treeRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   No locations found.
                 </TableCell>
               </TableRow>
@@ -176,6 +178,15 @@ export function LocationTable() {
                     </TableCell>
                     <TableCell className="text-right">
                       {assetCount}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {location.tags?.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

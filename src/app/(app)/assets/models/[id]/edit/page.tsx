@@ -45,6 +45,7 @@ export default function EditModelPage({ params }: { params: Promise<{ id: string
     assetType: model.assetType,
     barcodeLabelTemplate: model.barcodeLabelTemplate || "",
     isActive: model.isActive,
+    tags: model.tags ?? [],
   };
 
   return (

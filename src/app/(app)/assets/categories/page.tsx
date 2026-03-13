@@ -183,6 +183,7 @@ export default function CategoriesPage() {
               <TableHead className="text-right">Models</TableHead>
               <TableHead className="text-right hidden sm:table-cell">Kits</TableHead>
               <TableHead className="text-right hidden md:table-cell">Subcategories</TableHead>
+              <TableHead className="hidden lg:table-cell">Tags</TableHead>
               {(canUpdate || canDelete || canCreate) && (
                 <TableHead className="w-[100px]"></TableHead>
               )}
@@ -191,11 +192,11 @@ export default function CategoriesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell>
+                <TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell>
               </TableRow>
             ) : filteredRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                   <div className="flex flex-col items-center gap-2">
                     <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                     <p>{search ? "No matching categories." : "No categories yet."}</p>
@@ -247,6 +248,15 @@ export default function CategoriesPage() {
                   </TableCell>
                   <TableCell className="text-right hidden md:table-cell">
                     {cat._count.children > 0 ? cat._count.children : "\u2014"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {cat.tags?.map((tag: string) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   {(canUpdate || canDelete || canCreate) && (
                     <TableCell>

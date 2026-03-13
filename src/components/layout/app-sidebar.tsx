@@ -69,7 +69,6 @@ const navItems: NavItem[] = [
       { title: "Models", url: "/assets/models", icon: Boxes, resource: "model" },
       { title: "Categories", url: "/assets/categories", icon: Tags, resource: "model" },
       { title: "Kits", url: "/kits", icon: Container, resource: "kit" },
-      { title: "Availability", url: "/assets/availability", icon: CalendarRange, resource: "asset" },
     ],
   },
   {
@@ -80,6 +79,12 @@ const navItems: NavItem[] = [
     items: [
       { title: "Templates", url: "/projects/templates", icon: BookTemplate, resource: "project" },
     ],
+  },
+  {
+    title: "Availability",
+    url: "/availability",
+    icon: CalendarRange,
+    resource: "asset",
   },
   {
     title: "Warehouse",

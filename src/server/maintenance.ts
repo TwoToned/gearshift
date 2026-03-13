@@ -112,6 +112,7 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
       partsUsed: parsed.partsUsed || null,
       result: parsed.result ?? null,
       nextDueDate: parsed.nextDueDate ?? null,
+      tags: parsed.tags,
       assets: {
         create: assetIds.map((assetId) => ({ assetId })),
       },
@@ -182,6 +183,7 @@ export async function updateMaintenanceRecord(
       partsUsed: parsed.partsUsed || null,
       result: parsed.result ?? null,
       nextDueDate: parsed.nextDueDate ?? null,
+      tags: parsed.tags,
       assets: {
         deleteMany: toRemove.length > 0 ? { assetId: { in: toRemove } } : undefined,
         create: toAdd.map((assetId) => ({ assetId })),

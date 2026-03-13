@@ -36,8 +36,9 @@ This document provides an exhaustive technical reference for every feature, syst
 28. [Client & Location Management](#28-client--location-management)
 29. [Settings & Branding](#29-settings--branding)
 30. [Dashboard & Reporting](#30-dashboard--reporting)
-31. [Key Patterns & Conventions](#31-key-patterns--conventions)
-32. [Integration Checklist for New Features](#32-integration-checklist-for-new-features)
+31. [Universal Tags System](#31-universal-tags-system)
+32. [Key Patterns & Conventions](#32-key-patterns--conventions)
+33. [Integration Checklist for New Features](#33-integration-checklist-for-new-features)
 
 ---
 
@@ -415,7 +416,7 @@ div.app-shell (fixed inset-0 on mobile, relative on desktop)
 | `/assets/models/[id]/edit` | Edit model |
 | `/assets/categories` | Category list (table with indented children) |
 | `/assets/categories/[id]` | Category detail (subcategories, models & kits tabs) |
-| `/assets/availability` | Availability calendar |
+| `/availability` | Availability calendar (top-level) |
 | `/kits` | Kit list |
 | `/kits/new` | Create kit |
 | `/kits/[id]` | Kit detail (contents, media, status) |
@@ -1027,7 +1028,41 @@ Dashboard surfaces the same data as the notification system: overdue returns, up
 
 ---
 
-## 31. Key Patterns & Conventions
+## 31. Universal Tags System
+
+### Overview
+All major entities support free-form string tags stored as Postgres `String[]` arrays. Tags enable cross-entity categorization, filtering, and search.
+
+### Tagged Entities
+`Category`, `Model`, `Kit`, `Asset`, `BulkAsset`, `Location`, `MaintenanceRecord`, `Project`, `Client` — all have `tags String[] @default([])`.
+
+### Tag Normalization
+Tags are normalized to lowercase on save to prevent duplicates ("Fragile" vs "fragile"). Case is not preserved.
+
+### Server Actions
+- **CRUD**: All entity create/update actions accept `tags` in their input and pass to Prisma.
+- **`getOrgTags()`** (`src/server/tags.ts`): Returns all distinct tags across all 9 entity types for the current org. Powers autocomplete suggestions.
+
+### Global Search Integration
+`globalSearch()` in `src/server/search.ts` matches tags via raw SQL: `EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE $pattern)` for all entity types.
+
+### UI Components
+- **`TagInput`** (`src/components/ui/tag-input.tsx`): Reusable input with badge display, autocomplete from org-wide suggestions, keyboard navigation (Enter/comma to add, Backspace to remove, arrow keys for suggestions).
+- **Forms**: TagInput added to all entity create/edit forms via React Hook Form `Controller`. Placed after description/notes fields.
+- **Tables**: Tags shown as `Badge variant="secondary"` in list views, hidden on small screens (`hidden lg:table-cell`).
+
+### CSV Import/Export
+Tags exported as semicolon-separated values in a "tags" column. Import parses semicolons back to arrays with lowercase normalization.
+
+### Validation
+All entity Zod schemas include `tags: z.array(z.string()).default([])` in `src/lib/validations/`.
+
+### Org Export/Import
+Tags are simple string arrays on each model — no special handling needed. They export/import automatically with the parent entity.
+
+---
+
+## 32. Key Patterns & Conventions
 
 ### Server Action Pattern
 ```typescript
@@ -1074,7 +1109,7 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ---
 
-## 32. Integration Checklist for New Features
+## 33. Integration Checklist for New Features
 
 When implementing a new feature, ensure it integrates with ALL existing systems.
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { getOrgTags } from "@/server/tags";
+import { TagInput } from "@/components/ui/tag-input";
 
 const typeLabels: Record<string, string> = {
   REPAIR: "Repair",
@@ -67,6 +69,11 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
   const { data: members } = useQuery({
     queryKey: ["members", orgId],
     queryFn: getMembers,
+  });
+
+  const { data: orgTags } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: () => getOrgTags(),
   });
 
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -321,6 +328,23 @@ export function MaintenanceForm({ initialData }: MaintenanceFormProps) {
           {...form.register("description")}
           placeholder="Detailed notes about the work..."
           rows={3}
+        />
+      </div>
+
+      {/* Tags */}
+      <div className="space-y-2">
+        <Label>Tags</Label>
+        <Controller
+          name="tags"
+          control={form.control}
+          render={({ field }) => (
+            <TagInput
+              value={field.value ?? []}
+              onChange={field.onChange}
+              suggestions={orgTags}
+              placeholder="Add tags..."
+            />
+          )}
         />
       </div>
 

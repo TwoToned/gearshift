@@ -548,7 +548,7 @@ export function CommandSearch() {
       subtitle: dateInfo.searchPart
         ? `Showing results for "${dateInfo.searchPart}"`
         : "View asset availability calendar",
-      href: `/assets/availability?date=${dateInfo.iso}`,
+      href: `/availability?date=${dateInfo.iso}`,
       icon: CalendarRange,
     };
   }, [dateInfo]);

@@ -11,6 +11,10 @@ When making changes:
 2. **During**: Follow the patterns and conventions documented there.
 3. **After**: Update ARCHITECTURE.md to reflect any changes you've made — new routes, new server actions, changed behavior, removed features, etc.
 
+## Branching
+
+All new features and non-trivial changes must go on a dedicated branch (e.g., `feature/universal-tags`). Never commit feature work directly to `main`.
+
 ## Project
 
 GearFlow — a multi-tenant asset and rental management platform for AV/theatre production companies. Full spec in `PROMPT.md`. Built with Next.js 16 (App Router), TypeScript strict, Tailwind CSS v4, shadcn/ui, Better Auth, PostgreSQL + Prisma.
@@ -147,6 +151,13 @@ No test framework is configured.
 - **Sidebar**: Listed under Assets with `Tags` icon.
 - **Search**: Global search results link to `/assets/categories/[id]`. Added to PAGE_COMMANDS.
 - **Settings**: `/settings/assets` links to categories page (no longer inline manager).
+
+### Universal Tags
+- All major entities have `tags String[] @default([])`: Category, Model, Kit, Asset, BulkAsset, Location, MaintenanceRecord, Project, Client.
+- Tags normalized to lowercase on save.
+- `TagInput` component (`src/components/ui/tag-input.tsx`) with autocomplete from `getOrgTags()` (`src/server/tags.ts`).
+- Global search matches tags via raw SQL `EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ...)`.
+- CSV export uses semicolons as tag separator; import parses them back.
 
 ### Kit System
 - Kit line items: parent row (`kitId` set, `isKitChild: false`) with child rows (`isKitChild: true`, `parentLineItemId` pointing to parent).
@@ -312,3 +323,4 @@ When implementing a new feature, ensure it integrates with existing systems:
 9. **Mobile**: Ensure responsive tables (column hiding), touch targets, overflow handling (`break-words min-w-0`).
 10. **Org scoping**: Every query must include `organizationId`. Use `getOrgContext()` or `orgWhere()`.
 11. **Serialization**: Always `serialize()` return values from server actions.
+12. **Tags**: If the entity has `tags String[]`, add `TagInput` to its form and tags column to its table view.
