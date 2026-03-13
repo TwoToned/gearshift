@@ -7,6 +7,7 @@ import {
   useListOrganizations,
   organization,
 } from "@/lib/auth-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,11 +21,14 @@ import {
 
 export function OrgSwitcher() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: activeOrg } = useActiveOrganization();
   const { data: orgs } = useListOrganizations();
 
   const handleSwitch = async (orgId: string) => {
     await organization.setActive({ organizationId: orgId });
+    // Clear all cached data to prevent cross-tenant data leakage
+    queryClient.clear();
     router.refresh();
   };
 

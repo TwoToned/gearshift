@@ -33,13 +33,36 @@ export async function importOrganization(
   let manifest: OrgExportManifest | null = null;
   const files = new Map<string, Buffer>();
 
+  const MAX_TOTAL_DECOMPRESSED = 500 * 1024 * 1024; // 500MB
+  const MAX_SINGLE_ENTRY = 100 * 1024 * 1024; // 100MB per file
+  let totalDecompressed = 0;
+
   const directory = await unzipper.Open.buffer(zipBuffer);
   for (const entry of directory.files) {
+    // ZIP Slip protection: reject path traversal and absolute paths
+    if (entry.path.includes("..") || entry.path.startsWith("/") || entry.path.includes("\0")) {
+      throw new Error(`Invalid entry path in archive: ${entry.path}`);
+    }
+
     const buf = await entry.buffer();
+
+    // Decompression bomb protection
+    if (buf.length > MAX_SINGLE_ENTRY) {
+      throw new Error(`Entry exceeds size limit: ${entry.path} (${buf.length} bytes)`);
+    }
+    totalDecompressed += buf.length;
+    if (totalDecompressed > MAX_TOTAL_DECOMPRESSED) {
+      throw new Error(`Total decompressed size exceeds limit (${MAX_TOTAL_DECOMPRESSED} bytes)`);
+    }
+
     if (entry.path === "manifest.json") {
       manifest = JSON.parse(buf.toString("utf-8")) as OrgExportManifest;
     } else if (entry.path.startsWith("files/")) {
-      files.set(entry.path.replace("files/", ""), buf);
+      const safeKey = entry.path.replace("files/", "");
+      if (safeKey.includes("..")) {
+        throw new Error(`Invalid file path in archive: ${safeKey}`);
+      }
+      files.set(safeKey, buf);
     }
   }
 

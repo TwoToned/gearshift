@@ -1,13 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { timingSafeEqual } from "crypto";
+import { z } from "zod";
+
+function safeTokenCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+const promoteSchema = z.object({
+  token: z.string().min(1),
+  email: z.string().email(),
+});
 
 export async function POST(request: NextRequest) {
-  const { token, email } = await request.json();
+  let body;
+  try {
+    body = promoteSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const { token, email } = body;
 
   const enabled = process.env.SITE_ADMIN_REGISTRATION_ENABLED === "true";
   const secret = process.env.SITE_ADMIN_SECRET_TOKEN;
 
-  if (!enabled || !secret || token !== secret) {
+  if (!enabled || !secret || !safeTokenCompare(token, secret)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

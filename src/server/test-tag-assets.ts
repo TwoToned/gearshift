@@ -248,7 +248,7 @@ export async function updateTestTagAsset(id: string, data: {
   if (!existing) throw new Error("Test tag asset not found");
 
   const item = await prisma.testTagAsset.update({
-    where: { id },
+    where: { id, organizationId },
     data: {
       ...(data.description !== undefined && { description: data.description }),
       ...(data.equipmentClass !== undefined && { equipmentClass: data.equipmentClass as "CLASS_I" | "CLASS_II" | "CLASS_II_DOUBLE_INSULATED" | "LEAD_CORD_ASSEMBLY" }),
@@ -276,7 +276,7 @@ export async function retireTestTagAsset(id: string) {
   if (!existing) throw new Error("Test tag asset not found");
 
   const item = await prisma.testTagAsset.update({
-    where: { id },
+    where: { id, organizationId },
     data: { status: "RETIRED", isActive: false },
   });
 
@@ -297,7 +297,7 @@ export async function deleteTestTagAsset(id: string) {
     where: { testTagAssetId: id, organizationId },
   });
 
-  await prisma.testTagAsset.delete({ where: { id } });
+  await prisma.testTagAsset.delete({ where: { id, organizationId } });
   return { id };
 }
 
