@@ -43,7 +43,6 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets,
     testTagAssets,
     testTagRecords,
-    modelAccessories,
     supplierOrders,
     supplierOrderItems,
     activityLogs,
@@ -76,7 +75,6 @@ export async function exportOrganization(orgId: string) {
     }),
     prisma.testTagAsset.findMany({ where: { organizationId: orgId } }),
     prisma.testTagRecord.findMany({ where: { organizationId: orgId } }),
-    prisma.modelAccessory.findMany({ where: { organizationId: orgId } }),
     prisma.supplierOrder.findMany({ where: { organizationId: orgId } }),
     prisma.supplierOrderItem.findMany({
       where: { order: { organizationId: orgId } },
@@ -152,7 +150,6 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets: clean(maintenanceRecordAssets) as Record<string, unknown>[],
     testTagAssets: clean(testTagAssets) as Record<string, unknown>[],
     testTagRecords: clean(testTagRecords) as Record<string, unknown>[],
-    modelAccessories: clean(modelAccessories) as Record<string, unknown>[],
     supplierOrders: clean(supplierOrders) as Record<string, unknown>[],
     supplierOrderItems: clean(supplierOrderItems) as Record<string, unknown>[],
     activityLogs: clean(activityLogs) as Record<string, unknown>[],

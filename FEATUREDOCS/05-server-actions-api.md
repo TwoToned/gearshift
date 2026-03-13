@@ -30,7 +30,6 @@ export async function getItems({ page, pageSize, search, sort, order }) {
 | `assets.ts` | `createAsset`, `createAssets` (bulk), `updateAsset`, `deleteAsset`, `getAssets`, `getAsset` |
 | `bulk-assets.ts` | `createBulkAsset`, `updateBulkAsset`, `deleteBulkAsset`, `getBulkAssets`, `getBulkAssetById` |
 | `models.ts` | `createModel`, `updateModel`, `deleteModel`, `getModels`, `getModelById`, `getModelWithAssets` |
-| `model-accessories.ts` | `getModelAccessories`, `addModelAccessory`, `updateModelAccessory`, `removeModelAccessory`, `reorderModelAccessories` |
 | `kits.ts` | `createKit`, `updateKit`, `deleteKit`, `getKits`, `getKitById`, `addKitSerializedItems`, `removeKitSerializedItem`, `addKitBulkItems`, `removeKitBulkItem`, `checkOutKit`, `checkInKit` |
 | `categories.ts` | `createCategory`, `updateCategory`, `deleteCategory`, `getCategories`, `getCategory`, `getCategoryTree` |
 | `locations.ts` | `createLocation`, `updateLocation`, `deleteLocation`, `getLocations`, `getLocationHierarchy` |

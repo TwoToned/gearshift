@@ -13,8 +13,6 @@
 - Batches all queries for efficiency (single pass over all line items)
 - Returns `Map<lineItemId, { overBy, totalStock, effectiveStock, totalBooked, reducedOnly, inherited }>`
 - Kit parents inherit overbooking from children (`hasOverbookedChildren`, `hasReducedChildren`)
-- Accessory grandchildren propagate overbooking up to kit children
-
 ## UI Indicators
 - **Red badge**: "OVERBOOKED" — shown on project list (AlertTriangle), project detail, all 5 PDFs
 - **Purple badge**: "REDUCED STOCK" — shown when overbooking is caused only by unavailable assets

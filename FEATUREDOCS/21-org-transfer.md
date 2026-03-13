@@ -1,7 +1,7 @@
 # Organization Export/Import
 
 ## Export (`src/lib/org-export.ts`)
-- Queries all 27+ org-scoped tables (including supplierOrders, supplierOrderItems, modelAccessories)
+- Queries all 27+ org-scoped tables (including supplierOrders, supplierOrderItems)
 - Builds streaming ZIP via `archiver`: `manifest.json` + `files/{storageKey}`
 - Concurrent S3 downloads limited to 5
 - API: `GET /api/admin/org-export/[orgId]` (site admin only)
@@ -15,7 +15,6 @@
 - Image URL references (`model.image`, `kit.image`, etc.) updated via URL mapping
 - `safeDate()`/`safeDateOpt()` handle invalid dates
 - SupplierOrders imported after Projects (due to projectId FK)
-- ModelAccessories imported after Models (remaps parentModelId, accessoryModelId)
 - API: `POST /api/admin/org-import` (FormData with file + optional name/slug)
 
 ## Type Definitions

@@ -51,7 +51,6 @@ Detailed docs for each system are in the [`FEATUREDOCS/`](./FEATUREDOCS/) folder
 | 20 | [CSV Import/Export](./FEATUREDOCS/20-csv-import-export.md) | Bulk data operations |
 | 21 | [Org Transfer](./FEATUREDOCS/21-org-transfer.md) | Organization export/import (site admin) |
 | 22 | [Suppliers](./FEATUREDOCS/22-suppliers.md) | Supplier CRUD, purchase orders |
-| 23 | [Accessories](./FEATUREDOCS/23-accessories.md) | Model accessories, auto-pull logic |
 | 24 | [Activity Log](./FEATUREDOCS/24-activity-log.md) | Audit trail, change tracking |
 | 25 | [DataTable](./FEATUREDOCS/25-datatable.md) | Shared table component, filters, column visibility |
 | 26 | [Tags](./FEATUREDOCS/26-tags.md) | Universal tags system |
