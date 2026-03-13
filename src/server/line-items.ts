@@ -132,39 +132,6 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
         include: { model: true, asset: true, bulkAsset: true },
       });
 
-      // Scale accessory children proportionally
-      const accChildren = await prisma.projectLineItem.findMany({
-        where: { parentLineItemId: existing.id, organizationId, isAccessory: true, manualOverride: false },
-      });
-      for (const child of accChildren) {
-        if (oldQuantity > 0) {
-          const baseRatio = child.quantity / oldQuantity;
-          const newQty = Math.round(baseRatio * newQuantity);
-          const childTotal = calculateLineTotal(
-            child.unitPrice ? Number(child.unitPrice) : undefined,
-            newQty,
-            child.duration,
-            child.discount ? Number(child.discount) : undefined,
-          );
-          await prisma.projectLineItem.update({
-            where: { id: child.id },
-            data: { quantity: newQty, lineTotal: childTotal },
-          });
-        }
-      }
-
-      // If no accessories exist yet (e.g. accessory relationship added later), auto-add them
-      if (accChildren.length === 0 && parsed.modelId) {
-        const maxSort = await prisma.projectLineItem.aggregate({
-          where: { projectId, organizationId },
-          _max: { sortOrder: true },
-        });
-        await autoAddAccessories(
-          organizationId, projectId, existing.id,
-          parsed.modelId, newQuantity, (maxSort._max.sortOrder ?? -1) + 1,
-        );
-      }
-
       await recalculateProjectTotals(projectId);
 
       await logActivity({
@@ -228,20 +195,6 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
     },
   });
 
-  // Auto-pull accessories for equipment line items
-  let recommendedAccessories: Array<{ modelName: string; modelId: string }> = [];
-  if (parsed.type === "EQUIPMENT" && parsed.modelId) {
-    const pullResult = await autoAddAccessories(
-      organizationId,
-      projectId,
-      result.id,
-      parsed.modelId,
-      parsed.quantity,
-      nextSort + 1,
-    );
-    recommendedAccessories = pullResult.recommended;
-  }
-
   await recalculateProjectTotals(projectId);
 
   await logActivity({
@@ -256,7 +209,7 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
     projectId,
   });
 
-  return serialize({ ...result, recommendedAccessories });
+  return serialize(result);
 }
 
 export async function updateLineItem(id: string, data: LineItemFormValues, allowOverbook = false) {
@@ -299,54 +252,6 @@ export async function updateLineItem(id: string, data: LineItemFormValues, allow
       supplier: true,
     },
   });
-
-  // Scale accessory quantities when parent quantity changes
-  if (parsed.quantity) {
-    const oldItem = await prisma.projectLineItem.findUnique({
-      where: { id },
-      select: { quantity: true },
-    });
-    // oldItem may be null since we already updated, so use a pre-fetch approach
-    // Actually, result has the new quantity. We need the old quantity.
-    // Let's fetch accessory children and scale them
-    const accessoryChildren = await prisma.projectLineItem.findMany({
-      where: {
-        parentLineItemId: id,
-        organizationId,
-        isAccessory: true,
-        manualOverride: false,
-      },
-    });
-
-    if (accessoryChildren.length > 0 && result.quantity) {
-      // We need to look up the accessory definitions to find the base ratio
-      for (const child of accessoryChildren) {
-        if (!child.modelId || !result.modelId) continue;
-        const accDef = await prisma.modelAccessory.findFirst({
-          where: {
-            organizationId,
-            parentModelId: result.modelId,
-            accessoryModelId: child.modelId,
-          },
-        });
-        if (accDef) {
-          const newQty = result.quantity * accDef.quantity;
-          if (newQty !== child.quantity) {
-            const childTotal = calculateLineTotal(
-              child.unitPrice ? Number(child.unitPrice) : undefined,
-              newQty,
-              child.duration,
-              child.discount ? Number(child.discount) : undefined,
-            );
-            await prisma.projectLineItem.update({
-              where: { id: child.id },
-              data: { quantity: newQty, lineTotal: childTotal },
-            });
-          }
-        }
-      }
-    }
-  }
 
   await recalculateProjectTotals(result.projectId);
 
@@ -448,23 +353,6 @@ export async function addKitLineItem(
     return { parentItem, nextSort };
   });
 
-  // Auto-add accessories for kit children (outside transaction so autoAddAccessories can query committed data)
-  const kitChildren = await prisma.projectLineItem.findMany({
-    where: { parentLineItemId: result.parentItem.id, organizationId, isKitChild: true },
-    select: { id: true, modelId: true, quantity: true },
-  });
-
-  let accSort = result.nextSort;
-  for (const child of kitChildren) {
-    if (child.modelId) {
-      const accResult = await autoAddAccessories(
-        organizationId, projectId, child.id,
-        child.modelId, child.quantity, accSort,
-      );
-      accSort = accResult.nextSort;
-    }
-  }
-
   await recalculateProjectTotals(projectId);
   return serialize(result.parentItem);
 }
@@ -482,16 +370,11 @@ export async function removeLineItem(id: string) {
     throw new Error("This item is part of a Kit. Remove the Kit instead.");
   }
 
-  // If this is a kit parent or has accessory children, cascade delete children
+  // If this is a kit parent, cascade delete children
   const hasChildren = item.kitId && !item.isKitChild;
   if (hasChildren) {
     await prisma.projectLineItem.deleteMany({
       where: { parentLineItemId: item.id, organizationId },
-    });
-  } else {
-    // Delete mandatory accessory children (optional ones are also cleaned up)
-    await prisma.projectLineItem.deleteMany({
-      where: { parentLineItemId: item.id, organizationId, isAccessory: true },
     });
   }
 
@@ -750,115 +633,6 @@ export async function checkKitAvailability(
 /** Round to 2 decimal places to avoid floating-point drift in financial calculations */
 function roundCurrency(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-/**
- * Auto-add MANDATORY and OPTIONAL accessories as child line items.
- * Cascades up to 3 levels deep. Returns recommended accessories for UI toast.
- */
-async function autoAddAccessories(
-  organizationId: string,
-  projectId: string,
-  parentLineItemId: string,
-  modelId: string,
-  parentQuantity: number,
-  startSortOrder: number,
-  depth = 0,
-): Promise<{ recommended: Array<{ modelName: string; modelId: string }>; nextSort: number }> {
-  if (depth >= 3) return { recommended: [], nextSort: startSortOrder };
-
-  const accessories = await prisma.modelAccessory.findMany({
-    where: { parentModelId: modelId, organizationId },
-    include: {
-      accessoryModel: {
-        select: { id: true, name: true, defaultRentalPrice: true },
-      },
-    },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  if (accessories.length === 0) return { recommended: [], nextSort: startSortOrder };
-
-  let nextSort = startSortOrder;
-  const recommended: Array<{ modelName: string; modelId: string }> = [];
-
-  for (const acc of accessories) {
-    if (acc.level === "RECOMMENDED") {
-      recommended.push({
-        modelName: acc.accessoryModel.name,
-        modelId: acc.accessoryModel.id,
-      });
-      continue;
-    }
-
-    const qty = parentQuantity * acc.quantity;
-    const unitPrice = acc.accessoryModel.defaultRentalPrice
-      ? Number(acc.accessoryModel.defaultRentalPrice)
-      : null;
-    const lineTotal = unitPrice != null ? roundCurrency(unitPrice * qty) : null;
-
-    // Check if this accessory model already exists on the project (not as a child)
-    const existingOnProject = await prisma.projectLineItem.findFirst({
-      where: {
-        projectId,
-        organizationId,
-        modelId: acc.accessoryModel.id,
-        assetId: null,
-        isKitChild: false,
-        isAccessory: false,
-        status: { not: "CANCELLED" },
-      },
-    });
-
-    if (existingOnProject) {
-      // Merge: increment quantity on the existing line item
-      const newQty = existingOnProject.quantity + qty;
-      const existingPrice = existingOnProject.unitPrice ? Number(existingOnProject.unitPrice) : unitPrice;
-      const mergedTotal = existingPrice != null
-        ? roundCurrency(existingPrice * newQty * existingOnProject.duration)
-        : null;
-
-      await prisma.projectLineItem.update({
-        where: { id: existingOnProject.id },
-        data: { quantity: newQty, lineTotal: mergedTotal },
-      });
-    } else {
-      // Create new accessory child line item
-      const childItem = await prisma.projectLineItem.create({
-        data: {
-          organizationId,
-          projectId,
-          type: "EQUIPMENT",
-          modelId: acc.accessoryModel.id,
-          description: acc.accessoryModel.name,
-          quantity: qty,
-          unitPrice,
-          pricingType: "PER_DAY",
-          duration: 1,
-          lineTotal,
-          sortOrder: nextSort++,
-          parentLineItemId,
-          isAccessory: true,
-          accessoryLevel: acc.level,
-        },
-      });
-
-      // Cascade: check if this accessory model itself has accessories
-      const cascadeResult = await autoAddAccessories(
-        organizationId,
-        projectId,
-        childItem.id,
-        acc.accessoryModel.id,
-        qty,
-        nextSort,
-        depth + 1,
-      );
-      nextSort = cascadeResult.nextSort;
-      recommended.push(...cascadeResult.recommended);
-    }
-  }
-
-  return { recommended, nextSort };
 }
 
 function calculateLineTotal(

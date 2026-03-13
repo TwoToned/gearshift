@@ -135,8 +135,6 @@ model Organization {
   testTagAssets      TestTagAsset[]
   testTagRecords     TestTagRecord[]
   activityLogs       ActivityLog[]
-  modelAccessories   ModelAccessory[]
-
   @@map("organization")
 }
 
@@ -385,12 +383,6 @@ enum FailureAction {
   REFERRED_TO_ELECTRICIAN
 }
 
-enum AccessoryLevel {
-  MANDATORY
-  OPTIONAL
-  RECOMMENDED
-}
-
 enum SupplierOrderType {
   PURCHASE
   SUBHIRE
@@ -484,38 +476,12 @@ model Model {
   lineItems  ProjectLineItem[]
   media      ModelMedia[]
 
-  parentAccessories   ModelAccessory[] @relation("ParentAccessories")
-  accessoryOf         ModelAccessory[] @relation("AccessoryOf")
   supplierOrderItems  SupplierOrderItem[]
 
   @@index([organizationId])
   @@index([categoryId])
   @@index([isActive])
   @@map("model")
-}
-
-// ─── Model Accessory ──────────────────────────────────────────────────────────
-
-model ModelAccessory {
-  id              String         @id @default(cuid())
-  organizationId  String
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  parentModelId   String
-  parentModel     Model          @relation("ParentAccessories", fields: [parentModelId], references: [id], onDelete: Cascade)
-
-  accessoryModelId String
-  accessoryModel  Model          @relation("AccessoryOf", fields: [accessoryModelId], references: [id], onDelete: Cascade)
-
-  quantity        Int            @default(1)
-  level           AccessoryLevel
-  notes           String?
-  sortOrder       Int            @default(0)
-
-  @@unique([parentModelId, accessoryModelId])
-  @@index([organizationId])
-  @@index([parentModelId])
-  @@map("model_accessory")
 }
 
 // ─── Supplier ───────────────────────────────────────────────────────────────
@@ -995,9 +961,6 @@ model ProjectLineItem {
   returnedBy      User?          @relation("ReturnedBy", fields: [returnedById], references: [id])
   returnCondition ReturnCondition?
   returnNotes     String?
-  isAccessory       Boolean        @default(false)
-  accessoryLevel    AccessoryLevel?
-  manualOverride    Boolean        @default(false)
   isSubhire         Boolean        @default(false)
   showSubhireOnDocs Boolean        @default(false)
   supplierId        String?

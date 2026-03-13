@@ -262,23 +262,6 @@ export async function importOrganization(
     });
   }
 
-  // ── 5b. Model Accessories ───────────────────────────────────────
-  for (const r of (manifest.modelAccessories || []) as Rec[]) {
-    const id = newId("modelAccessory", r.id);
-    await prisma.modelAccessory.create({
-      data: {
-        id,
-        organizationId: newOrgId,
-        parentModelId: remap("model", r.parentModelId)!,
-        accessoryModelId: remap("model", r.accessoryModelId)!,
-        quantity: r.quantity ?? 1,
-        level: r.level,
-        notes: r.notes ?? null,
-        sortOrder: r.sortOrder ?? 0,
-      } as any,
-    });
-  }
-
   // ── 6. Kits ──────────────────────────────────────────────────────
   for (const r of manifest.kits as Rec[]) {
     const id = newId("kit", r.id);

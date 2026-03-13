@@ -80,7 +80,6 @@ src/
 │   ├── custom-roles.ts   # Custom role CRUD
 │   ├── user-profile.ts   # User account operations
 │   ├── invitations.ts    # Invitation helpers
-│   ├── model-accessories.ts  # Model accessory relationships
 │   ├── test-tag-assets.ts    # T&T asset CRUD
 │   ├── test-tag-records.ts   # T&T test record CRUD
 │   └── test-tag-reports.ts   # T&T report data + CSV
