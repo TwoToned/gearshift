@@ -313,7 +313,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
       <BookingCalendar entityType="kit" entityId={id} initialDate={initialDate} />
 
       {/* Contents Card */}
-      <Card>
+      <Card id="kit-contents">
         <CardHeader>
           <CardTitle className="text-base">Contents</CardTitle>
         </CardHeader>
