@@ -74,13 +74,6 @@ export const PAGE_COMMANDS: PageCommand[] = [
         searchable: true,
         searchType: "kit",
       },
-      {
-        label: "Availability",
-        href: "/assets/availability",
-        aliases: ["availability", "calendar", "avail", "bookings"],
-        icon: "CalendarRange",
-        description: "Asset availability calendar",
-      },
     ],
   },
   {
@@ -100,6 +93,13 @@ export const PAGE_COMMANDS: PageCommand[] = [
         description: "Project templates",
       },
     ],
+  },
+  {
+    label: "Availability",
+    href: "/availability",
+    aliases: ["availability", "calendar", "avail", "bookings", "schedule"],
+    icon: "CalendarRange",
+    description: "Asset availability calendar",
   },
   {
     label: "Warehouse",

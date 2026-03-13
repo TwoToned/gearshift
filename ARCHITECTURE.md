@@ -415,7 +415,7 @@ div.app-shell (fixed inset-0 on mobile, relative on desktop)
 | `/assets/models/[id]/edit` | Edit model |
 | `/assets/categories` | Category list (table with indented children) |
 | `/assets/categories/[id]` | Category detail (subcategories, models & kits tabs) |
-| `/assets/availability` | Availability calendar |
+| `/availability` | Availability calendar (top-level) |
 | `/kits` | Kit list |
 | `/kits/new` | Create kit |
 | `/kits/[id]` | Kit detail (contents, media, status) |
