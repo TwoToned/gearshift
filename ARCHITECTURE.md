@@ -58,4 +58,6 @@ Detailed docs for each system are in the [`FEATUREDOCS/`](./FEATUREDOCS/) folder
 | 28 | [Patterns](./FEATUREDOCS/28-patterns.md) | Key conventions, gotchas, code patterns |
 | 29 | [Integration Checklist](./FEATUREDOCS/29-integration-checklist.md) | What to update when adding new features |
 
-**When making changes**: Read the relevant feature doc(s) first, follow documented patterns, and update the relevant doc(s) after.
+**When making changes**: Read the relevant feature doc(s) first, follow documented patterns, and update the relevant doc(s) after. If no doc exists for the feature you're working on, create a new numbered file in `FEATUREDOCS/` and add it to the table above.
+
+All new features and non-trivial changes must go on a dedicated branch — never commit feature work directly to `main`.

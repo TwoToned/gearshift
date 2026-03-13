@@ -12,6 +12,10 @@
 
 All new features and non-trivial changes must go on a dedicated branch. Never commit feature work directly to `main`.
 
+## Feature Documentation
+
+Every feature change **must** update the relevant `FEATUREDOCS/` file. If the feature doesn't have one yet, create a new numbered markdown file (e.g. `FEATUREDOCS/30-my-feature.md`) and add it to the table in `ARCHITECTURE.md`.
+
 ## Commands
 
 ```bash
