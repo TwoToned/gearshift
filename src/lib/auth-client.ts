@@ -15,19 +15,12 @@ export const authClient = createAuthClient({
   ],
 });
 
-const {
-  useActiveOrganization: _useActiveOrganization,
-  ...authExports
-} = authClient;
-
-export const {
-  signIn,
-  signUp,
-  signOut,
-  useSession,
-  organization,
-  useListOrganizations,
-} = authExports;
+export const signIn = authClient.signIn;
+export const signUp = authClient.signUp;
+export const signOut = authClient.signOut;
+export const useSession = authClient.useSession;
+export const organization = authClient.organization;
+export const useListOrganizations = authClient.useListOrganizations;
 
 /**
  * Wrapper around Better Auth's useActiveOrganization that returns a stable
@@ -35,7 +28,7 @@ export const {
  * to prevent query key flicker (undefined → id) that causes DOM errors.
  */
 export function useActiveOrganization() {
-  const result = _useActiveOrganization();
+  const result = authClient.useActiveOrganization();
   const lastOrgId = useRef<string | undefined>(undefined);
 
   const currentId = result.data?.id;
