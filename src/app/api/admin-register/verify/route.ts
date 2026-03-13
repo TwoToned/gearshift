@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 function safeTokenCompare(a: string, b: string): boolean {
   try {
@@ -13,6 +14,19 @@ function safeTokenCompare(a: string, b: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 5 attempts per hour per IP
+  const ip = getClientIp(request);
+  const { allowed, retryAfterMs } = rateLimit(`admin-register:${ip}`, 5, 3600_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+      }
+    );
+  }
+
   const token = request.nextUrl.searchParams.get("token");
 
   const enabled = process.env.SITE_ADMIN_REGISTRATION_ENABLED === "true";

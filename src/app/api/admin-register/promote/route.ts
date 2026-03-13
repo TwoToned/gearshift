@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 function safeTokenCompare(a: string, b: string): boolean {
   try {
@@ -20,6 +21,19 @@ const promoteSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 attempts per hour per IP
+  const ip = getClientIp(request);
+  const { allowed, retryAfterMs } = rateLimit(`admin-promote:${ip}`, 5, 3600_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+      }
+    );
+  }
+
   let body;
   try {
     body = promoteSchema.parse(await request.json());

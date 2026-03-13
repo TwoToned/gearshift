@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { uploadToS3, ensureBucket } from "@/lib/storage";
 import { generateThumbnail, isImageMimeType, thumbExtension } from "@/lib/thumbnails";
+import { fileTypeFromBuffer } from "file-type";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,15 @@ export async function POST(request: NextRequest) {
     await ensureBucket();
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Validate actual file content via magic bytes (defense against Content-Type spoofing)
+    const detected = await fileTypeFromBuffer(buffer);
+    if (detected && !ALLOWED_MIME_TYPES.has(detected.mime)) {
+      return NextResponse.json(
+        { error: `Detected file type "${detected.mime}" is not allowed.` },
+        { status: 400 }
+      );
+    }
 
     // Upload original
     const { storageKey, url } = await uploadToS3(buffer, {
