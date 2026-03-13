@@ -176,6 +176,14 @@ No test framework is configured.
 - Pricing modes: `KIT_PRICE` (single price on parent) or `ITEMIZED` (individual prices on children).
 - Warehouse: kits check out/in via `checkOutKit`/`checkInKit` (not `checkOutItems`). Kit items in the checkout selection must be routed to `kitCheckOutMutation` separately from regular items.
 
+### Accessories & Auto-Pulls
+- `ModelAccessory` links parent model → accessory model with quantity ratio and `AccessoryLevel` (MANDATORY/OPTIONAL/RECOMMENDED).
+- `addLineItem` auto-adds MANDATORY and OPTIONAL accessories as child line items (`isAccessory: true`, `parentLineItemId` set). Cascades up to 3 levels. RECOMMENDED returned for UI toast.
+- `updateLineItem` scales non-`manualOverride` accessory children when parent qty changes.
+- `removeLineItem` cascade deletes all accessory children.
+- Circular reference detection via BFS up to 3 levels in `addModelAccessory`.
+- Server actions in `src/server/model-accessories.ts`. Validation in `src/lib/validations/model-accessory.ts`.
+
 ### Auto-Incrementing Asset Tags
 - Org settings (`Organization.metadata` JSON) store `assetTagPrefix`, `assetTagDigits`, `assetTagCounter`.
 - `peekNextAssetTags(count)` — read-only preview, no counter increment. Used by forms for suggested tags.

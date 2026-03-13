@@ -262,6 +262,23 @@ export async function importOrganization(
     });
   }
 
+  // ── 5b. Model Accessories ───────────────────────────────────────
+  for (const r of (manifest.modelAccessories || []) as Rec[]) {
+    const id = newId("modelAccessory", r.id);
+    await prisma.modelAccessory.create({
+      data: {
+        id,
+        organizationId: newOrgId,
+        parentModelId: remap("model", r.parentModelId)!,
+        accessoryModelId: remap("model", r.accessoryModelId)!,
+        quantity: r.quantity ?? 1,
+        level: r.level,
+        notes: r.notes ?? null,
+        sortOrder: r.sortOrder ?? 0,
+      } as any,
+    });
+  }
+
   // ── 6. Kits ──────────────────────────────────────────────────────
   for (const r of manifest.kits as Rec[]) {
     const id = newId("kit", r.id);
@@ -288,6 +305,7 @@ export async function importOrganization(
         organizationId: newOrgId,
         modelId: remap("model", r.modelId)!,
         supplierId: remap("supplier", r.supplierId),
+        supplierOrderId: remap("supplierOrder", r.supplierOrderId),
         locationId: remap("location", r.locationId),
         kitId: remap("kit", r.kitId),
         purchaseDate: safeDateOpt(r.purchaseDate),
@@ -390,6 +408,47 @@ export async function importOrganization(
     });
   }
 
+  // ── 12b. Supplier Orders ────────────────────────────────────────────
+  for (const r of (manifest.supplierOrders ?? []) as Rec[]) {
+    const id = newId("supplierOrder", r.id);
+    await prisma.supplierOrder.create({
+      data: {
+        ...stripRelations(r),
+        id,
+        organizationId: newOrgId,
+        supplierId: remap("supplier", r.supplierId)!,
+        projectId: remap("project", r.projectId),
+        createdById: remapUser(r.createdById),
+        orderDate: safeDateOpt(r.orderDate),
+        expectedDate: safeDateOpt(r.expectedDate),
+        receivedDate: safeDateOpt(r.receivedDate),
+        createdAt: safeDate(r.createdAt),
+        updatedAt: safeDate(r.updatedAt),
+      } as any,
+    });
+  }
+
+  // ── 12c. Supplier Order Items ──────────────────────────────────────
+  for (const r of (manifest.supplierOrderItems ?? []) as Rec[]) {
+    const id = newId("supplierOrderItem", r.id);
+    const orderId = remap("supplierOrder", r.orderId);
+    if (!orderId) continue;
+    await prisma.supplierOrderItem.create({
+      data: {
+        id,
+        orderId,
+        description: r.description as string,
+        quantity: r.quantity ?? 1,
+        unitPrice: r.unitPrice ?? null,
+        lineTotal: r.lineTotal ?? null,
+        modelId: remap("model", r.modelId),
+        assetId: remap("asset", r.assetId),
+        notes: r.notes ?? null,
+        sortOrder: r.sortOrder ?? 0,
+      } as any,
+    });
+  }
+
   // ── 13. Project Line Items (with parent hierarchy for kit children) ──
   await insertWithHierarchy("projectLineItem", manifest.projectLineItems as Rec[], async (r, id) => {
     await prisma.projectLineItem.create({
@@ -403,6 +462,7 @@ export async function importOrganization(
         bulkAssetId: remap("bulkAsset", r.bulkAssetId),
         kitId: remap("kit", r.kitId),
         parentLineItemId: remap("projectLineItem", r.parentLineItemId),
+        supplierOrderId: remap("supplierOrder", r.supplierOrderId),
         checkedOutById: remapUser(r.checkedOutById),
         returnedById: remapUser(r.returnedById),
         checkedOutAt: safeDateOpt(r.checkedOutAt),

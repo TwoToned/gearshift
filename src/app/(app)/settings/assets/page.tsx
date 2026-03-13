@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SupplierManager } from "@/components/settings/supplier-manager";
 import {
   getOrganization,
   updateOrganization,
@@ -141,7 +140,9 @@ export default function AssetsSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SupplierManager />
+            <Button variant="outline" render={<Link href="/suppliers" />}>
+              Manage Suppliers
+            </Button>
           </CardContent>
         </Card>
       )}

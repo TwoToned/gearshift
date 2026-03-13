@@ -148,6 +148,15 @@ export const PAGE_COMMANDS: PageCommand[] = [
     searchType: "client",
   },
   {
+    label: "Suppliers",
+    href: "/suppliers",
+    aliases: ["suppliers", "supplier", "vendors", "vendor", "purchase", "purchaseorders"],
+    icon: "Truck",
+    description: "Supplier management and purchase orders",
+    searchable: true,
+    searchType: "supplier",
+  },
+  {
     label: "Locations",
     href: "/locations",
     aliases: ["locations", "location", "venues", "sites", "places", "venue"],
@@ -226,9 +235,9 @@ export const PAGE_COMMANDS: PageCommand[] = [
       {
         label: "Assets",
         href: "/settings/assets",
-        aliases: ["assetsettings", "assettags", "tags", "suppliers"],
+        aliases: ["assetsettings", "assettags", "tags"],
         icon: "Package",
-        description: "Asset tags and suppliers",
+        description: "Asset tags configuration",
       },
       {
         label: "Test & Tag Settings",

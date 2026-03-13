@@ -19,6 +19,7 @@ export const lineItemSchema = z.object({
   isSubhire: z.boolean().default(false),
   showSubhireOnDocs: z.boolean().default(false),
   supplierId: z.string().optional(),
+  subhireOrderNumber: z.string().max(100).optional(),
 });
 
 export type LineItemFormValues = z.input<typeof lineItemSchema>;

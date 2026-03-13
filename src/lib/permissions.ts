@@ -25,6 +25,7 @@ export const RESOURCES = [
   "document",
   "orgSettings",
   "orgMembers",
+  "supplier",
   "reports",
 ] as const;
 
@@ -161,6 +162,15 @@ export const PERMISSION_REGISTRY: Record<
       { key: "remove", label: "Remove" },
     ],
   },
+  supplier: {
+    label: "Suppliers",
+    actions: [
+      { key: "read", label: "View" },
+      { key: "create", label: "Create" },
+      { key: "update", label: "Edit" },
+      { key: "delete", label: "Delete" },
+    ],
+  },
   reports: {
     label: "Reports",
     actions: [
@@ -191,6 +201,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: ["generate", "send"],
     orgSettings: ["read", "update"],
     orgMembers: ["read", "invite", "update_role", "remove"],
+    supplier: ALL_CRUD,
     reports: ["view", "export"],
   },
   admin: {
@@ -207,6 +218,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: ["generate", "send"],
     orgSettings: ["read", "update"],
     orgMembers: ["read", "invite", "update_role", "remove"],
+    supplier: ALL_CRUD,
     reports: ["view", "export"],
   },
   manager: {
@@ -223,6 +235,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: ["generate", "send"],
     orgSettings: ["read"],
     orgMembers: ["read"],
+    supplier: ["create", "read", "update"],
     reports: ["view", "export"],
   },
   member: {
@@ -239,6 +252,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: ["generate"],
     orgSettings: [],
     orgMembers: [],
+    supplier: ["read"],
     reports: ["view"],
   },
   staff: {
@@ -255,6 +269,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: ["generate"],
     orgSettings: [],
     orgMembers: [],
+    supplier: ["read"],
     reports: ["view"],
   },
   warehouse: {
@@ -271,6 +286,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: [],
     orgSettings: [],
     orgMembers: [],
+    supplier: ["read"],
     reports: ["view"],
   },
   viewer: {
@@ -287,6 +303,7 @@ export const rolePermissions: Record<string, PermissionMap> = {
     document: [],
     orgSettings: [],
     orgMembers: [],
+    supplier: ["read"],
     reports: ["view"],
   },
 };

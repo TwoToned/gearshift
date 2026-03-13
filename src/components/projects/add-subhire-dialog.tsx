@@ -118,6 +118,17 @@ export function AddSubhireDialog({
               />
             </div>
 
+            {form.watch("supplierId") && (
+              <div className="space-y-2">
+                <Label htmlFor="sub-orderNumber">Subhire Order #</Label>
+                <Input
+                  id="sub-orderNumber"
+                  {...form.register("subhireOrderNumber")}
+                  placeholder="e.g. PO-2024-001"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="sub-description">Description *</Label>
               <Input
