@@ -2,15 +2,54 @@
 
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
+import { serialize } from "@/lib/serialize";
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
 
 export async function getCategories() {
   const { organizationId } = await getOrgContext();
-  return prisma.category.findMany({
-    where: { organizationId },
-    include: { parent: true, _count: { select: { models: true, children: true } } },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  return serialize(
+    await prisma.category.findMany({
+      where: { organizationId },
+      include: { parent: true, _count: { select: { models: true, kits: true, children: true } } },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    })
+  );
+}
+
+export async function getCategory(id: string) {
+  const { organizationId } = await getOrgContext();
+
+  const category = await prisma.category.findFirst({
+    where: { id, organizationId },
+    include: {
+      parent: true,
+      children: {
+        include: { _count: { select: { models: true, kits: true, children: true } } },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      },
+      models: {
+        include: {
+          _count: { select: { assets: true } },
+          media: {
+            include: { file: true },
+            orderBy: { sortOrder: "asc" },
+            take: 1,
+          },
+        },
+        orderBy: { name: "asc" },
+      },
+      kits: {
+        include: {
+          _count: { select: { serializedItems: true, bulkItems: true } },
+        },
+        orderBy: { name: "asc" },
+      },
+      _count: { select: { models: true, kits: true, children: true } },
+    },
   });
+
+  if (!category) throw new Error("Category not found");
+  return serialize(category);
 }
 
 export async function getCategoryTree() {
@@ -36,31 +75,35 @@ export async function getCategoryTree() {
       roots.push(node);
     }
   }
-  return roots;
+  return serialize(roots);
 }
 
 export async function createCategory(data: CategoryFormValues) {
   const { organizationId } = await requirePermission("model", "create");
   const parsed = categorySchema.parse(data);
-  return prisma.category.create({
-    data: {
-      ...parsed,
-      parentId: parsed.parentId || null,
-      organizationId,
-    },
-  });
+  return serialize(
+    await prisma.category.create({
+      data: {
+        ...parsed,
+        parentId: parsed.parentId || null,
+        organizationId,
+      },
+    })
+  );
 }
 
 export async function updateCategory(id: string, data: CategoryFormValues) {
   const { organizationId } = await requirePermission("model", "update");
   const parsed = categorySchema.parse(data);
-  return prisma.category.update({
-    where: { id, organizationId },
-    data: {
-      ...parsed,
-      parentId: parsed.parentId || null,
-    },
-  });
+  return serialize(
+    await prisma.category.update({
+      where: { id, organizationId },
+      data: {
+        ...parsed,
+        parentId: parsed.parentId || null,
+      },
+    })
+  );
 }
 
 export async function deleteCategory(id: string) {
@@ -74,5 +117,7 @@ export async function deleteCategory(id: string) {
   if (category._count.children > 0) throw new Error("Cannot delete category with subcategories");
   if (category._count.models > 0) throw new Error("Cannot delete category with models");
 
-  return prisma.category.delete({ where: { id, organizationId } });
+  return serialize(
+    await prisma.category.delete({ where: { id, organizationId } })
+  );
 }

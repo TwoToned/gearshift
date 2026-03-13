@@ -57,6 +57,15 @@ export const PAGE_COMMANDS: PageCommand[] = [
         searchType: "model",
       },
       {
+        label: "Categories",
+        href: "/assets/categories",
+        aliases: ["categories", "category", "organize", "groups"],
+        icon: "Tags",
+        description: "Equipment categories and subcategories",
+        searchable: true,
+        searchType: "category",
+      },
+      {
         label: "Kits",
         href: "/kits",
         aliases: ["kits", "kitlist", "cases", "containers"],
@@ -210,9 +219,9 @@ export const PAGE_COMMANDS: PageCommand[] = [
       {
         label: "Assets",
         href: "/settings/assets",
-        aliases: ["assetsettings", "assettags", "tags", "categories", "suppliers"],
+        aliases: ["assetsettings", "assettags", "tags", "suppliers"],
         icon: "Package",
-        description: "Asset tags, categories, and suppliers",
+        description: "Asset tags and suppliers",
       },
       {
         label: "Test & Tag Settings",
