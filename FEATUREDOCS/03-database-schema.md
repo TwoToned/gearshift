@@ -1,0 +1,57 @@
+# Database Schema & Data Models
+
+## Core Auth Models
+- **User** — `id, name, email, emailVerified, image, role ("user"|"admin"), banned, banReason, twoFactorEnabled`
+- **Session** — `id, token, expiresAt, userId, activeOrganizationId, ipAddress, userAgent`
+- **Account** — OAuth/credential provider accounts
+- **Verification** — Email verification tokens
+- **TwoFactor** / **BackupCode** — TOTP 2FA storage
+- **Passkey** — `credentialID (unique), publicKey, counter, deviceType, backedUp, transports, name`
+
+## Organization & Membership
+- **Organization** — `id, name, slug (unique), logo, metadata (JSON)`. Metadata stores: `assetTagPrefix, assetTagDigits, assetTagCounter`, `testTag.*` settings, branding config
+- **Member** — `id, organizationId, userId, role (owner|admin|manager|member|staff|warehouse|viewer), createdAt`
+- **Invitation** — `id, organizationId, email, role, status (pending|accepted|rejected|cancelled), expiresAt, inviterId`
+- **CustomRole** — `id, organizationId, name, description, color, permissions (JSON)`. Unique: `[organizationId, name]`
+- **SiteSettings** — Singleton: `platformName, platformIcon, platformLogo, registrationPolicy, twoFactorGlobalPolicy, defaultCurrency, defaultTaxRate`
+
+## Asset Models
+- **Category** — `id, organizationId, name, parentId (self-join), description, icon, sortOrder`
+- **Model** — `id, organizationId, name, manufacturer, modelNumber, categoryId, description, image, images[], specifications (JSON), customFields (JSON), defaultRentalPrice, defaultPurchasePrice, replacementCost, weight, powerDraw, requiresTestAndTag, testAndTagIntervalDays, defaultEquipmentClass, defaultApplianceType, maintenanceIntervalDays, assetType (SERIALIZED|BULK), isActive`
+- **ModelAccessory** — `id, parentModelId, accessoryModelId, quantity, level (MANDATORY|OPTIONAL|RECOMMENDED), notes, sortOrder`. Unique: `[parentModelId, accessoryModelId]`
+- **Asset** — `id, organizationId, modelId, assetTag, serialNumber, customName, status (AVAILABLE|CHECKED_OUT|IN_MAINTENANCE|RETIRED|LOST|RESERVED), condition (NEW|GOOD|FAIR|POOR|DAMAGED), purchaseDate, purchasePrice, supplierId, purchaseOrderNumber, supplierOrderId, warrantyExpiry, notes, locationId, customFieldValues (JSON), kitId, isActive`. Unique: `[organizationId, assetTag]`
+- **BulkAsset** — `id, organizationId, modelId, assetTag, totalQuantity, availableQuantity, purchasePricePerUnit, locationId, status (ACTIVE|LOW_STOCK|OUT_OF_STOCK|RETIRED), reorderThreshold, isActive`. Unique: `[organizationId, assetTag]`
+
+## Kit Models
+- **Kit** — `id, organizationId, assetTag, name, description, categoryId, status (AVAILABLE|CHECKED_OUT|IN_MAINTENANCE|RETIRED|INCOMPLETE), condition, locationId, weight, caseType, caseDimensions, image, images[], notes, isActive`. Unique: `[organizationId, assetTag]`
+- **KitSerializedItem** — `id, organizationId, kitId, assetId (unique per org), position, sortOrder, addedAt, addedById, notes`. Unique: `[kitId, assetId]`
+- **KitBulkItem** — `id, organizationId, kitId, bulkAssetId, quantity, position, sortOrder, addedAt, addedById, notes`
+
+## Client & Location Models
+- **Client** — `id, organizationId, name, type (COMPANY|INDIVIDUAL|VENUE|PRODUCTION_COMPANY), contactName, contactEmail, contactPhone, billingAddress, shippingAddress, taxId, paymentTerms, defaultDiscount, notes, tags[], isActive`
+- **Location** — `id, organizationId, name, address, type (WAREHOUSE|VENUE|VEHICLE|OFFSITE), isDefault, parentId (self-join), notes`
+- **Supplier** — `id, organizationId, name, contactName, email, phone, website, address, notes, accountNumber, paymentTerms, defaultLeadTime, tags[], isActive`. Unique: `[organizationId, name]`
+
+## Supplier Order Models
+- **SupplierOrder** — `id, organizationId, supplierId, orderNumber, type (PURCHASE|SUBHIRE|REPAIR|OTHER), status (DRAFT|SUBMITTED|CONFIRMED|PARTIAL|RECEIVED|CANCELLED), orderDate, expectedDate, receivedDate, subtotal, taxAmount, total (Decimal), projectId, createdById, notes`. Unique: `[organizationId, orderNumber]`
+- **SupplierOrderItem** — `id, orderId, description, quantity, unitPrice, lineTotal, modelId, assetId, notes, sortOrder`
+
+## Project & Line Item Models
+- **Project** — `id, organizationId, projectNumber, name, clientId, status (ENQUIRY|QUOTING|QUOTED|CONFIRMED|PREPPING|CHECKED_OUT|ON_SITE|RETURNED|COMPLETED|INVOICED|CANCELLED), type (DRY_HIRE|WET_HIRE|INSTALLATION|TOUR|CORPORATE|THEATRE|FESTIVAL|CONFERENCE|OTHER), description, locationId, siteContactName/Phone/Email, loadInDate/Time, eventStartDate/Time, eventEndDate/Time, loadOutDate/Time, rentalStartDate, rentalEndDate, projectManagerId, crewNotes, internalNotes, clientNotes, subtotal, discountPercent, discountAmount, taxAmount, total, depositPercent, depositPaid, invoicedTotal, tags[], isTemplate`. Unique: `[organizationId, projectNumber]`
+- **ProjectLineItem** — `id, organizationId, projectId, type (EQUIPMENT|SERVICE|LABOUR|TRANSPORT|MISC), modelId, assetId, bulkAssetId, kitId, isKitChild, parentLineItemId, pricingMode (KIT_PRICE|ITEMIZED), description, quantity, unitPrice, pricingType (PER_DAY|PER_WEEK|FLAT|PER_HOUR), duration, discount, lineTotal, sortOrder, groupName, notes, isOptional, status, checkedOutQuantity, returnedQuantity, checkedOutAt/ById, returnedAt/ById, returnCondition, returnNotes, isSubhire, showSubhireOnDocs, supplierId, subhireOrderNumber, supplierOrderId, isAccessory, accessoryLevel, manualOverride`
+
+## Maintenance Models
+- **MaintenanceRecord** — `id, organizationId, kitId, type (REPAIR|PREVENTATIVE|TEST_AND_TAG|INSPECTION|CLEANING|FIRMWARE_UPDATE), status (SCHEDULED|IN_PROGRESS|COMPLETED|CANCELLED), title, description, reportedById, assignedToId, scheduledDate, completedDate, cost, partsUsed, result (PASS|FAIL|CONDITIONAL), nextDueDate`
+- **MaintenanceRecordAsset** — `id, maintenanceRecordId, assetId`. Unique: `[maintenanceRecordId, assetId]`
+
+## Test & Tag Models
+- **TestTagAsset** — `id, organizationId, testTagId, description, equipmentClass (CLASS_I|CLASS_II|CLASS_II_DOUBLE_INSULATED|LEAD_CORD_ASSEMBLY), applianceType, make, modelName, serialNumber, location, testIntervalMonths, status (NOT_YET_TESTED|CURRENT|DUE_SOON|OVERDUE|FAILED|RETIRED), lastTestDate, nextDueDate, notes, assetId (unique optional), bulkAssetId, isActive`. Unique: `[organizationId, testTagId]`
+- **TestTagRecord** — `id, organizationId, testTagAssetId, testDate, testedById, testerName, result (PASS|FAIL|NOT_APPLICABLE)`, plus 20+ detailed inspection/test fields
+
+## Media & Files
+- **FileUpload** — `id, organizationId, fileName, fileSize, mimeType, storageKey, url, thumbnailUrl, width, height, uploadedById`
+- **ModelMedia, AssetMedia, KitMedia, ProjectMedia, ClientMedia, LocationMedia** — Join tables: `{entityType}Id, fileId, type, isPrimary, displayName, sortOrder`
+
+## Activity & Scan Logs
+- **ActivityLog** — `id, organizationId, action, entityType, entityId, entityName, userId, userName, summary, details (JSON), metadata (JSON), projectId, assetId, kitId, createdAt`
+- **AssetScanLog** — `id, organizationId, assetId, bulkAssetId, kitId, projectId, action (CHECK_OUT|CHECK_IN|SCAN_VERIFY|TRANSFER), scannedById, scannedAt, notes, location`

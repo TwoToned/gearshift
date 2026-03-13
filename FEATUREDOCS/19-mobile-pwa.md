@@ -1,0 +1,65 @@
+# Mobile & PWA
+
+## PWA Configuration
+- Manifest: `public/manifest.json` — `display: standalone`, icons 192/384/512, start URL `/dashboard`
+- Service worker via `@ducanh2912/next-pwa`
+- Offline page: `src/app/offline/page.tsx`
+- Meta: `apple-mobile-web-app-capable: yes`, `statusBarStyle: black-translucent`
+
+## iOS PWA Viewport Fix (`src/app/globals.css`)
+With `viewport-fit: cover` + `black-translucent`, iOS pushes content into the status bar but doesn't extend viewport height, leaving a bottom gap. Fix:
+```css
+html { min-height: calc(100% + env(safe-area-inset-top)); }
+@media (max-width: 767px) {
+  .app-shell { position: fixed; inset: 0; overflow: hidden; }
+}
+```
+
+## Safe Area Pattern
+**Always use inline styles for `env()` values** — Tailwind arbitrary values don't reliably preserve `env()`:
+```tsx
+// CORRECT
+style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+// WRONG - may not work on iOS
+className="pt-[env(safe-area-inset-top,0px)]"
+```
+
+Applied on: TopBar, Sheet (sidebar), full-screen mobile dialogs, MobileNav, AdminShell.
+
+## App Layout Structure (mobile)
+```
+div.app-shell (position: fixed, inset: 0, flex column, overflow: hidden)
+├── SidebarProvider (flex-1, min-h-0)
+│   └── SidebarInset (min-h-0, flex column)
+│       ├── TopBar (sticky, paddingTop: safe-area-top)
+│       └── main (flex-1, overflow-auto ← content scrolls here)
+└── MobileNav (shrink-0, paddingBottom: safe-area-bottom, md:hidden)
+```
+
+## Mobile Bottom Nav (`src/components/layout/mobile-nav.tsx`)
+- Flow element (NOT position: fixed) — sits at bottom of flex column
+- 5 items: Home, Assets, Scan, Projects, Warehouse
+- Scan button opens camera overlay via `BarcodeScanner`
+- Scan result resolved via `scanLookup()` → navigates to matched entity
+
+## Barcode & QR Code Scanning
+
+### Scanner Component (`src/components/ui/barcode-scanner.tsx`)
+- Uses `html5-qrcode` library
+- No overlay — whole camera feed is scan area
+- Audio chime: Web Audio API, 1200Hz sine wave, 150ms with exponential fade
+- **Callbacks stored in refs** to prevent re-render loop
+- `continuous` prop: keeps scanning after first result (for multi-asset forms)
+
+### Scan Lookup (`src/server/scan-lookup.ts`)
+Resolves barcode value to entity URL:
+1. Check `Asset` by `assetTag` → `/assets/registry/{id}`
+2. Check `Kit` by `assetTag` → `/kits/{id}`
+3. Check `BulkAsset` by `assetTag` → `/assets/registry/{id}`
+4. Check `TestTagAsset` by `testTagId` → `/test-and-tag/{id}`
+
+### QR Code Generation
+`src/components/assets/asset-qr-code.tsx` — generates and prints QR codes encoding asset tag value.
+
+## Touch Targets
+`min-height: 44px; min-width: 44px` for `.touch-target` on touch devices. Checkboxes get 24px min size.
