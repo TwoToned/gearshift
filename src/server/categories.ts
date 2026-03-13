@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { categorySchema, type CategoryFormValues } from "@/lib/validations/category";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getCategories() {
   const { organizationId } = await getOrgContext();
@@ -79,35 +80,57 @@ export async function getCategoryTree() {
 }
 
 export async function createCategory(data: CategoryFormValues) {
-  const { organizationId } = await requirePermission("model", "create");
+  const { organizationId, userId, userName } = await requirePermission("model", "create");
   const parsed = categorySchema.parse(data);
-  return serialize(
-    await prisma.category.create({
-      data: {
-        ...parsed,
-        parentId: parsed.parentId || null,
-        organizationId,
-      },
-    })
-  );
+  const result = await prisma.category.create({
+    data: {
+      ...parsed,
+      parentId: parsed.parentId || null,
+      organizationId,
+    },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "category",
+    entityId: result.id,
+    entityName: result.name,
+    summary: `Created category ${result.name}`,
+  });
+
+  return serialize(result);
 }
 
 export async function updateCategory(id: string, data: CategoryFormValues) {
-  const { organizationId } = await requirePermission("model", "update");
+  const { organizationId, userId, userName } = await requirePermission("model", "update");
   const parsed = categorySchema.parse(data);
-  return serialize(
-    await prisma.category.update({
-      where: { id, organizationId },
-      data: {
-        ...parsed,
-        parentId: parsed.parentId || null,
-      },
-    })
-  );
+  const updated = await prisma.category.update({
+    where: { id, organizationId },
+    data: {
+      ...parsed,
+      parentId: parsed.parentId || null,
+    },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "category",
+    entityId: updated.id,
+    entityName: updated.name,
+    summary: `Updated category ${updated.name}`,
+  });
+
+  return serialize(updated);
 }
 
 export async function deleteCategory(id: string) {
-  const { organizationId } = await requirePermission("model", "delete");
+  const { organizationId, userId, userName } = await requirePermission("model", "delete");
   // Check for children or models first
   const category = await prisma.category.findUnique({
     where: { id, organizationId },
@@ -117,7 +140,19 @@ export async function deleteCategory(id: string) {
   if (category._count.children > 0) throw new Error("Cannot delete category with subcategories");
   if (category._count.models > 0) throw new Error("Cannot delete category with models");
 
-  return serialize(
-    await prisma.category.delete({ where: { id, organizationId } })
-  );
+  await prisma.category.delete({ where: { id, organizationId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "category",
+    entityId: id,
+    entityName: category.name,
+    summary: `Deleted category ${category.name}`,
+    details: { deleted: { name: category.name } },
+  });
+
+  return serialize({ id });
 }

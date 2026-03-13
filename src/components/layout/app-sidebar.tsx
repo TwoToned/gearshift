@@ -12,6 +12,7 @@ import {
   MapPin,
   Wrench,
   BarChart3,
+  ScrollText,
   Settings,
   CalendarRange,
   Warehouse,
@@ -125,6 +126,12 @@ const navItems: NavItem[] = [
     title: "Reports",
     url: "/reports",
     icon: BarChart3,
+    resource: "reports",
+  },
+  {
+    title: "Activity Log",
+    url: "/activity",
+    icon: ScrollText,
     resource: "reports",
   },
 ];

@@ -159,6 +159,15 @@ No test framework is configured.
 - Global search matches tags via raw SQL `EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ...)`.
 - CSV export uses semicolons as tag separator; import parses them back.
 
+### Activity Log (Audit Trail)
+- **Model**: `ActivityLog` tracks all write operations with `action`, `entityType`, `entityId`, `entityName`, `summary`, `details` (JSON), `userName` (denormalized).
+- **Logging**: `logActivity()` from `src/lib/activity-log.ts` — called after every successful write in all 16 server action files. Never blocks main operation.
+- **Diff helper**: `buildChanges(before, after, fields)` computes field changes for UPDATE details.
+- **Page**: `/activity` — full table with entity type, action, date range, search filters. CSV export.
+- **Per-entity**: `ActivityTimeline` component (`src/components/activity/activity-timeline.tsx`) for detail pages.
+- **`getOrgContext()`** now returns `userName` alongside `organizationId` and `userId`.
+- Permissions: gated by `reports` read.
+
 ### Kit System
 - Kit line items: parent row (`kitId` set, `isKitChild: false`) with child rows (`isKitChild: true`, `parentLineItemId` pointing to parent).
 - Pricing modes: `KIT_PRICE` (single price on parent) or `ITEMIZED` (individual prices on children).
@@ -324,3 +333,4 @@ When implementing a new feature, ensure it integrates with existing systems:
 10. **Org scoping**: Every query must include `organizationId`. Use `getOrgContext()` or `orgWhere()`.
 11. **Serialization**: Always `serialize()` return values from server actions.
 12. **Tags**: If the entity has `tags String[]`, add `TagInput` to its form and tags column to its table view.
+13. **Activity Log**: Add `logActivity()` calls to all write operations (create/update/delete) in server actions.

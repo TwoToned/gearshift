@@ -8,6 +8,7 @@ import {
 } from "@/lib/validations/maintenance";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
+import { logActivity } from "@/lib/activity-log";
 
 const assetInclude = {
   assets: {
@@ -86,7 +87,7 @@ export async function getMaintenanceRecord(id: string) {
 }
 
 export async function createMaintenanceRecord(data: MaintenanceFormValues) {
-  const { organizationId, userId } = await requirePermission("maintenance", "create");
+  const { organizationId, userId, userName } = await requirePermission("maintenance", "create");
   const parsed = maintenanceSchema.parse(data);
 
   const assetIds = parsed.assetIds?.length
@@ -139,6 +140,18 @@ export async function createMaintenanceRecord(data: MaintenanceFormValues) {
     });
   }
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "maintenance",
+    entityId: record.id,
+    entityName: record.title,
+    summary: `Created maintenance record: ${record.title}`,
+    details: { assetCount: assetIds.length },
+  });
+
   return serialize(record);
 }
 
@@ -146,7 +159,7 @@ export async function updateMaintenanceRecord(
   id: string,
   data: MaintenanceFormValues
 ) {
-  const { organizationId } = await requirePermission("maintenance", "update");
+  const { organizationId, userId, userName } = await requirePermission("maintenance", "update");
   const parsed = maintenanceSchema.parse(data);
 
   const existing = await prisma.maintenanceRecord.findUnique({
@@ -220,11 +233,22 @@ export async function updateMaintenanceRecord(
     }
   }
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "maintenance",
+    entityId: record.id,
+    entityName: record.title,
+    summary: `Updated maintenance record: ${record.title}`,
+  });
+
   return serialize(record);
 }
 
 export async function deleteMaintenanceRecord(id: string) {
-  const { organizationId } = await requirePermission("maintenance", "delete");
+  const { organizationId, userId, userName } = await requirePermission("maintenance", "delete");
 
   const record = await prisma.maintenanceRecord.findUnique({
     where: { id, organizationId },
@@ -243,6 +267,18 @@ export async function deleteMaintenanceRecord(id: string) {
 
   await prisma.maintenanceRecord.delete({
     where: { id, organizationId },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "maintenance",
+    entityId: id,
+    entityName: record.title,
+    summary: `Deleted maintenance record: ${record.title}`,
+    details: { deleted: { title: record.title } },
   });
 }
 

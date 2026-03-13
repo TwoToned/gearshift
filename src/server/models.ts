@@ -7,6 +7,7 @@ import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
 import type { Prisma } from "@/generated/prisma/client";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
 import { getOrgTestTagSettings } from "@/server/settings";
+import { logActivity } from "@/lib/activity-log";
 
 export type ModelWithRelations = Prisma.ModelGetPayload<{
   include: {
@@ -91,7 +92,7 @@ export async function getModel(id: string) {
 }
 
 export async function createModel(data: ModelFormValues) {
-  const { organizationId } = await requirePermission("model", "create");
+  const { organizationId, userId, userName } = await requirePermission("model", "create");
   const parsed = modelSchema.parse(data);
   const model = await prisma.model.create({
     data: {
@@ -127,11 +128,23 @@ export async function createModel(data: ModelFormValues) {
     await backfillTestTagAssets();
   }
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "model",
+    entityId: model.id,
+    entityName: model.name,
+    summary: `Created model ${model.name}`,
+    details: { created: { name: model.name, manufacturer: model.manufacturer } },
+  });
+
   return serialize(model);
 }
 
 export async function updateModel(id: string, data: ModelFormValues) {
-  const { organizationId } = await requirePermission("model", "update");
+  const { organizationId, userId, userName } = await requirePermission("model", "update");
   const parsed = modelSchema.parse(data);
   const model = await prisma.model.update({
     where: { id, organizationId },
@@ -195,11 +208,22 @@ export async function updateModel(id: string, data: ModelFormValues) {
     }
   }
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "model",
+    entityId: model.id,
+    entityName: model.name,
+    summary: `Updated model ${model.name}`,
+  });
+
   return serialize(model);
 }
 
 export async function archiveModel(id: string) {
-  const { organizationId } = await requirePermission("model", "delete");
+  const { organizationId, userId, userName } = await requirePermission("model", "delete");
 
   // Delete all assets and bulk assets under this model
   await Promise.all([
@@ -207,8 +231,21 @@ export async function archiveModel(id: string) {
     prisma.bulkAsset.deleteMany({ where: { modelId: id, organizationId } }),
   ]);
 
-  return serialize(await prisma.model.update({
+  const archived = await prisma.model.update({
     where: { id, organizationId },
     data: { isActive: false },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "model",
+    entityId: id,
+    entityName: archived.name,
+    summary: `Archived model ${archived.name}`,
+  });
+
+  return serialize(archived);
 }

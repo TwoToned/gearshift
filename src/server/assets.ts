@@ -7,6 +7,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { reserveAssetTags, getOrgTestTagSettings } from "@/server/settings";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
+import { logActivity } from "@/lib/activity-log";
 
 export type AssetWithRelations = Prisma.AssetGetPayload<{
   include: {
@@ -136,7 +137,7 @@ export async function getAsset(id: string) {
 }
 
 export async function createAsset(data: AssetFormValues) {
-  const { organizationId } = await requirePermission("asset", "create");
+  const { organizationId, userId, userName } = await requirePermission("asset", "create");
   const parsed = assetSchema.parse(data);
 
   // Fetch the model to check T&T requirements
@@ -193,6 +194,19 @@ export async function createAsset(data: AssetFormValues) {
       });
     }
 
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "asset",
+      entityId: result.id,
+      entityName: result.assetTag,
+      summary: `Created asset ${result.assetTag}`,
+      details: { created: { assetTag: result.assetTag, modelId: parsed.modelId } },
+      assetId: result.id,
+    });
+
     return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
@@ -206,7 +220,7 @@ export async function createAssets(
   data: AssetFormValues,
   assets: { tag: string; serialNumber?: string }[],
 ) {
-  const { organizationId } = await requirePermission("asset", "create");
+  const { organizationId, userId, userName } = await requirePermission("asset", "create");
   const parsed = assetSchema.parse(data);
 
   const model = await prisma.model.findUnique({ where: { id: parsed.modelId } });
@@ -270,12 +284,29 @@ export async function createAssets(
     );
   }
 
+  for (const result of results) {
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "asset",
+      entityId: result.id,
+      entityName: result.assetTag,
+      summary: `Created asset ${result.assetTag}`,
+      details: { created: { assetTag: result.assetTag, modelId: parsed.modelId } },
+      assetId: result.id,
+    });
+  }
+
   return serialize(results);
 }
 
 export async function updateAsset(id: string, data: AssetFormValues) {
-  const { organizationId } = await requirePermission("asset", "update");
+  const { organizationId, userId, userName } = await requirePermission("asset", "update");
   const parsed = assetSchema.parse(data);
+
+  const before = await prisma.asset.findUnique({ where: { id, organizationId } });
 
   const updated = await prisma.asset.update({
     where: { id, organizationId },
@@ -299,6 +330,18 @@ export async function updateAsset(id: string, data: AssetFormValues) {
       isActive: parsed.isActive,
       tags: parsed.tags,
     },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "asset",
+    entityId: updated.id,
+    entityName: updated.assetTag,
+    summary: `Updated asset ${updated.assetTag}`,
+    assetId: updated.id,
   });
 
   // Register in T&T if model requires it and not already registered
@@ -337,7 +380,7 @@ export async function bulkUpdateAssets(
 }
 
 export async function deleteAsset(id: string) {
-  const { organizationId } = await requirePermission("asset", "delete");
+  const { organizationId, userId, userName } = await requirePermission("asset", "delete");
 
   const asset = await prisma.asset.findUnique({
     where: { id, organizationId },
@@ -367,6 +410,19 @@ export async function deleteAsset(id: string) {
   }
 
   await prisma.asset.delete({ where: { id, organizationId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "asset",
+    entityId: id,
+    entityName: asset.assetTag,
+    summary: `Deleted asset ${asset.assetTag}`,
+    details: { deleted: { assetTag: asset.assetTag } },
+  });
+
   return { id };
 }
 

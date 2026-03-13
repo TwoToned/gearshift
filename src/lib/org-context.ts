@@ -17,6 +17,7 @@ export async function getOrgContext() {
   return {
     organizationId,
     userId: session.user.id,
+    userName: session.user.name || "Unknown",
     user: session.user,
     session: session.session,
   };
@@ -87,8 +88,8 @@ async function resolvePermissions(
 export async function requirePermission(
   resource: Resource,
   action: string,
-): Promise<{ organizationId: string; userId: string }> {
-  const { organizationId, userId } = await getOrgContext();
+): Promise<{ organizationId: string; userId: string; userName: string }> {
+  const { organizationId, userId, userName } = await getOrgContext();
 
   const member = await prisma.member.findFirst({
     where: { organizationId, userId },
@@ -111,7 +112,7 @@ export async function requirePermission(
     throw new Error("You don't have permission to perform this action.");
   }
 
-  return { organizationId, userId };
+  return { organizationId, userId, userName };
 }
 
 /**

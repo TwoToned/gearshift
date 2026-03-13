@@ -13,6 +13,7 @@ import {
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { reserveAssetTags } from "@/server/settings";
+import { logActivity } from "@/lib/activity-log";
 
 // ---------------------------------------------------------------------------
 // getKits – paginated list with optional filters
@@ -132,7 +133,7 @@ export async function getKit(id: string) {
 // createKit
 // ---------------------------------------------------------------------------
 export async function createKit(data: KitFormValues) {
-  const { organizationId } = await requirePermission("kit", "create");
+  const { organizationId, userId, userName } = await requirePermission("kit", "create");
   const parsed = kitSchema.parse(data);
 
   try {
@@ -161,6 +162,20 @@ export async function createKit(data: KitFormValues) {
       },
     });
     await reserveAssetTags(1);
+
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "kit",
+      entityId: result.id,
+      entityName: result.assetTag,
+      summary: `Created kit ${result.assetTag} - ${result.name}`,
+      details: { created: { assetTag: result.assetTag, name: result.name } },
+      kitId: result.id,
+    });
+
     return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
@@ -174,33 +189,45 @@ export async function createKit(data: KitFormValues) {
 // updateKit
 // ---------------------------------------------------------------------------
 export async function updateKit(id: string, data: KitFormValues) {
-  const { organizationId } = await requirePermission("kit", "update");
+  const { organizationId, userId, userName } = await requirePermission("kit", "update");
   const parsed = kitSchema.parse(data);
 
-  return serialize(
-    await prisma.kit.update({
-      where: { id, organizationId },
-      data: {
-        name: parsed.name,
-        assetTag: parsed.assetTag,
-        description: parsed.description,
-        categoryId: parsed.categoryId || null,
-        status: parsed.status,
-        condition: parsed.condition,
-        locationId: parsed.locationId || null,
-        weight: parsed.weight,
-        caseType: parsed.caseType,
-        caseDimensions: parsed.caseDimensions,
-        notes: parsed.notes,
-        purchaseDate: parsed.purchaseDate,
-        purchasePrice: parsed.purchasePrice,
-        image: parsed.image,
-        images: parsed.images,
-        isActive: parsed.isActive,
-        tags: parsed.tags,
-      },
-    }),
-  );
+  const updated = await prisma.kit.update({
+    where: { id, organizationId },
+    data: {
+      name: parsed.name,
+      assetTag: parsed.assetTag,
+      description: parsed.description,
+      categoryId: parsed.categoryId || null,
+      status: parsed.status,
+      condition: parsed.condition,
+      locationId: parsed.locationId || null,
+      weight: parsed.weight,
+      caseType: parsed.caseType,
+      caseDimensions: parsed.caseDimensions,
+      notes: parsed.notes,
+      purchaseDate: parsed.purchaseDate,
+      purchasePrice: parsed.purchasePrice,
+      image: parsed.image,
+      images: parsed.images,
+      isActive: parsed.isActive,
+      tags: parsed.tags,
+    },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "kit",
+    entityId: updated.id,
+    entityName: updated.assetTag,
+    summary: `Updated kit ${updated.assetTag} - ${updated.name}`,
+    kitId: updated.id,
+  });
+
+  return serialize(updated);
 }
 
 export async function updateKitNotes(id: string, notes: string) {
@@ -215,7 +242,7 @@ export async function updateKitNotes(id: string, notes: string) {
 // archiveKit – soft delete: remove all contents, then deactivate
 // ---------------------------------------------------------------------------
 export async function archiveKit(id: string) {
-  const { organizationId } = await requirePermission("kit", "delete");
+  const { organizationId, userId, userName } = await requirePermission("kit", "delete");
 
   const kit = await prisma.kit.findUnique({
     where: { id, organizationId },
@@ -230,35 +257,47 @@ export async function archiveKit(id: string) {
     throw new Error("Only AVAILABLE kits can be archived");
   }
 
-  return serialize(
-    await prisma.$transaction(async (tx) => {
-      // Clear kitId on all serialized assets
-      for (const item of kit.serializedItems) {
-        await tx.asset.update({
-          where: { id: item.assetId },
-          data: { kitId: null, status: "AVAILABLE" },
-        });
-      }
-      // Delete all serialized items
-      await tx.kitSerializedItem.deleteMany({ where: { kitId: id } });
-
-      // Return bulk quantities
-      for (const item of kit.bulkItems) {
-        await tx.bulkAsset.update({
-          where: { id: item.bulkAssetId },
-          data: { availableQuantity: { increment: item.quantity } },
-        });
-      }
-      // Delete all bulk items
-      await tx.kitBulkItem.deleteMany({ where: { kitId: id } });
-
-      // Soft-delete the kit
-      return tx.kit.update({
-        where: { id, organizationId },
-        data: { isActive: false, status: "RETIRED" },
+  const archived = await prisma.$transaction(async (tx) => {
+    // Clear kitId on all serialized assets
+    for (const item of kit.serializedItems) {
+      await tx.asset.update({
+        where: { id: item.assetId },
+        data: { kitId: null, status: "AVAILABLE" },
       });
-    }),
-  );
+    }
+    // Delete all serialized items
+    await tx.kitSerializedItem.deleteMany({ where: { kitId: id } });
+
+    // Return bulk quantities
+    for (const item of kit.bulkItems) {
+      await tx.bulkAsset.update({
+        where: { id: item.bulkAssetId },
+        data: { availableQuantity: { increment: item.quantity } },
+      });
+    }
+    // Delete all bulk items
+    await tx.kitBulkItem.deleteMany({ where: { kitId: id } });
+
+    // Soft-delete the kit
+    return tx.kit.update({
+      where: { id, organizationId },
+      data: { isActive: false, status: "RETIRED" },
+    });
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "kit",
+    entityId: id,
+    entityName: kit.assetTag,
+    summary: `Archived kit ${kit.assetTag} - ${kit.name}`,
+    kitId: id,
+  });
+
+  return serialize(archived);
 }
 
 // ---------------------------------------------------------------------------
