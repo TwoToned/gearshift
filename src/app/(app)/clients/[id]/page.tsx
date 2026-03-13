@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Archive, Mail, Phone, MapPin, FileText } from "lucide-react";
+import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -176,23 +177,35 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Addresses</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-3 text-sm">
             {client.billingAddress && (
               <div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                   <MapPin className="h-3 w-3" />
                   Billing
                 </div>
-                <p className="whitespace-pre-wrap">{client.billingAddress}</p>
+                <AddressDisplay
+                  address={client.billingAddress}
+                  latitude={client.billingLatitude}
+                  longitude={client.billingLongitude}
+                  label={`${client.name} — Billing`}
+                  compact
+                />
               </div>
             )}
             {client.shippingAddress && (
               <div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                   <MapPin className="h-3 w-3" />
                   Shipping
                 </div>
-                <p className="whitespace-pre-wrap">{client.shippingAddress}</p>
+                <AddressDisplay
+                  address={client.shippingAddress}
+                  latitude={client.shippingLatitude}
+                  longitude={client.shippingLongitude}
+                  label={`${client.name} — Shipping`}
+                  compact
+                />
               </div>
             )}
             {!client.billingAddress && !client.shippingAddress && (

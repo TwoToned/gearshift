@@ -27,9 +27,9 @@
 - **KitBulkItem** — `id, organizationId, kitId, bulkAssetId, quantity, position, sortOrder, addedAt, addedById, notes`
 
 ## Client & Location Models
-- **Client** — `id, organizationId, name, type (COMPANY|INDIVIDUAL|VENUE|PRODUCTION_COMPANY), contactName, contactEmail, contactPhone, billingAddress, shippingAddress, taxId, paymentTerms, defaultDiscount, notes, tags[], isActive`
-- **Location** — `id, organizationId, name, address, type (WAREHOUSE|VENUE|VEHICLE|OFFSITE), isDefault, parentId (self-join), notes`
-- **Supplier** — `id, organizationId, name, contactName, email, phone, website, address, notes, accountNumber, paymentTerms, defaultLeadTime, tags[], isActive`. Unique: `[organizationId, name]`
+- **Client** — `id, organizationId, name, type (COMPANY|INDIVIDUAL|VENUE|PRODUCTION_COMPANY), contactName, contactEmail, contactPhone, billingAddress, billingLatitude, billingLongitude, shippingAddress, shippingLatitude, shippingLongitude, taxId, paymentTerms, defaultDiscount, notes, tags[], isActive`
+- **Location** — `id, organizationId, name, address, latitude, longitude, type (WAREHOUSE|VENUE|VEHICLE|OFFSITE), isDefault, parentId (self-join), notes`
+- **Supplier** — `id, organizationId, name, contactName, email, phone, website, address, latitude, longitude, notes, accountNumber, paymentTerms, defaultLeadTime, tags[], isActive`. Unique: `[organizationId, name]`
 
 ## Supplier Order Models
 - **SupplierOrder** — `id, organizationId, supplierId, orderNumber, type (PURCHASE|SUBHIRE|REPAIR|OTHER), status (DRAFT|SUBMITTED|CONFIRMED|PARTIAL|RECEIVED|CANCELLED), orderDate, expectedDate, receivedDate, subtotal, taxAmount, total (Decimal), projectId, createdById, notes`. Unique: `[organizationId, orderNumber]`

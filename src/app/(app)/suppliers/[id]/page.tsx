@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Mail, Phone, Globe, MapPin, Trash2, Plus } from "lucide-react";
+import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -165,9 +166,14 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
               {supplier.address && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  <span className="whitespace-pre-wrap">{supplier.address}</span>
+                <div className="mt-2">
+                  <AddressDisplay
+                    address={supplier.address}
+                    latitude={supplier.latitude}
+                    longitude={supplier.longitude}
+                    label={supplier.name}
+                    compact
+                  />
                 </div>
               )}
               {!supplier.contactName && !supplier.email && !supplier.phone && (

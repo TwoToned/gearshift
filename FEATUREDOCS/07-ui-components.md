@@ -18,6 +18,9 @@ shadcn/ui v4 uses Base UI, which uses `render` prop for composition (NOT Radix's
 - **UserAvatar** (`src/components/ui/user-avatar.tsx`) — Avatar with image + initials fallback
 - **MediaUploader** (`src/components/media/media-uploader.tsx`) — Drag-to-reorder, primary marking, bulk upload
 - **MediaThumbnail** (`src/components/media/media-thumbnail.tsx`) — Image with fallback placeholder
+- **AddressInput** (`src/components/ui/address-input.tsx`) — Text input with Nominatim autocomplete. Shows suggestions as user types (debounced 300ms, min 3 chars). On selection, fires `onPlaceSelect` with lat/lng. Freeform text clears coordinates. Shows teal MapPin icon when geocoded. Use with `Controller` from React Hook Form.
+- **AddressMap** (`src/components/ui/address-map.tsx`) — Leaflet + OpenStreetMap map with pin. Dynamic import (no SSR). Dark mode tiles (CartoDB DarkMatter/Positron). Shows "Get Directions" link (Google Maps / Apple Maps). Props: `latitude`, `longitude`, `address`, `label`, `height`, `zoom`, `interactive`, `showDirectionsLink`.
+- **AddressDisplay** (`src/components/ui/address-display.tsx`) — Conditional wrapper: renders `AddressMap` if coordinates exist, plain text if only address, nothing if empty. Use on all detail pages. Props: `address`, `latitude`, `longitude`, `label`, `compact` (150px non-interactive map for cards).
 
 ## Dialog vs Sheet
 - **Dialog**: Centered modal. Full-screen on mobile with safe area padding via `style` prop

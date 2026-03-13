@@ -496,6 +496,8 @@ model Supplier {
   phone           String?
   website         String?
   address         String?
+  latitude        Float?
+  longitude       Float?
   notes           String?
   accountNumber   String?
   paymentTerms    String?
@@ -758,6 +760,8 @@ model Location {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   address        String?
+  latitude       Float?
+  longitude      Float?
   type           LocationType @default(WAREHOUSE)
   isDefault      Boolean      @default(false)
   parentId       String?
@@ -837,8 +841,12 @@ model Client {
   contactName     String?
   contactEmail    String?
   contactPhone    String?
-  billingAddress  String?
-  shippingAddress String?
+  billingAddress    String?
+  billingLatitude   Float?
+  billingLongitude  Float?
+  shippingAddress   String?
+  shippingLatitude  Float?
+  shippingLongitude Float?
   taxId           String?
   paymentTerms    String?
   defaultDiscount Decimal?   @db.Decimal(5, 2)

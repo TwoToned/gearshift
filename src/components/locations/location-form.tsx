@@ -8,9 +8,11 @@ import { toast } from "sonner";
 
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { useOrgCountry } from "@/lib/use-org-country";
 import { createLocation, updateLocation, getLocations } from "@/server/locations";
 import { getOrgTags } from "@/server/tags";
 import { TagInput } from "@/components/ui/tag-input";
+import { AddressInput } from "@/components/ui/address-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +37,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
   const isEditing = !!initialData?.id;
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
+  const orgCountry = useOrgCountry();
 
   const { data: locationsData } = useQuery({
     queryKey: ["locations", orgId, { pageSize: 100 }],
@@ -55,6 +58,8 @@ export function LocationForm({ initialData }: LocationFormProps) {
     defaultValues: initialData || {
       name: "",
       address: "",
+      latitude: null,
+      longitude: null,
       type: "WAREHOUSE",
       isDefault: false,
       notes: "",
@@ -128,7 +133,32 @@ export function LocationForm({ initialData }: LocationFormProps) {
 
           <div className="space-y-2">
             <Label>Address</Label>
-            <Input {...form.register("address")} placeholder="123 Main St, City" />
+            <Controller
+              name="address"
+              control={form.control}
+              render={({ field }) => (
+                <AddressInput
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  onPlaceSelect={(place) => {
+                    if (place) {
+                      form.setValue("latitude", place.latitude);
+                      form.setValue("longitude", place.longitude);
+                    } else {
+                      form.setValue("latitude", null);
+                      form.setValue("longitude", null);
+                    }
+                  }}
+                  initialCoordinates={
+                    form.watch("latitude") != null && form.watch("longitude") != null
+                      ? { latitude: form.watch("latitude") as number, longitude: form.watch("longitude") as number }
+                      : null
+                  }
+                  placeholder="123 Main St, City"
+                  countryCode={orgCountry}
+                />
+              )}
+            />
           </div>
 
           <div className="space-y-2">

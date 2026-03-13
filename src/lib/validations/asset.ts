@@ -42,12 +42,17 @@ export type BulkAssetFormValues = z.input<typeof bulkAssetSchema>;
 export const locationSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   address: z.string().max(500).optional(),
+  latitude: z.coerce.number().optional().nullable(),
+  longitude: z.coerce.number().optional().nullable(),
   type: z.enum(["WAREHOUSE", "VENUE", "VEHICLE", "OFFSITE"]).default("WAREHOUSE"),
   isDefault: z.boolean().default(false),
   parentId: z.string().nullable().optional(),
   notes: z.string().max(1000).optional(),
   tags: z.array(z.string()).default([]),
-});
+}).refine(
+  (data) => (data.latitude != null) === (data.longitude != null),
+  { message: "Both latitude and longitude must be provided together" }
+);
 
 export type LocationFormValues = z.input<typeof locationSchema>;
 
