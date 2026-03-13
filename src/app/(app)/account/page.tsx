@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { usePlatformBranding } from "@/lib/use-platform-name";
 import {
   Card,
   CardContent,
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   Shield,
   KeyRound,
@@ -32,6 +33,12 @@ import {
   Building2,
   DoorOpen,
   Loader2,
+  Fingerprint,
+  Camera,
+  Trash2,
+  Plus,
+  Pencil,
+  Link2,
 } from "lucide-react";
 import { authClient, useSession, useActiveOrganization } from "@/lib/auth-client";
 import {
@@ -48,9 +55,20 @@ export default function AccountPage() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { data: activeOrg } = useActiveOrganization();
+  const { name: platformName } = usePlatformBranding();
   const orgId = activeOrg?.id;
   const [name, setName] = useState("");
   const [nameLoaded, setNameLoaded] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Available social providers (from server config)
+  const [socialProviders, setSocialProviders] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/auth/social-providers", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : { providers: [] })
+      .then((d) => setSocialProviders(d.providers || []))
+      .catch(() => setSocialProviders([]));
+  }, []);
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
@@ -69,6 +87,10 @@ export default function AccountPage() {
     name: string;
   } | null>(null);
 
+  // Passkey rename
+  const [renamePasskey, setRenamePasskey] = useState<{ id: string; name: string } | null>(null);
+  const [passkeyNewName, setPasskeyNewName] = useState("");
+
   const profileQuery = useQuery({
     queryKey: ["profile", orgId],
     queryFn: getProfile,
@@ -84,6 +106,14 @@ export default function AccountPage() {
     queryFn: getActiveSessions,
   });
 
+  const passkeysQuery = useQuery({
+    queryKey: ["passkeys"],
+    queryFn: async () => {
+      const res = await authClient.passkey.listUserPasskeys();
+      return res.data || [];
+    },
+  });
+
   // Set name once loaded
   if (profileQuery.data && !nameLoaded) {
     setName(profileQuery.data.name || "");
@@ -95,6 +125,36 @@ export default function AccountPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/avatar", { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Profile picture updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/avatar", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to remove avatar");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Profile picture removed");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -156,7 +216,6 @@ export default function AccountPage() {
       if (res.error) throw new Error(res.error.message || "Failed to enable 2FA");
       const uri = res.data?.totpURI || "";
       setTotpURI(uri);
-      // Generate QR code data URL
       if (uri) {
         const QRCode = (await import("qrcode")).default;
         const dataUrl = await QRCode.toDataURL(uri, { width: 200, margin: 2 });
@@ -204,13 +263,63 @@ export default function AccountPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Passkey mutations
+  const addPasskeyMutation = useMutation({
+    mutationFn: async () => {
+      const email = profile?.email || session?.user?.email || "unknown";
+      const res = await authClient.passkey.addPasskey({
+        name: `${platformName} - ${email}`,
+      });
+      if (res?.error) throw new Error(res.error.message || "Failed to add passkey");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
+      toast.success("Passkey registered");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deletePasskeyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await authClient.passkey.deletePasskey({ id });
+      if (res?.error) throw new Error(res.error.message || "Failed to delete passkey");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
+      toast.success("Passkey deleted");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const renamePasskeyMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await authClient.passkey.updatePasskey({ id, name });
+      if (res?.error) throw new Error(res.error.message || "Failed to rename passkey");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
+      toast.success("Passkey renamed");
+      setRenamePasskey(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Social login
+  const handleLinkSocial = async (provider: "google" | "microsoft") => {
+    try {
+      await authClient.linkSocial({
+        provider,
+        callbackURL: "/account",
+      });
+    } catch {
+      toast.error("Failed to link account");
+    }
+  };
+
   const profile = profileQuery.data;
-  const initials = profile?.name
-    ?.split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const passkeys = (passkeysQuery.data || []) as any[];
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -229,11 +338,31 @@ export default function AccountPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={profile?.image || undefined} />
-              <AvatarFallback className="text-lg">{initials || "?"}</AvatarFallback>
-            </Avatar>
-            <div>
+            <div className="relative group">
+              <UserAvatar
+                user={{ name: profile?.name, image: profile?.image }}
+                size="xl"
+              />
+              <button
+                type="button"
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera className="h-5 w-5 text-white" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadAvatarMutation.mutate(file);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+            <div className="flex-1">
               <p className="font-medium">{profile?.name}</p>
               <p className="text-sm text-muted-foreground">{profile?.email}</p>
               {profile?.role === "admin" && (
@@ -241,6 +370,32 @@ export default function AccountPage() {
                   Site Admin
                 </Badge>
               )}
+              <div className="flex gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadAvatarMutation.isPending}
+                >
+                  {uploadAvatarMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Camera className="mr-1 h-3 w-3" />
+                  )}
+                  {profile?.image ? "Change" : "Upload"} Photo
+                </Button>
+                {profile?.image && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeAvatarMutation.mutate()}
+                    disabled={removeAvatarMutation.isPending}
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" />
+                    Remove
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
           <Separator />
@@ -371,6 +526,145 @@ export default function AccountPage() {
               </div>
             )}
           </div>
+
+          <Separator />
+
+          {/* Passkeys */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Fingerprint className="h-4 w-4" />
+                Passkeys
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => addPasskeyMutation.mutate()}
+                disabled={addPasskeyMutation.isPending}
+              >
+                {addPasskeyMutation.isPending ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Plus className="mr-1 h-3 w-3" />
+                )}
+                Add Passkey
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Use Touch ID, Face ID, or a security key for passwordless sign-in.
+            </p>
+            {passkeys.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No passkeys registered.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {passkeys.map((pk: { id: string; name?: string; createdAt?: string }) => (
+                  <div
+                    key={pk.id}
+                    className="flex items-center justify-between rounded-md border p-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Fingerprint className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">
+                          {pk.name || "Unnamed Passkey"}
+                        </span>
+                      </div>
+                      {pk.createdAt && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Added {new Date(pk.createdAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          setRenamePasskey({ id: pk.id, name: pk.name || "" });
+                          setPasskeyNewName(pk.name || "");
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          if (confirm("Delete this passkey?")) {
+                            deletePasskeyMutation.mutate(pk.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Connected Accounts — only show if any social providers are enabled */}
+          {socialProviders.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  Connected Accounts
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Link social accounts for easier sign-in.
+                </p>
+                <div className="space-y-2">
+                  {socialProviders.includes("google") && (
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                      <div className="flex items-center gap-3">
+                        <svg className="h-5 w-5" viewBox="0 0 24 24">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        <span className="text-sm">Google</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleLinkSocial("google")}
+                      >
+                        <Link2 className="mr-1 h-3 w-3" />
+                        Connect
+                      </Button>
+                    </div>
+                  )}
+                  {socialProviders.includes("microsoft") && (
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                      <div className="flex items-center gap-3">
+                        <svg className="h-5 w-5" viewBox="0 0 21 21">
+                          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                        </svg>
+                        <span className="text-sm">Microsoft</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleLinkSocial("microsoft")}
+                      >
+                        <Link2 className="mr-1 h-3 w-3" />
+                        Connect
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -573,6 +867,44 @@ export default function AccountPage() {
               disabled={leaveOrgMutation.isPending}
             >
               {leaveOrgMutation.isPending ? "Leaving..." : "Leave Organization"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Passkey Dialog */}
+      <Dialog
+        open={!!renamePasskey}
+        onOpenChange={(open) => !open && setRenamePasskey(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Passkey</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="passkeyName">Name</Label>
+            <Input
+              id="passkeyName"
+              value={passkeyNewName}
+              onChange={(e) => setPasskeyNewName(e.target.value)}
+              placeholder="e.g. MacBook Touch ID"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenamePasskey(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                renamePasskey &&
+                renamePasskeyMutation.mutate({
+                  id: renamePasskey.id,
+                  name: passkeyNewName,
+                })
+              }
+              disabled={renamePasskeyMutation.isPending || !passkeyNewName.trim()}
+            >
+              {renamePasskeyMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

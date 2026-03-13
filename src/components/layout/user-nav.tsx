@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, User, ChevronsUpDown, Shield } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,12 +23,6 @@ export function UserNav() {
 
   const user = session?.user;
   const isSiteAdmin = (user as Record<string, unknown>)?.role === "admin";
-  const initials = user?.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <DropdownMenu>
@@ -40,12 +34,11 @@ export function UserNav() {
           />
         }
       >
-        <Avatar className="h-8 w-8 rounded-lg">
-          <AvatarImage src={user?.image || undefined} alt={user?.name} />
-          <AvatarFallback className="rounded-lg text-xs">
-            {initials || "?"}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          user={{ name: user?.name, image: user?.image }}
+          size="sm"
+          className="rounded-lg"
+        />
         <div className="grid flex-1 text-left text-sm leading-tight">
           <span className="truncate font-medium">{user?.name || "User"}</span>
           <span className="truncate text-xs text-muted-foreground">

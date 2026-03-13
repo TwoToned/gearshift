@@ -50,7 +50,10 @@ No test framework is configured.
 - `src/app/api/admin-register/` — Secret admin registration token verification + promotion.
 
 ### Auth & Multi-Tenancy
-- **Better Auth** with Organization, TwoFactor, and Admin plugins. Server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
+- **Better Auth** with Organization, TwoFactor, Admin, and Passkey plugins. Server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
+- **Passkeys**: `@better-auth/passkey` plugin. `Passkey` model in schema. Login via `authClient.signIn.passkey()`. Managed on account page. Env: `PASSKEY_RP_ID`.
+- **Social Login**: Google and Microsoft, conditional on env vars (`GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`). Login page dynamically shows buttons. Account page has "Connected Accounts" section.
+- **Profile Pictures**: Upload via `POST /api/avatar` (resizes to 256x256 via sharp). Stored under global `avatars/` S3 prefix. `UserAvatar` component (`src/components/ui/user-avatar.tsx`) used across the app.
 - Middleware (`src/middleware.ts`) checks `better-auth.session_token` or `__Secure-better-auth.session_token` cookie; redirects unauthenticated users to `/login`.
 - Public routes exempted from auth: `/login`, `/register`, `/api/auth`, `/invite`, `/two-factor`, `/no-organization`, `/onboarding`, `/api/platform-name`, `/api/registration-policy`.
 - Every session has `activeOrganizationId`. All data must be scoped to it.

@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { organization, twoFactor, admin } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import { sendEmail } from "./email";
@@ -84,7 +85,26 @@ export const auth = betterAuth({
       issuer: "GearFlow",
     }),
     admin(),
+    passkey({
+      rpID: process.env.PASSKEY_RP_ID || "localhost",
+      rpName: process.env.PLATFORM_NAME || "GearFlow",
+      origin: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    }),
   ],
+  socialProviders: {
+    ...(process.env.GOOGLE_CLIENT_ID && {
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      },
+    }),
+    ...(process.env.MICROSOFT_CLIENT_ID && {
+      microsoft: {
+        clientId: process.env.MICROSOFT_CLIENT_ID,
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+      },
+    }),
+  },
   session: {
     cookieCache: {
       enabled: true,

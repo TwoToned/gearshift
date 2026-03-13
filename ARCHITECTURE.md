@@ -39,8 +39,9 @@ This document provides an exhaustive technical reference for every feature, syst
 31. [Universal Tags System](#31-universal-tags-system)
 32. [Activity Log (Audit Trail)](#32-activity-log-audit-trail)
 33. [Advanced DataTable System](#33-advanced-datatable-system)
-34. [Key Patterns & Conventions](#34-key-patterns--conventions)
-35. [Integration Checklist for New Features](#35-integration-checklist-for-new-features)
+34. [User Customisation & Auth Methods](#34-user-customisation--auth-methods)
+35. [Key Patterns & Conventions](#35-key-patterns--conventions)
+36. [Integration Checklist for New Features](#36-integration-checklist-for-new-features)
 
 ---
 
@@ -231,9 +232,11 @@ src/
 ## 4. Authentication & Multi-Tenancy
 
 ### Better Auth Configuration (`src/lib/auth.ts`)
-- Plugins: `organization()`, `twoFactor({ issuer: "GearFlow" })`, `admin()`
+- Plugins: `organization()`, `twoFactor({ issuer: "GearFlow" })`, `admin()`, `passkey()`
+- Social providers: Google and Microsoft (conditional on env vars `GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`)
 - Email verification, password reset via Resend
 - Session stored in PostgreSQL `Session` table with `activeOrganizationId`
+- Passkey RP ID configurable via `PASSKEY_RP_ID` env var (defaults to `localhost`)
 
 ### Middleware (`src/middleware.ts`)
 - Checks cookies: `better-auth.session_token` or `__Secure-better-auth.session_token` (HTTPS)
@@ -1158,7 +1161,35 @@ All list/table pages use a shared `DataTable` component (`src/components/ui/data
 
 ---
 
-## 34. Key Patterns & Conventions
+## 34. User Customisation & Auth Methods
+
+### Profile Pictures
+- **UserAvatar component** (`src/components/ui/user-avatar.tsx`): Reusable avatar with image + initials fallback. Sizes: `xs` (24px), `sm` (32px), `md` (40px), `lg` (48px), `xl` (64px). Consistent hash-based color per user name.
+- **Upload**: `POST /api/avatar` — accepts JPEG/PNG/WebP (max 5MB), resizes to 256x256 via `sharp`, stores under global `avatars/users/{userId}/` S3 prefix (not org-scoped).
+- **Remove**: `DELETE /api/avatar` — deletes S3 file, sets `User.image` to null.
+- **File proxy**: `GET /api/files/avatars/...` allowed without org prefix validation (avatars are global).
+- **Display locations**: Sidebar user nav, team member list, account page. All use `UserAvatar` component.
+
+### Passkeys (WebAuthn)
+- **Plugin**: `@better-auth/passkey` — server config in `src/lib/auth.ts`, client in `src/lib/auth-client.ts`.
+- **Database**: `Passkey` model with `credentialID` (unique), `publicKey`, `counter`, `deviceType`, `backedUp`, `transports`, `name`.
+- **Login page**: "Sign in with Passkey" button using `authClient.signIn.passkey()`. Email input has `autocomplete="username webauthn"` for conditional UI.
+- **Account page**: Passkey management section — list registered passkeys, add new (via `authClient.passkey.addPasskey()`), rename, delete.
+- **Env vars**: `PASSKEY_RP_ID` (e.g. `gearflow.com` in production, `localhost` for dev).
+
+### Social Login (Google & Microsoft)
+- **Configuration**: Conditional on env vars — providers only enabled when `GOOGLE_CLIENT_ID` / `MICROSOFT_CLIENT_ID` are set.
+- **Login page**: Social buttons shown dynamically based on `/api/auth/social-providers` endpoint. Renders above email/password form with "or" divider.
+- **Account page**: "Connected Accounts" section with Connect buttons for Google and Microsoft via `authClient.linkSocial()`.
+- **Account linking**: Better Auth auto-links social accounts to existing users with matching email via the `Account` table.
+- **Env vars**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`.
+
+### Account Page Sections
+The `/account` page is organized into: Profile (avatar + name), Security (password, 2FA, passkeys, connected accounts), Organizations, Active Sessions.
+
+---
+
+## 35. Key Patterns & Conventions
 
 ### Server Action Pattern
 ```typescript
@@ -1205,7 +1236,7 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ---
 
-## 35. Integration Checklist for New Features
+## 36. Integration Checklist for New Features
 
 When implementing a new feature, ensure it integrates with ALL existing systems.
 

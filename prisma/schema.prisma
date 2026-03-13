@@ -43,6 +43,7 @@ model User {
   twoFactors              TwoFactor[]
   backupCodes             BackupCode[]
   activityLogs            ActivityLog[]
+  passkeys                Passkey[]
 
   @@map("user")
 }
@@ -1204,6 +1205,24 @@ model BackupCode {
   @@map("backup_code")
 }
 
+model Passkey {
+  id              String   @id @default(cuid())
+  name            String?
+  publicKey       String
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID    String   @unique
+  counter         Int
+  deviceType      String
+  backedUp        Boolean
+  transports      String?
+  aaguid          String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@map("passkey")
+}
+
 // ─── Site Settings ──────────────────────────────────────────────────────────
 
 model SiteSettings {
@@ -1215,6 +1234,8 @@ model SiteSettings {
   twoFactorGlobalPolicy  String   @default("OFF")  // OFF, RECOMMENDED, REQUIRED_SITE_ADMINS, REQUIRED_ALL
   defaultCurrency        String   @default("AUD")
   defaultTaxRate         Float    @default(10)
+  socialLoginGoogle      Boolean  @default(false)
+  socialLoginMicrosoft   Boolean  @default(false)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

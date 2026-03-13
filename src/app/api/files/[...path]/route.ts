@@ -24,8 +24,11 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Verify the file belongs to the requesting user's organization
-  if (!storageKey.startsWith(organizationId + "/")) {
+  // Allow avatar paths (global, not org-scoped)
+  const isAvatarPath = storageKey.startsWith("avatars/");
+
+  // Verify the file belongs to the requesting user's organization (or is an avatar)
+  if (!isAvatarPath && !storageKey.startsWith(organizationId + "/")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

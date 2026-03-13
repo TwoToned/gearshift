@@ -52,6 +52,8 @@ export async function updateSiteSettings(data: {
   twoFactorGlobalPolicy?: string;
   defaultCurrency?: string;
   defaultTaxRate?: number;
+  socialLoginGoogle?: boolean;
+  socialLoginMicrosoft?: boolean;
 }) {
   await requireSiteAdmin();
 

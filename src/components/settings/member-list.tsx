@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -216,13 +216,6 @@ export function MemberList() {
         </>
       )}
       {items.map((member) => {
-        const initials = member.user.name
-          ?.split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2);
-
         const display = getRoleDisplay(member.role, customRolesMap);
 
         return (
@@ -231,10 +224,7 @@ export function MemberList() {
             className="flex items-center justify-between rounded-md border p-3"
           >
             <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={member.user.image || undefined} />
-                <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
-              </Avatar>
+              <UserAvatar user={member.user} size="sm" />
               <div>
                 <p className="text-sm font-medium">{member.user.name || "Unnamed"}</p>
                 <p className="text-xs text-muted-foreground">
