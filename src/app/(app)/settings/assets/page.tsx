@@ -17,13 +17,16 @@ import {
   type OrgSettings,
 } from "@/server/settings";
 import { useCanDo } from "@/lib/use-permissions";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 export default function AssetsSettingsPage() {
   const queryClient = useQueryClient();
   const canEdit = useCanDo("orgSettings", "update");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: org } = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: getOrganization,
   });
 
@@ -40,7 +43,7 @@ export default function AssetsSettingsPage() {
   const updateMutation = useMutation({
     mutationFn: () => updateOrganization({ name, settings }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["organization"] });
+      queryClient.invalidateQueries({ queryKey: ["organization", orgId] });
       toast.success("Settings saved");
     },
     onError: (e) => toast.error(e.message),

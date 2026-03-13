@@ -11,6 +11,11 @@ export async function scanLookup(value: string): Promise<{ url: string | null; l
   const { organizationId } = await getOrgContext();
   const tag = value.trim();
 
+  // Validate scanned value: reasonable length and character set
+  if (!tag || tag.length > 128 || !/^[A-Za-z0-9\-_.:/ ]+$/.test(tag)) {
+    return { url: null, label: null };
+  }
+
   // 1. Check serialized assets
   const asset = await prisma.asset.findUnique({
     where: { organizationId_assetTag: { organizationId, assetTag: tag } },

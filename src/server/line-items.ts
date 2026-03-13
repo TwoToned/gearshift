@@ -576,6 +576,11 @@ export async function checkKitAvailability(
 
 // --- Internal helpers ---
 
+/** Round to 2 decimal places to avoid floating-point drift in financial calculations */
+function roundCurrency(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 function calculateLineTotal(
   unitPrice: number | undefined,
   quantity: number,
@@ -583,9 +588,9 @@ function calculateLineTotal(
   discount: number | undefined
 ): number | null {
   if (unitPrice == null) return null;
-  const gross = unitPrice * quantity * duration;
+  const gross = roundCurrency(unitPrice * quantity * duration);
   const disc = discount ?? 0;
-  return Math.max(0, gross - disc);
+  return Math.max(0, roundCurrency(gross - disc));
 }
 
 export async function recalculateProjectTotals(projectId: string) {
@@ -597,15 +602,17 @@ export async function recalculateProjectTotals(projectId: string) {
     },
   });
 
-  const subtotal = lineItems.reduce((sum, li) => {
-    const lt =
-      li.lineTotal != null
-        ? typeof li.lineTotal === "number"
-          ? li.lineTotal
-          : Number(li.lineTotal)
-        : 0;
-    return sum + lt;
-  }, 0);
+  const subtotal = roundCurrency(
+    lineItems.reduce((sum, li) => {
+      const lt =
+        li.lineTotal != null
+          ? typeof li.lineTotal === "number"
+            ? li.lineTotal
+            : Number(li.lineTotal)
+          : 0;
+      return sum + lt;
+    }, 0)
+  );
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -614,10 +621,10 @@ export async function recalculateProjectTotals(projectId: string) {
 
   const discountPercent =
     project?.discountPercent != null ? Number(project.discountPercent) : 0;
-  const discountAmount = subtotal * (discountPercent / 100);
-  const taxableAmount = subtotal - discountAmount;
-  const taxAmount = taxableAmount * 0.1; // 10% GST
-  const total = taxableAmount + taxAmount;
+  const discountAmount = roundCurrency(subtotal * (discountPercent / 100));
+  const taxableAmount = roundCurrency(subtotal - discountAmount);
+  const taxAmount = roundCurrency(taxableAmount * 0.1); // 10% GST
+  const total = roundCurrency(taxableAmount + taxAmount);
 
   await prisma.project.update({
     where: { id: projectId },

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const WAREHOUSE_STATUSES = [
   "CONFIRMED",
@@ -96,9 +97,11 @@ export default function WarehousePage() {
   const [search, setSearch] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["warehouse-projects", { search }],
+    queryKey: ["warehouse-projects", orgId, { search }],
     queryFn: () =>
       getProjects({
         search: search || undefined,

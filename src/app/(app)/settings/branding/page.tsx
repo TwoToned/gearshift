@@ -9,10 +9,14 @@ import {
   getOrganization,
   type OrgSettings,
 } from "@/server/settings";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 export default function BrandingSettingsPage() {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const { data: org } = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: getOrganization,
   });
 

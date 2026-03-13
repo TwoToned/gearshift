@@ -12,7 +12,7 @@ import { useIsViewer } from "@/lib/use-permissions";
 interface NotesEditorProps {
   title?: string;
   initialNotes: string;
-  queryKey: string[];
+  queryKey: unknown[];
   onSave: (notes: string) => Promise<unknown>;
   placeholder?: string;
   rows?: number;

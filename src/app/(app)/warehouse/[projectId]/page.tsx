@@ -75,6 +75,7 @@ import {
 import { RequirePermission } from "@/components/auth/require-permission";
 import { OnlinePickList } from "@/components/warehouse/online-pick-list";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -302,6 +303,8 @@ function WarehouseProjectPage({
   const [returnNotes, setReturnNotes] = useState("");
   const [pickListOpen, setPickListOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   // Selection state
   const [selectedOut, setSelectedOut] = useState<Set<string>>(new Set());
@@ -335,12 +338,12 @@ function WarehouseProjectPage({
   }>>([]);
 
   const { data: project, isLoading } = useQuery({
-    queryKey: ["warehouse-project", projectId],
+    queryKey: ["warehouse-project", orgId, projectId],
     queryFn: () => getProjectForWarehouse(projectId),
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["warehouse-project", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["warehouse-project", orgId, projectId] });
     setSelectedOut(new Set());
     setSelectedIn(new Set());
   };

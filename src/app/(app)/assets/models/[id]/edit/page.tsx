@@ -4,13 +4,16 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getModel } from "@/server/models";
 import { ModelForm } from "@/components/assets/model-form";
+import { useActiveOrganization } from "@/lib/auth-client";
 import type { ModelFormValues } from "@/lib/validations/model";
 
 export default function EditModelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: model, isLoading } = useQuery({
-    queryKey: ["model", id],
+    queryKey: ["model", orgId, id],
     queryFn: () => getModel(id),
   });
 

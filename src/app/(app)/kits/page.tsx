@@ -23,6 +23,7 @@ import {
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -46,15 +47,17 @@ export default function KitsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [locationId, setLocationId] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kits", { search, status, locationId, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["kits", orgId, { search, status, locationId, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getKits({
         search: search || undefined,

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getTestTagAssets } from "@/server/test-tag-assets";
 import { getReportPreviewCount, type ReportFilters } from "@/server/test-tag-reports";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { RequirePermission } from "@/components/auth/require-permission";
 
 type ReportType = "register" | "overdue" | "session" | "item-history" | "due-schedule" | "class-summary" | "tester-activity" | "failed-items" | "bulk-summary" | "compliance-certificate";
@@ -129,17 +130,19 @@ export default function TestTagReportsPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   // For item-history: search test tag assets
   const { data: searchResults } = useQuery({
-    queryKey: ["test-tag-search", searchInput],
+    queryKey: ["test-tag-search", orgId, searchInput],
     queryFn: () => getTestTagAssets({ search: searchInput, pageSize: 5 }),
     enabled: activeReport?.key === "item-history" && searchInput.length >= 2,
   });
 
   // For bulk-summary: search bulk-linked test tag assets
   const { data: bulkAssets } = useQuery({
-    queryKey: ["test-tag-bulk-assets"],
+    queryKey: ["test-tag-bulk-assets", orgId],
     queryFn: () => getTestTagAssets({ assetLinkType: "bulk", pageSize: 100 }),
     enabled: activeReport?.key === "bulk-summary",
   });

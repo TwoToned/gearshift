@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 type AddMode = "model" | "asset-tag";
 
@@ -49,6 +50,8 @@ export function AddEquipmentDialog({
   onOpenChange,
 }: AddEquipmentDialogProps) {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const [mode, setMode] = useState<AddMode>("model");
   const [selectedModelId, setSelectedModelId] = useState("");
   const [assetTagInput, setAssetTagInput] = useState("");
@@ -66,7 +69,7 @@ export function AddEquipmentDialog({
   });
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models", { pageSize: 200 }],
+    queryKey: ["models", orgId, { pageSize: 200 }],
     queryFn: () => getModels({ pageSize: 200 }),
     enabled: open,
   });
@@ -85,6 +88,7 @@ export function AddEquipmentDialog({
   const { data: availability, isLoading: availabilityLoading } = useQuery({
     queryKey: [
       "availability",
+      orgId,
       selectedModelId,
       rentalStartDate?.toISOString(),
       rentalEndDate?.toISOString(),
@@ -104,6 +108,7 @@ export function AddEquipmentDialog({
   const { data: assetLookup, isLoading: lookupLoading } = useQuery({
     queryKey: [
       "asset-lookup",
+      orgId,
       lookupTag,
       rentalStartDate?.toISOString(),
       rentalEndDate?.toISOString(),

@@ -16,6 +16,7 @@ import {
 import { Trash2, Mail, X } from "lucide-react";
 import { NotViewer } from "@/components/auth/permission-gate";
 import { toast } from "sonner";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getMembers, getPendingInvitations, revokeInvitation } from "@/server/settings";
 import { changeMemberRole, removeOrgMember } from "@/server/org-members";
 import { getCustomRoles } from "@/server/custom-roles";
@@ -68,19 +69,21 @@ function getRoleDisplay(role: string, customRolesMap: Map<string, CustomRoleData
 
 export function MemberList() {
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: members, isLoading } = useQuery({
-    queryKey: ["org-members"],
+    queryKey: ["org-members", orgId],
     queryFn: getMembers,
   });
 
   const { data: customRoles } = useQuery({
-    queryKey: ["custom-roles"],
+    queryKey: ["custom-roles", orgId],
     queryFn: getCustomRoles,
   });
 
   const { data: pendingInvitations } = useQuery({
-    queryKey: ["pending-invitations"],
+    queryKey: ["pending-invitations", orgId],
     queryFn: getPendingInvitations,
   });
 

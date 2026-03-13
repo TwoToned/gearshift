@@ -35,6 +35,7 @@ import {
 import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   Table,
   TableBody,
@@ -94,9 +95,11 @@ export default function MaintenancePage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["maintenance", search, statusFilter, typeFilter, page, pageSize, sortBy, sortOrder],
+    queryKey: ["maintenance", orgId, search, statusFilter, typeFilter, page, pageSize, sortBy, sortOrder],
     queryFn: () =>
       getMaintenanceRecords({
         search: search || undefined,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { useActiveOrganization } from "@/lib/auth-client";
 import { createCategory, getCategories } from "@/server/categories";
 import {
   Dialog,
@@ -28,9 +29,11 @@ export function QuickCreateCategory({ open, onOpenChange, onCreated }: QuickCrea
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState("");
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
     staleTime: 0,
   });

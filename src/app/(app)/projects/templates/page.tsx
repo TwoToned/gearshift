@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { BookTemplate, Plus, Trash2, Copy } from "lucide-react";
 import { getTemplates, deleteTemplate, duplicateProject } from "@/server/projects";
 import { RequirePermission } from "@/components/auth/require-permission";
@@ -52,9 +53,11 @@ export default function TemplatesPage() {
   const [createFrom, setCreateFrom] = useState<any>(null);
   const [projectNumber, setProjectNumber] = useState("");
   const [projectName, setProjectName] = useState("");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: templates, isLoading } = useQuery({
-    queryKey: ["templates"],
+    queryKey: ["templates", orgId],
     queryFn: getTemplates,
   });
 

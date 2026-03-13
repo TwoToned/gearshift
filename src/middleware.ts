@@ -5,6 +5,11 @@ const publicRoutes = ["/login", "/register", "/api/auth", "/api/platform-name", 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // CVE-2025-29927: Strip x-middleware-subrequest header to prevent middleware bypass
+  if (request.headers.has("x-middleware-subrequest")) {
+    return new NextResponse(null, { status: 403 });
+  }
+
   // Allow public routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
@@ -21,7 +26,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  addSecurityHeaders(response);
+  return response;
+}
+
+function addSecurityHeaders(response: NextResponse) {
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  response.headers.set("X-DNS-Prefetch-Control", "off");
 }
 
 export const config = {

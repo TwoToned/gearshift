@@ -7,6 +7,7 @@ import { Search, Plus, Pencil, Loader2, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { getAssets, bulkUpdateAssets } from "@/server/assets";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getBulkAssets } from "@/server/bulk-assets";
 import { getLocations } from "@/server/locations";
 import { exportAssetsCSV, exportBulkAssetsCSV } from "@/server/csv";
@@ -70,15 +71,17 @@ export function AssetTable() {
   const [importOpen, setImportOpen] = useState(false);
 
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations"],
+    queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
   const locations = locationsData?.locations || [];
 
   const serializedQuery = useQuery({
-    queryKey: ["assets", { search, status, locationId, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["assets", orgId, { search, status, locationId, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getAssets({
       search: search || undefined,
       status: status || undefined,
@@ -92,7 +95,7 @@ export function AssetTable() {
   });
 
   const bulkQuery = useQuery({
-    queryKey: ["bulk-assets", { search, status, locationId, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["bulk-assets", orgId, { search, status, locationId, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getBulkAssets({
       search: search || undefined,
       status: status || undefined,

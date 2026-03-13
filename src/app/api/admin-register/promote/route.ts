@@ -1,13 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { timingSafeEqual } from "crypto";
+import { z } from "zod";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+function safeTokenCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+const promoteSchema = z.object({
+  token: z.string().min(1),
+  email: z.string().email(),
+});
 
 export async function POST(request: NextRequest) {
-  const { token, email } = await request.json();
+  // Rate limit: 5 attempts per hour per IP
+  const ip = getClientIp(request);
+  const { allowed, retryAfterMs } = rateLimit(`admin-promote:${ip}`, 5, 3600_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+      }
+    );
+  }
+
+  let body;
+  try {
+    body = promoteSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const { token, email } = body;
 
   const enabled = process.env.SITE_ADMIN_REGISTRATION_ENABLED === "true";
   const secret = process.env.SITE_ADMIN_SECRET_TOKEN;
 
-  if (!enabled || !secret || token !== secret) {
+  if (!enabled || !secret || !safeTokenCompare(token, secret)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

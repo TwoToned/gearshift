@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-400",
@@ -100,6 +101,8 @@ export default function AvailabilityPageWrapper() {
 function AvailabilityPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const today = useMemo(() => new Date(), []);
 
   // Parse ?date=YYYY-MM-DD and ?search=term query params for deep-linking from search
@@ -134,6 +137,7 @@ function AvailabilityPage() {
   const { data: projects = [], isLoading } = useQuery({
     queryKey: [
       "calendar",
+      orgId,
       format(currentMonth, "yyyy-MM"),
     ],
     queryFn: () =>

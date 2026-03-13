@@ -19,6 +19,11 @@ export async function GET(
   const { path } = await params;
   const storageKey = path.join("/");
 
+  // Defense-in-depth: reject path traversal and null bytes
+  if (storageKey.includes("..") || storageKey.includes("\0") || storageKey.includes("//")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Verify the file belongs to the requesting user's organization
   if (!storageKey.startsWith(organizationId + "/")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -47,8 +52,13 @@ export async function GET(
       // Extract filename from key for Content-Disposition
       const fileName = storageKey.split("/").pop() || "download";
       // Remove UUID prefix (first 8 chars + dash)
-      const cleanName = fileName.replace(/^[a-f0-9]+-/, "");
-      headers["Content-Disposition"] = `inline; filename="${cleanName}"`;
+      let cleanName = fileName.replace(/^[a-f0-9]+-/, "");
+      // Sanitize: remove CRLF, quotes, path separators, and traversal sequences
+      cleanName = cleanName.replace(/[\r\n"\\/:]/g, "_").replace(/\.\./g, "_");
+      cleanName = cleanName.replace(/^\.+/, ""); // Remove leading dots
+      if (!cleanName) cleanName = "download";
+      const encodedName = encodeURIComponent(cleanName);
+      headers["Content-Disposition"] = `inline; filename="${cleanName}"; filename*=UTF-8''${encodedName}`;
       headers["Cache-Control"] = "private, max-age=3600";
     }
 

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const equipmentClassOptions = [
   { value: "CLASS_I", label: "Class I" },
@@ -52,6 +53,8 @@ function NewTestTagAssetInner() {
   const searchParams = useSearchParams();
   const preselectedAssetId = searchParams.get("assetId") || "";
   const preselectedBulkAssetId = searchParams.get("bulkAssetId") || "";
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const form = useForm<TestTagAssetFormValues>({
     resolver: zodResolver(testTagAssetSchema),
@@ -72,17 +75,17 @@ function NewTestTagAssetInner() {
   });
 
   const peekQuery = useQuery({
-    queryKey: ["peek-test-tag-ids"],
+    queryKey: ["peek-test-tag-ids", orgId],
     queryFn: () => peekNextTestTagIds(1),
   });
 
   const assetsQuery = useQuery({
-    queryKey: ["assets", { pageSize: 500 }],
+    queryKey: ["assets", orgId, { pageSize: 500 }],
     queryFn: () => getAssets({ pageSize: 500 }),
   });
 
   const bulkAssetsQuery = useQuery({
-    queryKey: ["bulk-assets", { pageSize: 500 }],
+    queryKey: ["bulk-assets", orgId, { pageSize: 500 }],
     queryFn: () => getBulkAssets({ pageSize: 500 }),
   });
 

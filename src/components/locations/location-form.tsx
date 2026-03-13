@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { createLocation, updateLocation, getLocations } from "@/server/locations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +31,11 @@ export function LocationForm({ initialData }: LocationFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isEditing = !!initialData?.id;
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: locationsData } = useQuery({
-    queryKey: ["locations", { pageSize: 100 }],
+    queryKey: ["locations", orgId, { pageSize: 100 }],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
 

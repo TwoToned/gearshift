@@ -480,11 +480,12 @@ export async function removeBulkItemFromKit(
   return serialize(
     await prisma.$transaction(async (tx) => {
       const bulkItem = await tx.kitBulkItem.findUnique({
-        where: { id: bulkItemId },
+        where: { id: bulkItemId, organizationId },
       });
       if (!bulkItem) throw new Error("Bulk item not found");
+      if (bulkItem.kitId !== kitId) throw new Error("Bulk item does not belong to this kit");
 
-      await tx.kitBulkItem.delete({ where: { id: bulkItemId } });
+      await tx.kitBulkItem.delete({ where: { id: bulkItemId, organizationId } });
 
       await tx.bulkAsset.update({
         where: { id: bulkItem.bulkAssetId },

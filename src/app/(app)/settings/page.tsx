@@ -14,13 +14,16 @@ import {
   type OrgSettings,
 } from "@/server/settings";
 import { useCanDo } from "@/lib/use-permissions";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 export default function GeneralSettingsPage() {
   const queryClient = useQueryClient();
   const canEdit = useCanDo("orgSettings", "update");
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: org } = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: getOrganization,
   });
 

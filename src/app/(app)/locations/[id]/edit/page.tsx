@@ -4,13 +4,16 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getLocation } from "@/server/locations";
 import { LocationForm } from "@/components/locations/location-form";
+import { useActiveOrganization } from "@/lib/auth-client";
 import type { LocationFormValues } from "@/lib/validations/asset";
 
 export default function EditLocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: location, isLoading } = useQuery({
-    queryKey: ["location", id],
+    queryKey: ["location", orgId, id],
     queryFn: () => getLocation(id),
   });
 

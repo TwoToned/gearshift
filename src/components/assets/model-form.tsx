@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { modelSchema, type ModelFormValues } from "@/lib/validations/model";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { createModel, updateModel } from "@/server/models";
 import { getCategories } from "@/server/categories";
 import { Button } from "@/components/ui/button";
@@ -55,9 +56,11 @@ export function ModelForm({ initialData }: ModelFormProps) {
   const router = useRouter();
   const isEditing = !!initialData;
   const [showCreateCategory, setShowCreateCategory] = useState(false);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
   });
 

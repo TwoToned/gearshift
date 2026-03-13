@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { icons } from "lucide-react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getOrganization } from "@/server/settings";
 import type { OrgBranding } from "@/server/settings";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -45,8 +46,10 @@ function buildFaviconSvg(iconPaths: string | null, color: string, fallbackLetter
  */
 export function DynamicFavicon() {
   const { name: platformName, icon: platformIcon } = usePlatformBranding();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
   const { data: org } = useQuery({
-    queryKey: ["organization"],
+    queryKey: ["organization", orgId],
     queryFn: getOrganization,
   });
 

@@ -110,7 +110,7 @@ export async function updateCustomRole(
   if (data.permissions !== undefined) updateData.permissions = JSON.stringify(data.permissions);
 
   const updated = await prisma.customRole.update({
-    where: { id },
+    where: { id, organizationId },
     data: updateData,
   });
 
@@ -143,7 +143,7 @@ export async function deleteCustomRole(id: string) {
     );
   }
 
-  await prisma.customRole.delete({ where: { id } });
+  await prisma.customRole.delete({ where: { id, organizationId } });
   return { success: true };
 }
 

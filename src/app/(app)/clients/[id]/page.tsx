@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getClient, archiveClient, updateClientNotes } from "@/server/clients";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { NotesEditor } from "@/components/ui/notes-editor";
@@ -55,9 +56,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: client, isLoading } = useQuery({
-    queryKey: ["client", id],
+    queryKey: ["client", orgId, id],
     queryFn: () => getClient(id),
   });
 
@@ -267,7 +270,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         <TabsContent value="notes" className="mt-4">
           <NotesEditor
             initialNotes={client.notes || ""}
-            queryKey={["client", id]}
+            queryKey={["client", orgId, id]}
             onSave={(notes) => updateClientNotes(id, notes)}
             placeholder="Add notes about this client..."
           />
@@ -284,7 +287,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 entityId={id}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
                 existingMedia={(client.media || []).map((m: MediaItem) => m)}
-                queryKey={["client", id]}
+                queryKey={["client", orgId, id]}
                 onUploadComplete={async (fileUpload) => {
                   await addClientMedia({
                     clientId: id,

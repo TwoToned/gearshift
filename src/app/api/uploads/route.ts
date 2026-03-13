@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOrganization } from "@/lib/auth-server";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { uploadToS3, ensureBucket } from "@/lib/storage";
 import { generateThumbnail, isImageMimeType, thumbExtension } from "@/lib/thumbnails";
+import { fileTypeFromBuffer } from "file-type";
 
 export const runtime = "nodejs";
 
@@ -29,6 +31,9 @@ const MAX_SIZE_MB = parseInt(process.env.UPLOAD_MAX_SIZE_MB || "50", 10);
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  const csrfError = validateCsrfOrigin(request);
+  if (csrfError) return csrfError;
+
   let session;
   try {
     session = await requireOrganization();
@@ -66,6 +71,15 @@ export async function POST(request: NextRequest) {
     await ensureBucket();
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Validate actual file content via magic bytes (defense against Content-Type spoofing)
+    const detected = await fileTypeFromBuffer(buffer);
+    if (detected && !ALLOWED_MIME_TYPES.has(detected.mime)) {
+      return NextResponse.json(
+        { error: `Detected file type "${detected.mime}" is not allowed.` },
+        { status: 400 }
+      );
+    }
 
     // Upload original
     const { storageKey, url } = await uploadToS3(buffer, {

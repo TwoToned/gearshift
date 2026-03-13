@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useActiveOrganization } from "@/lib/auth-client";
 import {
   Package,
   FolderOpen,
@@ -30,18 +31,21 @@ const statusColors: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const { data: stats } = useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: ["dashboard-stats", orgId],
     queryFn: getDashboardStats,
   });
 
   const { data: upcoming } = useQuery({
-    queryKey: ["dashboard-upcoming"],
+    queryKey: ["dashboard-upcoming", orgId],
     queryFn: getUpcomingProjects,
   });
 
   const { data: activity } = useQuery({
-    queryKey: ["dashboard-activity"],
+    queryKey: ["dashboard-activity", orgId],
     queryFn: getRecentActivity,
   });
 

@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, Pencil, Trash2, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 import { getAsset, archiveAsset, deleteAsset, updateAssetNotes } from "@/server/assets";
 import { getBulkAsset, archiveBulkAsset, deleteBulkAsset, updateBulkAssetNotes } from "@/server/bulk-assets";
@@ -83,6 +84,9 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const initialDate = useMemo(() => {
     const d = searchParams.get("date");
     if (!d) return null;
@@ -93,13 +97,13 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
   }, [searchParams]);
 
   const assetQuery = useQuery({
-    queryKey: ["asset", id],
+    queryKey: ["asset", orgId, id],
     queryFn: () => getAsset(id),
     enabled: !isBulk,
   });
 
   const bulkQuery = useQuery({
-    queryKey: ["bulk-asset", id],
+    queryKey: ["bulk-asset", orgId, id],
     queryFn: () => getBulkAsset(id),
     enabled: isBulk,
   });
@@ -417,7 +421,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
         <TabsContent value="notes" className="mt-4">
           <NotesEditor
             initialNotes={asset.notes || ""}
-            queryKey={["asset", id]}
+            queryKey={["asset", orgId, id]}
             onSave={(notes) => updateAssetNotes(id, notes)}
             placeholder="Add notes about this asset..."
           />
@@ -446,7 +450,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 entityId={id}
                 accept="image/*"
                 existingMedia={assetPhotos}
-                queryKey={["asset", id]}
+                queryKey={["asset", orgId, id]}
                 onUploadComplete={async (fileUpload) => {
                   await addAssetMedia({
                     assetId: id,

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getNotifications, type AppNotification } from "@/server/notifications";
 import { formatDistanceToNow } from "date-fns";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 const DISMISSED_KEY = "gearflow-dismissed-notifications";
 
@@ -56,13 +57,15 @@ const severityColors: Record<string, string> = {
 export function Notifications() {
   const router = useRouter();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   useEffect(() => {
     setDismissed(getDismissedIds());
   }, []);
 
   const { data: notifications } = useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", orgId],
     queryFn: getNotifications,
     refetchInterval: 60_000,
   });

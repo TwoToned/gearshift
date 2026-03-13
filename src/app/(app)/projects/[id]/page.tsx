@@ -24,6 +24,7 @@ import {
 import { LineItemsPanel } from "@/components/projects/line-items-panel";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 import {
   getProject,
@@ -139,11 +140,13 @@ export default function ProjectDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const [dupMode, setDupMode] = useState<"duplicate" | "template" | null>(null);
 
   const { data: project, isLoading } = useQuery({
-    queryKey: ["project", id],
+    queryKey: ["project", orgId, id],
     queryFn: () => getProject(id),
   });
 
@@ -155,7 +158,7 @@ export default function ProjectDetailPage({
       ),
     onSuccess: () => {
       toast.success("Status updated");
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
     onError: (e) => toast.error(e.message),
@@ -166,7 +169,7 @@ export default function ProjectDetailPage({
     onSuccess: () => {
       toast.success("Project cancelled");
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["project", orgId, id] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -656,7 +659,7 @@ export default function ProjectDetailPage({
             <NotesEditor
               title="Crew Notes"
               initialNotes={project.crewNotes || ""}
-              queryKey={["project", id]}
+              queryKey={["project", orgId, id]}
               onSave={(notes) => updateProjectNotes(id, "crewNotes", notes)}
               placeholder="Notes for crew members..."
               rows={4}
@@ -664,7 +667,7 @@ export default function ProjectDetailPage({
             <NotesEditor
               title="Internal Notes"
               initialNotes={project.internalNotes || ""}
-              queryKey={["project", id]}
+              queryKey={["project", orgId, id]}
               onSave={(notes) => updateProjectNotes(id, "internalNotes", notes)}
               placeholder="Internal notes (not visible to client)..."
               rows={4}
@@ -672,7 +675,7 @@ export default function ProjectDetailPage({
             <NotesEditor
               title="Client Notes"
               initialNotes={project.clientNotes || ""}
-              queryKey={["project", id]}
+              queryKey={["project", orgId, id]}
               onSave={(notes) => updateProjectNotes(id, "clientNotes", notes)}
               placeholder="Notes visible to client on documents..."
               rows={4}
@@ -693,7 +696,7 @@ export default function ProjectDetailPage({
                   entityId={id}
                   accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.txt"
                   existingMedia={(project.media || []) as MediaItem[]}
-                  queryKey={["project", id]}
+                  queryKey={["project", orgId, id]}
                   onUploadComplete={async (fileUpload) => {
                     await addProjectMedia({
                       projectId: id,

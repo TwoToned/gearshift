@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Plus, Download, Upload } from "lucide-react";
 
 import { getModels } from "@/server/models";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { getCategories } from "@/server/categories";
 import { exportModelsCSV } from "@/server/csv";
 import { CSVImportDialog } from "@/components/assets/csv-import-dialog";
@@ -32,14 +33,16 @@ export function ModelTable() {
   const [categoryId, setCategoryId] = useState("");
   const [assetType, setAssetType] = useState<"" | "SERIALIZED" | "BULK">("");
   const [importOpen, setImportOpen] = useState(false);
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", orgId],
     queryFn: () => getCategories(),
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["models", { search, categoryId, assetType, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["models", orgId, { search, categoryId, assetType, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getModels({
         search: search || undefined,

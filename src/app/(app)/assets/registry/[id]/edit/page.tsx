@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getAsset } from "@/server/assets";
 import { getBulkAsset } from "@/server/bulk-assets";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { AssetForm } from "@/components/assets/asset-form";
 import { BulkAssetForm } from "@/components/assets/bulk-asset-form";
 import type { AssetFormValues } from "@/lib/validations/asset";
@@ -22,15 +23,17 @@ function EditAssetContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
   const isBulk = searchParams.get("type") === "bulk";
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   const assetQuery = useQuery({
-    queryKey: ["asset", id],
+    queryKey: ["asset", orgId, id],
     queryFn: () => getAsset(id),
     enabled: !isBulk,
   });
 
   const bulkQuery = useQuery({
-    queryKey: ["bulk-asset", id],
+    queryKey: ["bulk-asset", orgId, id],
     queryFn: () => getBulkAsset(id),
     enabled: isBulk,
   });

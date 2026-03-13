@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
+import { useActiveOrganization } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -50,8 +51,11 @@ function formatClass(cls: string) {
 }
 
 export default function TestAndTagPage() {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["test-tag-dashboard-stats"],
+    queryKey: ["test-tag-dashboard-stats", orgId],
     queryFn: () => getTestTagDashboardStats(),
     staleTime: 60_000,
   });

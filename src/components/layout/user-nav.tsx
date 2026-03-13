@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { LogOut, User, ChevronsUpDown, Shield } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import { SidebarMenuButton } from "@/components/ui/sidebar";
 
 export function UserNav() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
 
   const user = session?.user;
@@ -83,6 +85,7 @@ export function UserNav() {
         <DropdownMenuGroup>
           <DropdownMenuItem
             onClick={async () => {
+              queryClient.clear();
               await signOut();
               router.push("/login");
             }}

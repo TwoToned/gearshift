@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Archive, Plus, Package, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useActiveOrganization } from "@/lib/auth-client";
 
 import { getModel, archiveModel } from "@/server/models";
 import { archiveBulkAsset, deleteBulkAsset } from "@/server/bulk-assets";
@@ -53,6 +54,9 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
   const initialDate = useMemo(() => {
     const d = searchParams.get("date");
     if (!d) return null;
@@ -63,7 +67,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
   }, [searchParams]);
 
   const { data: model, isLoading } = useQuery({
-    queryKey: ["model", id],
+    queryKey: ["model", orgId, id],
     queryFn: () => getModel(id),
   });
 
@@ -80,7 +84,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
     mutationFn: (bulkId: string) => archiveBulkAsset(bulkId),
     onSuccess: () => {
       toast.success("Bulk asset archived");
-      queryClient.invalidateQueries({ queryKey: ["model", id] });
+      queryClient.invalidateQueries({ queryKey: ["model", orgId, id] });
       queryClient.invalidateQueries({ queryKey: ["bulk-assets"] });
     },
     onError: (e) => toast.error(e.message),
@@ -90,7 +94,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
     mutationFn: (bulkId: string) => deleteBulkAsset(bulkId),
     onSuccess: () => {
       toast.success("Bulk asset deleted");
-      queryClient.invalidateQueries({ queryKey: ["model", id] });
+      queryClient.invalidateQueries({ queryKey: ["model", orgId, id] });
       queryClient.invalidateQueries({ queryKey: ["bulk-assets"] });
     },
     onError: (e) => toast.error(e.message),
@@ -415,7 +419,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                 entityId={id}
                 accept="image/*"
                 existingMedia={photos}
-                queryKey={["model", id]}
+                queryKey={["model", orgId, id]}
                 onUploadComplete={async (fileUpload) => {
                   await addModelMedia({
                     modelId: id,
@@ -448,7 +452,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                 entityId={id}
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
                 existingMedia={documents}
-                queryKey={["model", id]}
+                queryKey={["model", orgId, id]}
                 onUploadComplete={async (fileUpload) => {
                   await addModelMedia({
                     modelId: id,
