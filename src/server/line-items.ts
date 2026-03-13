@@ -7,9 +7,10 @@ import {
   type LineItemFormValues,
 } from "@/lib/validations/line-item";
 import { serialize } from "@/lib/serialize";
+import { logActivity } from "@/lib/activity-log";
 
 export async function addLineItem(projectId: string, data: LineItemFormValues, allowOverbook = false) {
-  const { organizationId } = await requirePermission("project", "manage_line_items");
+  const { organizationId, userId, userName } = await requirePermission("project", "manage_line_items");
   const parsed = lineItemSchema.parse(data);
 
   // Server-side availability enforcement for equipment
@@ -131,6 +132,19 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
       });
 
       await recalculateProjectTotals(projectId);
+
+      await logActivity({
+        organizationId,
+        userId,
+        userName,
+        action: "UPDATE",
+        entityType: "lineItem",
+        entityId: result.id,
+        entityName: result.description || `Line item`,
+        summary: `Merged line item into existing on project (qty ${existing.quantity} -> ${newQuantity})`,
+        projectId,
+      });
+
       return serialize(result);
     }
   }
@@ -181,11 +195,23 @@ export async function addLineItem(projectId: string, data: LineItemFormValues, a
 
   await recalculateProjectTotals(projectId);
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "lineItem",
+    entityId: result.id,
+    entityName: result.description || `Line item`,
+    summary: `Added line item to project`,
+    projectId,
+  });
+
   return serialize(result);
 }
 
 export async function updateLineItem(id: string, data: LineItemFormValues, allowOverbook = false) {
-  const { organizationId } = await requirePermission("project", "manage_line_items");
+  const { organizationId, userId, userName } = await requirePermission("project", "manage_line_items");
   const parsed = lineItemSchema.parse(data);
 
   const lineTotal = calculateLineTotal(
@@ -225,6 +251,18 @@ export async function updateLineItem(id: string, data: LineItemFormValues, allow
   });
 
   await recalculateProjectTotals(result.projectId);
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "lineItem",
+    entityId: result.id,
+    entityName: result.description || `Line item`,
+    summary: `Updated line item on project`,
+    projectId: result.projectId,
+  });
 
   return serialize(result);
 }
@@ -317,7 +355,7 @@ export async function addKitLineItem(
 }
 
 export async function removeLineItem(id: string) {
-  const { organizationId } = await requirePermission("project", "manage_line_items");
+  const { organizationId, userId, userName } = await requirePermission("project", "manage_line_items");
 
   const item = await prisma.projectLineItem.findFirst({
     where: { id, organizationId },
@@ -338,6 +376,18 @@ export async function removeLineItem(id: string) {
 
   await prisma.projectLineItem.delete({ where: { id } });
   await recalculateProjectTotals(item.projectId);
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "lineItem",
+    entityId: id,
+    entityName: item.description || `Line item`,
+    summary: `Removed line item from project`,
+    projectId: item.projectId,
+  });
 
   return serialize({ success: true });
 }

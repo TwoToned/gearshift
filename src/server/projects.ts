@@ -10,6 +10,7 @@ import type { Prisma, ProjectStatus } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 import { recalculateProjectTotals } from "@/server/line-items";
+import { logActivity } from "@/lib/activity-log";
 
 async function generateTemplateCode(organizationId: string): Promise<string> {
   const count = await prisma.project.count({
@@ -224,7 +225,7 @@ export async function getProject(id: string) {
 }
 
 export async function createProject(data: ProjectFormValues & { isTemplate?: boolean }) {
-  const { organizationId } = await requirePermission("project", "create");
+  const { organizationId, userId, userName } = await requirePermission("project", "create");
   const parsed = projectSchema.parse(data);
 
   const isTemplate = data.isTemplate ?? false;
@@ -238,12 +239,11 @@ export async function createProject(data: ProjectFormValues & { isTemplate?: boo
     : parsed.projectNumber!;
 
   try {
-    return serialize(
-      await prisma.project.create({
-        data: {
-          organizationId,
-          isTemplate,
-          projectNumber,
+    const result = await prisma.project.create({
+      data: {
+        organizationId,
+        isTemplate,
+        projectNumber,
         name: parsed.name,
         clientId: parsed.clientId || null,
         status: parsed.status,
@@ -272,8 +272,21 @@ export async function createProject(data: ProjectFormValues & { isTemplate?: boo
         invoicedTotal: parsed.invoicedTotal ?? null,
         tags: parsed.tags,
       },
-    })
-  );
+    });
+
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "project",
+      entityId: result.id,
+      entityName: result.projectNumber,
+      summary: `Created ${isTemplate ? "template" : "project"} ${result.projectNumber} - ${result.name}`,
+      projectId: result.id,
+    });
+
+    return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
       throw new Error(`Project code "${parsed.projectNumber}" already exists`);
@@ -283,60 +296,85 @@ export async function createProject(data: ProjectFormValues & { isTemplate?: boo
 }
 
 export async function updateProject(id: string, data: ProjectFormValues) {
-  const { organizationId } = await requirePermission("project", "update");
+  const { organizationId, userId, userName } = await requirePermission("project", "update");
   const parsed = projectSchema.parse(data);
 
-  return serialize(
-    await prisma.project.update({
-      where: { id, organizationId },
-      data: {
-        projectNumber: parsed.projectNumber,
-        name: parsed.name,
-        clientId: parsed.clientId || null,
-        status: parsed.status,
-        type: parsed.type,
-        description: parsed.description || null,
-        locationId: parsed.locationId || null,
-        siteContactName: parsed.siteContactName || null,
-        siteContactPhone: parsed.siteContactPhone || null,
-        siteContactEmail: parsed.siteContactEmail || null,
-        loadInDate: parsed.loadInDate ?? null,
-        loadInTime: parsed.loadInTime || null,
-        eventStartDate: parsed.eventStartDate ?? null,
-        eventStartTime: parsed.eventStartTime || null,
-        eventEndDate: parsed.eventEndDate ?? null,
-        eventEndTime: parsed.eventEndTime || null,
-        loadOutDate: parsed.loadOutDate ?? null,
-        loadOutTime: parsed.loadOutTime || null,
-        rentalStartDate: parsed.rentalStartDate ?? null,
-        rentalEndDate: parsed.rentalEndDate ?? null,
-        crewNotes: parsed.crewNotes || null,
-        internalNotes: parsed.internalNotes || null,
-        clientNotes: parsed.clientNotes || null,
-        discountPercent: parsed.discountPercent ?? null,
-        depositPercent: parsed.depositPercent ?? null,
-        depositPaid: parsed.depositPaid ?? null,
-        invoicedTotal: parsed.invoicedTotal ?? null,
-        tags: parsed.tags,
-      },
-    })
-  );
+  const updated = await prisma.project.update({
+    where: { id, organizationId },
+    data: {
+      projectNumber: parsed.projectNumber,
+      name: parsed.name,
+      clientId: parsed.clientId || null,
+      status: parsed.status,
+      type: parsed.type,
+      description: parsed.description || null,
+      locationId: parsed.locationId || null,
+      siteContactName: parsed.siteContactName || null,
+      siteContactPhone: parsed.siteContactPhone || null,
+      siteContactEmail: parsed.siteContactEmail || null,
+      loadInDate: parsed.loadInDate ?? null,
+      loadInTime: parsed.loadInTime || null,
+      eventStartDate: parsed.eventStartDate ?? null,
+      eventStartTime: parsed.eventStartTime || null,
+      eventEndDate: parsed.eventEndDate ?? null,
+      eventEndTime: parsed.eventEndTime || null,
+      loadOutDate: parsed.loadOutDate ?? null,
+      loadOutTime: parsed.loadOutTime || null,
+      rentalStartDate: parsed.rentalStartDate ?? null,
+      rentalEndDate: parsed.rentalEndDate ?? null,
+      crewNotes: parsed.crewNotes || null,
+      internalNotes: parsed.internalNotes || null,
+      clientNotes: parsed.clientNotes || null,
+      discountPercent: parsed.discountPercent ?? null,
+      depositPercent: parsed.depositPercent ?? null,
+      depositPaid: parsed.depositPaid ?? null,
+      invoicedTotal: parsed.invoicedTotal ?? null,
+      tags: parsed.tags,
+    },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "project",
+    entityId: updated.id,
+    entityName: updated.projectNumber,
+    summary: `Updated project ${updated.projectNumber} - ${updated.name}`,
+    projectId: updated.id,
+  });
+
+  return serialize(updated);
 }
 
 export async function updateProjectStatus(
   id: string,
   status: ProjectFormValues["status"]
 ) {
-  const { organizationId } = await requirePermission("project", "update");
+  const { organizationId, userId, userName } = await requirePermission("project", "update");
   const project = await prisma.project.findUnique({ where: { id, organizationId } });
   if (!project) throw new Error("Project not found");
   if (project.isTemplate) throw new Error("Cannot change status of a template");
-  return serialize(
-    await prisma.project.update({
-      where: { id, organizationId },
-      data: { status },
-    })
-  );
+  const updated = await prisma.project.update({
+    where: { id, organizationId },
+    data: { status },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "STATUS_CHANGE",
+    entityType: "project",
+    entityId: updated.id,
+    entityName: updated.projectNumber,
+    summary: `Changed project ${updated.projectNumber} status from ${project.status} to ${status}`,
+    details: { changes: [{ field: "status", from: project.status, to: status }] },
+    projectId: updated.id,
+  });
+
+  return serialize(updated);
 }
 
 export async function updateProjectNotes(
@@ -623,7 +661,7 @@ export async function deleteTemplate(id: string) {
 }
 
 export async function deleteProject(id: string) {
-  const { organizationId } = await requirePermission("project", "delete");
+  const { organizationId, userId, userName } = await requirePermission("project", "delete");
 
   // Only allow deleting cancelled projects
   const project = await prisma.project.findUnique({
@@ -635,5 +673,17 @@ export async function deleteProject(id: string) {
 
   await prisma.project.delete({
     where: { id, organizationId },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "project",
+    entityId: id,
+    entityName: project.projectNumber,
+    summary: `Deleted project ${project.projectNumber} - ${project.name}`,
+    details: { deleted: { projectNumber: project.projectNumber, name: project.name } },
   });
 }

@@ -6,6 +6,7 @@ import { bulkAssetSchema, type BulkAssetFormValues } from "@/lib/validations/ass
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { reserveAssetTags } from "@/server/settings";
+import { logActivity } from "@/lib/activity-log";
 
 export type BulkAssetWithRelations = Prisma.BulkAssetGetPayload<{
   include: {
@@ -99,7 +100,7 @@ export async function getBulkAsset(id: string) {
 }
 
 export async function createBulkAsset(data: BulkAssetFormValues) {
-  const { organizationId } = await requirePermission("bulkAsset", "create");
+  const { organizationId, userId, userName } = await requirePermission("bulkAsset", "create");
   const parsed = bulkAssetSchema.parse(data);
   try {
     const result = await prisma.bulkAsset.create({
@@ -119,6 +120,19 @@ export async function createBulkAsset(data: BulkAssetFormValues) {
       },
     });
     await reserveAssetTags(1);
+
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "bulkAsset",
+      entityId: result.id,
+      entityName: result.assetTag,
+      summary: `Created bulk asset ${result.assetTag}`,
+      details: { created: { assetTag: result.assetTag, totalQuantity: parsed.totalQuantity } },
+    });
+
     return serialize(result);
   } catch (e: unknown) {
     if (e instanceof Error && e.message.includes("Unique constraint")) {
@@ -129,7 +143,7 @@ export async function createBulkAsset(data: BulkAssetFormValues) {
 }
 
 export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
-  const { organizationId } = await requirePermission("bulkAsset", "update");
+  const { organizationId, userId, userName } = await requirePermission("bulkAsset", "update");
   const parsed = bulkAssetSchema.parse(data);
 
   const existing = await prisma.bulkAsset.findUnique({ where: { id, organizationId } });
@@ -139,7 +153,7 @@ export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
   const totalDiff = parsed.totalQuantity - existing.totalQuantity;
   const newAvailable = Math.max(0, existing.availableQuantity + totalDiff);
 
-  return serialize(await prisma.bulkAsset.update({
+  const updated = await prisma.bulkAsset.update({
     where: { id, organizationId },
     data: {
       modelId: parsed.modelId,
@@ -154,11 +168,24 @@ export async function updateBulkAsset(id: string, data: BulkAssetFormValues) {
       isActive: parsed.isActive,
       tags: parsed.tags,
     },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "bulkAsset",
+    entityId: updated.id,
+    entityName: updated.assetTag,
+    summary: `Updated bulk asset ${updated.assetTag}`,
+  });
+
+  return serialize(updated);
 }
 
 export async function deleteBulkAsset(id: string) {
-  const { organizationId } = await requirePermission("bulkAsset", "delete");
+  const { organizationId, userId, userName } = await requirePermission("bulkAsset", "delete");
 
   const asset = await prisma.bulkAsset.findUnique({
     where: { id, organizationId },
@@ -176,6 +203,19 @@ export async function deleteBulkAsset(id: string) {
   }
 
   await prisma.bulkAsset.delete({ where: { id, organizationId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "bulkAsset",
+    entityId: id,
+    entityName: asset.assetTag,
+    summary: `Deleted bulk asset ${asset.assetTag}`,
+    details: { deleted: { assetTag: asset.assetTag } },
+  });
+
   return { id };
 }
 

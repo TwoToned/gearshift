@@ -203,6 +203,13 @@ export const PAGE_COMMANDS: PageCommand[] = [
     description: "Business reports and analytics",
   },
   {
+    label: "Activity Log",
+    href: "/activity",
+    aliases: ["activity", "activitylog", "audit", "auditlog", "log", "history", "trail"],
+    icon: "ScrollText",
+    description: "View all activity across the organization",
+  },
+  {
     label: "Settings",
     href: "/settings",
     aliases: ["settings", "config", "preferences", "prefs", "setup", "options", "admin"],

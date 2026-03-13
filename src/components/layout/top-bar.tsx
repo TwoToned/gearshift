@@ -38,6 +38,7 @@ const segmentLabels: Record<string, string> = {
   billing: "Billing",
   branding: "Branding",
   team: "Team",
+  activity: "Activity Log",
   account: "Account",
   changelog: "Changelog",
   new: "New",

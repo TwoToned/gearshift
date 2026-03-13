@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { supplierSchema, type SupplierFormValues } from "@/lib/validations/asset";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getSuppliers() {
   const { organizationId } = await getOrgContext();
@@ -17,7 +18,7 @@ export async function getSuppliers() {
 }
 
 export async function createSupplier(data: SupplierFormValues) {
-  const { organizationId } = await requirePermission("orgSettings", "update");
+  const { organizationId, userId, userName } = await requirePermission("orgSettings", "update");
   const parsed = supplierSchema.parse(data);
   // Clean empty strings to null
   const cleaned = {
@@ -29,15 +30,26 @@ export async function createSupplier(data: SupplierFormValues) {
     address: parsed.address || null,
     notes: parsed.notes || null,
   };
-  return serialize(
-    await prisma.supplier.create({
-      data: { ...cleaned, organizationId },
-    })
-  );
+  const result = await prisma.supplier.create({
+    data: { ...cleaned, organizationId },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "supplier",
+    entityId: result.id,
+    entityName: result.name,
+    summary: `Created supplier ${result.name}`,
+  });
+
+  return serialize(result);
 }
 
 export async function updateSupplier(id: string, data: SupplierFormValues) {
-  const { organizationId } = await requirePermission("orgSettings", "update");
+  const { organizationId, userId, userName } = await requirePermission("orgSettings", "update");
   const parsed = supplierSchema.parse(data);
   const cleaned = {
     ...parsed,
@@ -48,16 +60,27 @@ export async function updateSupplier(id: string, data: SupplierFormValues) {
     address: parsed.address || null,
     notes: parsed.notes || null,
   };
-  return serialize(
-    await prisma.supplier.update({
-      where: { id, organizationId },
-      data: cleaned,
-    })
-  );
+  const updated = await prisma.supplier.update({
+    where: { id, organizationId },
+    data: cleaned,
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "supplier",
+    entityId: updated.id,
+    entityName: updated.name,
+    summary: `Updated supplier ${updated.name}`,
+  });
+
+  return serialize(updated);
 }
 
 export async function deleteSupplier(id: string) {
-  const { organizationId } = await requirePermission("orgSettings", "update");
+  const { organizationId, userId, userName } = await requirePermission("orgSettings", "update");
   const supplier = await prisma.supplier.findUnique({
     where: { id, organizationId },
     include: { _count: { select: { assets: true } } },
@@ -67,5 +90,18 @@ export async function deleteSupplier(id: string) {
     throw new Error("Cannot delete supplier with assets linked to it");
   }
   await prisma.supplier.delete({ where: { id, organizationId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "supplier",
+    entityId: id,
+    entityName: supplier.name,
+    summary: `Deleted supplier ${supplier.name}`,
+    details: { deleted: { name: supplier.name } },
+  });
+
   return { success: true };
 }

@@ -42,6 +42,7 @@ model User {
   testTagRecords          TestTagRecord[]
   twoFactors              TwoFactor[]
   backupCodes             BackupCode[]
+  activityLogs            ActivityLog[]
 
   @@map("user")
 }
@@ -130,6 +131,7 @@ model Organization {
   locationMedia      LocationMedia[]
   testTagAssets      TestTagAsset[]
   testTagRecords     TestTagRecord[]
+  activityLogs       ActivityLog[]
 
   @@map("organization")
 }
@@ -1217,4 +1219,39 @@ model SiteSettings {
   updatedAt              DateTime @updatedAt
 
   @@map("site_settings")
+}
+
+// ─── Activity Log ────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  action          String   // CREATE, UPDATE, DELETE, STATUS_CHANGE, CHECK_OUT, CHECK_IN, etc.
+  entityType      String   // asset, bulkAsset, model, kit, project, client, location, etc.
+  entityId        String
+  entityName      String   // Human-readable name/tag at time of action
+
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName        String   // Denormalized — preserved if user is deleted
+
+  summary         String   // Human-readable: "Created asset TTP-00042"
+  details         Json?    // Structured change data
+  metadata        Json?    // Extra context
+
+  projectId       String?
+  assetId         String?
+  kitId           String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType])
+  @@index([organizationId, userId])
+  @@index([organizationId, projectId])
+  @@index([organizationId, assetId])
+  @@index([organizationId, entityType, entityId])
+  @@map("activity_log")
 }

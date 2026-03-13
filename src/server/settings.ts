@@ -5,6 +5,7 @@ import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { sendEmail } from "@/lib/email";
 import { getPlatformName } from "@/lib/platform";
+import { logActivity } from "@/lib/activity-log";
 
 export interface OrgBranding {
   primaryColor?: string;
@@ -72,7 +73,7 @@ export async function updateOrganization(data: {
   name: string;
   settings: OrgSettings;
 }) {
-  const { organizationId } = await requirePermission("orgSettings", "update");
+  const { organizationId, userId, userName } = await requirePermission("orgSettings", "update");
 
   const updated = await prisma.organization.update({
     where: { id: organizationId },
@@ -80,6 +81,17 @@ export async function updateOrganization(data: {
       name: data.name,
       metadata: JSON.stringify(data.settings),
     },
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "settings",
+    entityId: organizationId,
+    entityName: updated.name,
+    summary: `Updated organization settings`,
   });
 
   return serialize(updated);
@@ -245,7 +257,7 @@ export async function getNextAssetTag(): Promise<string> {
 const VALID_BUILT_IN_ROLES = ["admin", "manager", "member", "staff", "warehouse", "viewer"] as const;
 
 export async function addMemberByEmail(email: string, role: string) {
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId, userName } = await getOrgContext();
 
   // Validate: either a built-in role or a custom role belonging to this org
   const isBuiltIn = (VALID_BUILT_IN_ROLES as readonly string[]).includes(role);
@@ -298,6 +310,17 @@ export async function addMemberByEmail(email: string, role: string) {
       include: { user: true },
     });
 
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CREATE",
+      entityType: "member",
+      entityId: member.id,
+      entityName: normalizedEmail,
+      summary: `Added member ${normalizedEmail} with role ${role}`,
+    });
+
     return serialize(member);
   }
 
@@ -338,6 +361,17 @@ export async function addMemberByEmail(email: string, role: string) {
         <p style="color: #666; font-size: 14px;">This invitation expires in 7 days.</p>
       </div>
     `,
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "invitation",
+    entityId: invitation.id,
+    entityName: normalizedEmail,
+    summary: `Invited ${normalizedEmail} to organization with role ${role}`,
   });
 
   return serialize({ id: invitation.id, invited: true, email: normalizedEmail });

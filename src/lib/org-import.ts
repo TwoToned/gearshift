@@ -504,7 +504,26 @@ export async function importOrganization(
     });
   }
 
-  // ── 19. File Uploads (re-upload to S3) ───────────────────────────
+  // ── 19. Activity Logs ───────────────────────────────────────────
+  for (const r of (manifest.activityLogs ?? []) as Rec[]) {
+    const id = newId("activityLog", r.id);
+    const userId = remapUser(r.userId);
+    await prisma.activityLog.create({
+      data: {
+        ...stripRelations(r),
+        id,
+        organizationId: newOrgId,
+        userId: userId || null,
+        projectId: r.projectId ? (remap("project", r.projectId) ?? null) : null,
+        assetId: r.assetId ? (remap("asset", r.assetId) ?? null) : null,
+        kitId: r.kitId ? (remap("kit", r.kitId) ?? null) : null,
+        entityId: r.entityId as string,
+        createdAt: safeDate(r.createdAt),
+      } as any,
+    });
+  }
+
+  // ── 20. File Uploads (re-upload to S3) ───────────────────────────
   const urlMap = new Map<string, string>(); // old URL -> new URL
   if (files.size > 0) {
     await ensureBucket();

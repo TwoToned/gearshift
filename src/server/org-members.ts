@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { sendEmail, roleChangedEmail, removedFromOrgEmail } from "@/lib/email";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getOrgMembers(params?: {
   page?: number;
@@ -48,7 +49,7 @@ export async function getOrgMembers(params?: {
 
 export async function changeMemberRole(memberId: string, newRole: string) {
   await requirePermission("orgMembers", "update_role");
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId, userName } = await getOrgContext();
 
   const target = await prisma.member.findFirst({
     where: { id: memberId, organizationId },
@@ -88,6 +89,18 @@ export async function changeMemberRole(memberId: string, newRole: string) {
     data: { role: newRole },
   });
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "member",
+    entityId: memberId,
+    entityName: target.user.name || target.user.email || "Member",
+    summary: `Changed role of ${target.user.name || target.user.email} from ${target.role} to ${newRole}`,
+    details: { changes: [{ field: "role", from: target.role, to: newRole }] },
+  });
+
   // Send notification email
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
@@ -110,7 +123,7 @@ export async function changeMemberRole(memberId: string, newRole: string) {
 
 export async function removeOrgMember(memberId: string) {
   await requirePermission("orgMembers", "remove");
-  const { organizationId, userId } = await getOrgContext();
+  const { organizationId, userId, userName } = await getOrgContext();
 
   const target = await prisma.member.findFirst({
     where: { id: memberId, organizationId },
@@ -135,6 +148,17 @@ export async function removeOrgMember(memberId: string) {
   }
 
   await prisma.member.delete({ where: { id: memberId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "member",
+    entityId: memberId,
+    entityName: target.user.email || "Member",
+    summary: `Removed member ${target.user.email} from organization`,
+  });
 
   // Send notification
   const org = await prisma.organization.findUnique({

@@ -37,8 +37,9 @@ This document provides an exhaustive technical reference for every feature, syst
 29. [Settings & Branding](#29-settings--branding)
 30. [Dashboard & Reporting](#30-dashboard--reporting)
 31. [Universal Tags System](#31-universal-tags-system)
-32. [Key Patterns & Conventions](#32-key-patterns--conventions)
-33. [Integration Checklist for New Features](#33-integration-checklist-for-new-features)
+32. [Activity Log (Audit Trail)](#32-activity-log-audit-trail)
+33. [Key Patterns & Conventions](#33-key-patterns--conventions)
+34. [Integration Checklist for New Features](#34-integration-checklist-for-new-features)
 
 ---
 
@@ -1062,7 +1063,51 @@ Tags are simple string arrays on each model — no special handling needed. They
 
 ---
 
-## 32. Key Patterns & Conventions
+## 32. Activity Log (Audit Trail)
+
+### Overview
+A comprehensive activity log tracks every significant write operation across all entities. Provides a full audit trail visible on a dedicated page with filtering, searching, and CSV export.
+
+### Data Model: `ActivityLog`
+- **Fields**: `action`, `entityType`, `entityId`, `entityName` (denormalized), `userId`, `userName` (denormalized), `summary` (human-readable), `details` (JSON: changes/created/deleted), `metadata` (JSON), `projectId`, `assetId`, `kitId`.
+- **Indexes**: `[organizationId, createdAt]`, `[organizationId, entityType]`, `[organizationId, userId]`, `[organizationId, projectId]`, `[organizationId, assetId]`, `[organizationId, entityType, entityId]`.
+- User FK uses `onDelete: SetNull` — `userName` preserved for deleted users.
+
+### Logging Utility (`src/lib/activity-log.ts`)
+- **`logActivity(input)`**: Creates an ActivityLog record. Wrapped in try/catch — never blocks the main operation.
+- **`buildChanges(before, after, fields, labels?)`**: Compares two objects and returns a changes array for UPDATE details.
+
+### Actions Logged
+All write operations across 16 server action files: CREATE, UPDATE, DELETE, STATUS_CHANGE, CHECK_OUT, CHECK_IN, ASSIGN, UNASSIGN, INVITE.
+
+### Server Action: `src/server/activity-log.ts`
+- **`getActivityLogs(filters)`**: Paginated query with filters for entityType, action, userId, date range, search.
+- **`getEntityActivityLog(entityType, entityId)`**: All logs for a specific entity (max 100).
+- **`exportActivityLogCSV(filters)`**: CSV export respecting current filters.
+
+### Page: `/activity`
+- Full-width table with filter bar: entity type, action, date range, search, CSV export.
+- Expandable rows show field changes ("field: old -> new").
+- Paginated, sortable by timestamp (newest first).
+
+### Entity Detail Integration
+- **`ActivityTimeline`** component (`src/components/activity/activity-timeline.tsx`): Compact timeline for entity detail pages.
+- Shows timestamp, action badge, summary, user, and field changes.
+
+### Sidebar & Navigation
+- Sidebar: "Activity Log" with `ScrollText` icon, gated by `reports` read permission.
+- Page commands: aliases `activity`, `audit`, `log`, `history`, `trail`.
+- Top bar: `activity: "Activity Log"` in segment labels.
+
+### Org Export/Import
+ActivityLog records included in org export/import. On import, `userId`, `projectId`, `assetId`, `kitId` are remapped.
+
+### `getOrgContext()` Enhancement
+`getOrgContext()` now returns `userName` (from `session.user.name`) in addition to `organizationId` and `userId`, enabling all server actions to log the acting user's name.
+
+---
+
+## 33. Key Patterns & Conventions
 
 ### Server Action Pattern
 ```typescript
@@ -1109,7 +1154,7 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ---
 
-## 33. Integration Checklist for New Features
+## 34. Integration Checklist for New Features
 
 When implementing a new feature, ensure it integrates with ALL existing systems.
 

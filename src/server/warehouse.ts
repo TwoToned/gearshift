@@ -5,6 +5,7 @@ import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 import type { Prisma } from "@/generated/prisma/client";
+import { logActivity } from "@/lib/activity-log";
 
 // ---------------------------------------------------------------------------
 // 1. getProjectForWarehouse
@@ -240,7 +241,7 @@ export async function checkOutItems(
     notes?: string;
   }>
 ) {
-  const { organizationId, userId } = await requirePermission("warehouse", "check_out");
+  const { organizationId, userId, userName } = await requirePermission("warehouse", "check_out");
 
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
@@ -371,6 +372,21 @@ export async function checkOutItems(
     return updated;
   });
 
+  for (const item of items) {
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CHECK_OUT",
+      entityType: "asset",
+      entityId: item.assetId || item.lineItemId,
+      entityName: `Line item ${item.lineItemId}`,
+      summary: `Checked out item on project`,
+      projectId,
+      assetId: item.assetId,
+    });
+  }
+
   return serialize(results);
 }
 
@@ -387,7 +403,7 @@ export async function checkInItems(
     notes?: string;
   }>
 ) {
-  const { organizationId, userId } = await requirePermission("warehouse", "check_in");
+  const { organizationId, userId, userName } = await requirePermission("warehouse", "check_in");
 
   const results = await prisma.$transaction(async (tx) => {
     const updated: unknown[] = [];
@@ -510,6 +526,20 @@ export async function checkInItems(
     return updated;
   });
 
+  for (const item of items) {
+    await logActivity({
+      organizationId,
+      userId,
+      userName,
+      action: "CHECK_IN",
+      entityType: "asset",
+      entityId: item.lineItemId,
+      entityName: `Line item ${item.lineItemId}`,
+      summary: `Checked in item on project (condition: ${item.returnCondition})`,
+      projectId,
+    });
+  }
+
   return serialize(results);
 }
 
@@ -518,9 +548,9 @@ export async function checkInItems(
 // ---------------------------------------------------------------------------
 
 export async function checkOutKit(projectId: string, kitId: string) {
-  const { organizationId, userId } = await requirePermission("warehouse", "check_out");
+  const { organizationId, userId, userName } = await requirePermission("warehouse", "check_out");
 
-  return serialize(await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Find the kit parent line item on this project
     const kitLineItem = await tx.projectLineItem.findFirst({
       where: { projectId, organizationId, kitId, isKitChild: false },
@@ -573,7 +603,22 @@ export async function checkOutKit(projectId: string, kitId: string) {
     });
 
     return { success: true, kitId };
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CHECK_OUT",
+    entityType: "kit",
+    entityId: kitId,
+    entityName: `Kit ${kitId}`,
+    summary: `Checked out kit with all contents`,
+    projectId,
+    kitId,
+  });
+
+  return serialize(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -585,9 +630,9 @@ export async function checkInKit(
   kitId: string,
   returnCondition: "GOOD" | "DAMAGED" | "MISSING" = "GOOD"
 ) {
-  const { organizationId, userId } = await requirePermission("warehouse", "check_in");
+  const { organizationId, userId, userName } = await requirePermission("warehouse", "check_in");
 
-  return serialize(await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const kitLineItem = await tx.projectLineItem.findFirst({
       where: { projectId, organizationId, kitId, isKitChild: false },
     });
@@ -641,7 +686,22 @@ export async function checkInKit(
     });
 
     return { success: true, kitId };
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CHECK_IN",
+    entityType: "kit",
+    entityId: kitId,
+    entityName: `Kit ${kitId}`,
+    summary: `Checked in kit (condition: ${returnCondition})`,
+    projectId,
+    kitId,
+  });
+
+  return serialize(result);
 }
 
 // ---------------------------------------------------------------------------

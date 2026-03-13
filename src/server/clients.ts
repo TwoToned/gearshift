@@ -5,6 +5,7 @@ import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { clientSchema, type ClientFormValues } from "@/lib/validations/client";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getClients(params?: {
   search?: string;
@@ -71,10 +72,10 @@ export async function getClient(id: string) {
 }
 
 export async function createClient(data: ClientFormValues) {
-  const { organizationId } = await requirePermission("client", "create");
+  const { organizationId, userId, userName } = await requirePermission("client", "create");
   const parsed = clientSchema.parse(data);
 
-  return serialize(await prisma.client.create({
+  const result = await prisma.client.create({
     data: {
       organizationId,
       name: parsed.name,
@@ -91,14 +92,27 @@ export async function createClient(data: ClientFormValues) {
       tags: parsed.tags,
       isActive: parsed.isActive,
     },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "client",
+    entityId: result.id,
+    entityName: result.name,
+    summary: `Created client ${result.name}`,
+  });
+
+  return serialize(result);
 }
 
 export async function updateClient(id: string, data: ClientFormValues) {
-  const { organizationId } = await requirePermission("client", "update");
+  const { organizationId, userId, userName } = await requirePermission("client", "update");
   const parsed = clientSchema.parse(data);
 
-  return serialize(await prisma.client.update({
+  const updated = await prisma.client.update({
     where: { id, organizationId },
     data: {
       name: parsed.name,
@@ -115,7 +129,20 @@ export async function updateClient(id: string, data: ClientFormValues) {
       tags: parsed.tags,
       isActive: parsed.isActive,
     },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "client",
+    entityId: updated.id,
+    entityName: updated.name,
+    summary: `Updated client ${updated.name}`,
+  });
+
+  return serialize(updated);
 }
 
 export async function updateClientNotes(id: string, notes: string) {
@@ -127,9 +154,22 @@ export async function updateClientNotes(id: string, notes: string) {
 }
 
 export async function archiveClient(id: string) {
-  const { organizationId } = await requirePermission("client", "update");
-  return serialize(await prisma.client.update({
+  const { organizationId, userId, userName } = await requirePermission("client", "update");
+  const archived = await prisma.client.update({
     where: { id, organizationId },
     data: { isActive: false },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "client",
+    entityId: id,
+    entityName: archived.name,
+    summary: `Archived client ${archived.name}`,
+  });
+
+  return serialize(archived);
 }

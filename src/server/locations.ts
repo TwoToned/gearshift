@@ -5,6 +5,7 @@ import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { locationSchema, type LocationFormValues } from "@/lib/validations/asset";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getLocations(params?: {
   search?: string;
@@ -101,7 +102,7 @@ export async function getLocation(id: string) {
 }
 
 export async function createLocation(data: LocationFormValues) {
-  const { organizationId } = await requirePermission("location", "create");
+  const { organizationId, userId, userName } = await requirePermission("location", "create");
   const parsed = locationSchema.parse(data);
 
   // If this is set as default, unset other defaults
@@ -112,17 +113,30 @@ export async function createLocation(data: LocationFormValues) {
     });
   }
 
-  return serialize(await prisma.location.create({
+  const result = await prisma.location.create({
     data: {
       ...parsed,
       parentId: parsed.parentId || null,
       organizationId,
     },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "location",
+    entityId: result.id,
+    entityName: result.name,
+    summary: `Created location ${result.name}`,
+  });
+
+  return serialize(result);
 }
 
 export async function updateLocation(id: string, data: LocationFormValues) {
-  const { organizationId } = await requirePermission("location", "update");
+  const { organizationId, userId, userName } = await requirePermission("location", "update");
   const parsed = locationSchema.parse(data);
 
   if (parsed.isDefault) {
@@ -132,17 +146,30 @@ export async function updateLocation(id: string, data: LocationFormValues) {
     });
   }
 
-  return serialize(await prisma.location.update({
+  const updated = await prisma.location.update({
     where: { id, organizationId },
     data: {
       ...parsed,
       parentId: parsed.parentId || null,
     },
-  }));
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "UPDATE",
+    entityType: "location",
+    entityId: updated.id,
+    entityName: updated.name,
+    summary: `Updated location ${updated.name}`,
+  });
+
+  return serialize(updated);
 }
 
 export async function deleteLocation(id: string) {
-  const { organizationId } = await requirePermission("location", "delete");
+  const { organizationId, userId, userName } = await requirePermission("location", "delete");
   const location = await prisma.location.findUnique({
     where: { id, organizationId },
     include: { _count: { select: { assets: true, bulkAssets: true, children: true } } },
@@ -152,7 +179,21 @@ export async function deleteLocation(id: string) {
   if (location._count.assets > 0 || location._count.bulkAssets > 0) {
     throw new Error("Cannot delete location with assets assigned to it");
   }
-  return serialize(await prisma.location.delete({ where: { id, organizationId } }));
+  await prisma.location.delete({ where: { id, organizationId } });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "DELETE",
+    entityType: "location",
+    entityId: id,
+    entityName: location.name,
+    summary: `Deleted location ${location.name}`,
+    details: { deleted: { name: location.name } },
+  });
+
+  return serialize({ id });
 }
 
 export async function updateLocationNotes(id: string, notes: string) {

@@ -5,6 +5,7 @@ import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import { reserveTestTagIds, peekNextTestTagIds, getOrgTestTagSettings } from "@/server/settings";
 import type { Prisma, TestTagStatus } from "@/generated/prisma/client";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getTestTagAssets(params?: {
   search?: string;
@@ -137,7 +138,7 @@ export async function createTestTagAsset(data: {
   assetId?: string;
   bulkAssetId?: string;
 }) {
-  const { organizationId } = await requirePermission("testTag", "create");
+  const { organizationId, userId, userName } = await requirePermission("testTag", "create");
 
   // If linking to a serialized asset, use the asset's tag as the test tag ID
   let testTagId = data.testTagId;
@@ -180,6 +181,17 @@ export async function createTestTagAsset(data: {
     },
   });
 
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "testTagAsset",
+    entityId: item.id,
+    entityName: testTagId,
+    summary: `Created test tag asset ${testTagId}`,
+  });
+
   return serialize(item);
 }
 
@@ -194,7 +206,7 @@ export async function createTestTagAssetsFromBulk(data: {
   modelName?: string;
   location?: string;
 }) {
-  const { organizationId } = await requirePermission("testTag", "create");
+  const { organizationId, userId, userName } = await requirePermission("testTag", "create");
 
   // Verify bulk asset exists
   const bulkAsset = await prisma.bulkAsset.findFirst({
@@ -223,6 +235,18 @@ export async function createTestTagAssetsFromBulk(data: {
       })
     )
   );
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "testTagAsset",
+    entityId: items[0]?.id || "",
+    entityName: `${data.count} test tag assets`,
+    summary: `Batch created ${items.length} test tag assets from bulk asset`,
+    details: { count: items.length, bulkAssetId: data.bulkAssetId },
+  });
 
   return serialize({ count: items.length, items });
 }

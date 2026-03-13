@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, requirePermission } from "@/lib/org-context";
 import { serialize } from "@/lib/serialize";
 import type { OrgSettings } from "@/server/settings";
+import { logActivity } from "@/lib/activity-log";
 
 /**
  * Recalculate and update a TestTagAsset's status based on its latest test record and dates.
@@ -108,7 +109,7 @@ export async function createTestTagRecord(data: {
   failureNotes?: string;
   nextDueDate: Date | string;
 }) {
-  const { organizationId, userId } = await requirePermission("testTag", "create");
+  const { organizationId, userId, userName } = await requirePermission("testTag", "create");
 
   // Verify asset exists and belongs to org
   const testTagAsset = await prisma.testTagAsset.findFirst({
@@ -172,6 +173,18 @@ export async function createTestTagRecord(data: {
     await recalculateStatus(data.testTagAssetId, organizationId, tx);
 
     return created;
+  });
+
+  await logActivity({
+    organizationId,
+    userId,
+    userName,
+    action: "CREATE",
+    entityType: "testTagRecord",
+    entityId: record.id,
+    entityName: testTagAsset.testTagId,
+    summary: `Recorded ${data.result} test for ${testTagAsset.testTagId}`,
+    details: { result: data.result, testerName: data.testerName },
   });
 
   return serialize(record);

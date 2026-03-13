@@ -43,6 +43,7 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets,
     testTagAssets,
     testTagRecords,
+    activityLogs,
     fileUploads,
     modelMedia,
     assetMedia,
@@ -72,6 +73,7 @@ export async function exportOrganization(orgId: string) {
     }),
     prisma.testTagAsset.findMany({ where: { organizationId: orgId } }),
     prisma.testTagRecord.findMany({ where: { organizationId: orgId } }),
+    prisma.activityLog.findMany({ where: { organizationId: orgId } }),
     prisma.fileUpload.findMany({ where: { organizationId: orgId } }),
     prisma.modelMedia.findMany({ where: { organizationId: orgId } }),
     prisma.assetMedia.findMany({ where: { organizationId: orgId } }),
@@ -105,6 +107,7 @@ export async function exportOrganization(orgId: string) {
   collectUserIds(testTagRecords as unknown as Record<string, unknown>[], ["testedById"]);
   collectUserIds(kitSerializedItems as unknown as Record<string, unknown>[], ["addedById"]);
   collectUserIds(kitBulkItems as unknown as Record<string, unknown>[], ["addedById"]);
+  collectUserIds(activityLogs as unknown as Record<string, unknown>[], ["userId"]);
   collectUserIds(fileUploads as unknown as Record<string, unknown>[], ["uploadedById"]);
 
   const users = await prisma.user.findMany({
@@ -140,6 +143,7 @@ export async function exportOrganization(orgId: string) {
     maintenanceRecordAssets: clean(maintenanceRecordAssets) as Record<string, unknown>[],
     testTagAssets: clean(testTagAssets) as Record<string, unknown>[],
     testTagRecords: clean(testTagRecords) as Record<string, unknown>[],
+    activityLogs: clean(activityLogs) as Record<string, unknown>[],
     fileUploads: clean(fileUploads) as Record<string, unknown>[],
     modelMedia: clean(modelMedia) as Record<string, unknown>[],
     assetMedia: clean(assetMedia) as Record<string, unknown>[],
