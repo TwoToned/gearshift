@@ -6,11 +6,17 @@ import { clientSchema, type ClientFormValues } from "@/lib/validations/client";
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const clientFilterColumns: FilterColumnDef[] = [
+  { id: "type", filterType: "enum", filterKey: "type" },
+];
 
 export async function getClients(params?: {
   search?: string;
   type?: string;
   isActive?: boolean;
+  filters?: Record<string, FilterValue>;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -18,9 +24,11 @@ export async function getClients(params?: {
 }) {
   const { organizationId } = await getOrgContext();
   const {
-    search, type, isActive = true, page = 1, pageSize = 25,
+    search, type, isActive = true, filters, page = 1, pageSize = 25,
     sortBy = "name", sortOrder = "asc",
   } = params || {};
+
+  const filterWhere = buildFilterWhere(filters, clientFilterColumns);
 
   const where: Prisma.ClientWhereInput = {
     organizationId,
@@ -33,6 +41,7 @@ export async function getClients(params?: {
         { contactEmail: { contains: search, mode: "insensitive" } },
       ],
     }),
+    ...filterWhere,
   };
 
   const [clients, total] = await Promise.all([

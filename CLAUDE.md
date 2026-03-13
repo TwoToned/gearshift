@@ -250,10 +250,14 @@ No test framework is configured.
 - **API routes**: `src/app/api/admin/org-export/[orgId]/route.ts` (GET, streams zip), `src/app/api/admin/org-import/route.ts` (POST, FormData with file + optional name/slug).
 - **UI**: Export button on org detail page + per-row download button. Import button + dialog on org list page.
 
-### Table Components
-- `SortableTableHead` and `PageSizeSelect` in `src/components/ui/sortable-table-head.tsx`.
-- `useTablePreferences` hook (`src/lib/use-table-preferences.ts`) persists sort, page size, and view mode to localStorage per table key.
-- Responsive column hiding: use `hidden sm:table-cell`, `hidden md:table-cell`, `hidden lg:table-cell` to progressively show columns.
+### Advanced DataTable System
+- **`DataTable`** component (`src/components/ui/data-table.tsx`): Shared table component replacing all hand-built tables. Configured via `ColumnDef<TData>[]` column definitions.
+- **Column visibility**: Toggle columns on/off via popover. `alwaysVisible` columns cannot be hidden. `defaultVisible: false` columns are hidden by default. Persisted to localStorage.
+- **Enum filter dropdowns**: Checkbox popover multi-select filters for enum columns. Active filters shown as removable chips below the toolbar.
+- **`buildFilterWhere(filters, columnDefs)`** in `src/lib/table-utils.ts`: Translates filter state to Prisma `where` clauses. Supports nested dot-paths.
+- **`useTablePreferences`** hook (`src/lib/use-table-preferences.ts`): Persists sort, page size, view mode, column visibility, and filters to localStorage per table key. Key additions: `columnVisibility`, `toggleColumnVisibility`, `filters`, `setFilter`, `clearFilters`, `resetPreferences`.
+- **Server action pattern**: Add `filters?: Record<string, FilterValue>` param, call `buildFilterWhere(filters, filterColumnDefs)`, merge into where clause. For `tags` filters: use `{ hasSome: values }`.
+- **Legacy**: `SortableTableHead` and `PageSizeSelect` still exist in `src/components/ui/sortable-table-head.tsx` but are no longer used by DataTable-powered pages.
 - **Hierarchical tables**: Locations and categories indent children under parents using `paddingLeft: depth * 24` on the name cell. Tree is built client-side from flat data via `parentId` grouping.
 
 ### Test & Tag (T&T) Module

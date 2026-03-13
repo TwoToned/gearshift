@@ -1,24 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useState, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { getTestTagAssets } from "@/server/test-tag-assets";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useActiveOrganization } from "@/lib/auth-client";
+import { useTablePreferences } from "@/lib/use-table-preferences";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
@@ -37,8 +28,8 @@ function formatEquipmentClass(value: string): string {
   const map: Record<string, string> = {
     CLASS_I: "Class I",
     CLASS_II: "Class II",
-    CLASS_II_DOUBLE_INSULATED: "Class II (Double Insulated)",
-    LEAD_CORD_ASSEMBLY: "Lead / Cord Assembly",
+    CLASS_II_DOUBLE_INSULATED: "Class II (DI)",
+    LEAD_CORD_ASSEMBLY: "Lead / Cord",
   };
   return map[value] || value;
 }
@@ -56,43 +47,166 @@ function formatDate(date: string | Date | null | undefined): string {
   return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyItem = Record<string, any>;
+
+function useTestTagColumns(): ColumnDef<AnyItem>[] {
+  return [
+    {
+      id: "testTagId",
+      header: "Test Tag ID",
+      accessorKey: "testTagId",
+      alwaysVisible: true,
+      cell: (row) => (
+        <span className="font-mono font-medium text-sm">{row.testTagId}</span>
+      ),
+    },
+    {
+      id: "description",
+      header: "Description",
+      accessorKey: "description",
+      cell: (row) => (
+        <span className="max-w-[200px] truncate block">{row.description}</span>
+      ),
+    },
+    {
+      id: "equipmentClass",
+      header: "Equipment Class",
+      accessorKey: "equipmentClass",
+      filterable: true,
+      filterType: "enum",
+      responsiveHide: "lg",
+      filterOptions: [
+        { value: "CLASS_I", label: "Class I" },
+        { value: "CLASS_II", label: "Class II" },
+        { value: "CLASS_II_DOUBLE_INSULATED", label: "Class II (DI)" },
+        { value: "LEAD_CORD_ASSEMBLY", label: "Lead / Cord" },
+      ],
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {formatEquipmentClass(row.equipmentClass)}
+        </span>
+      ),
+    },
+    {
+      id: "applianceType",
+      header: "Appliance Type",
+      accessorKey: "applianceType",
+      filterable: true,
+      filterType: "enum",
+      responsiveHide: "lg",
+      defaultVisible: false,
+      filterOptions: [
+        { value: "APPLIANCE", label: "Appliance" },
+        { value: "CORD_SET", label: "Cord Set" },
+        { value: "EXTENSION_LEAD", label: "Extension Lead" },
+        { value: "POWER_BOARD", label: "Power Board" },
+        { value: "RCD_PORTABLE", label: "RCD Portable" },
+        { value: "RCD_FIXED", label: "RCD Fixed" },
+        { value: "THREE_PHASE", label: "Three Phase" },
+        { value: "OTHER", label: "Other" },
+      ],
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {formatApplianceType(row.applianceType)}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "status",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: [
+        { value: "CURRENT", label: "Current", color: "bg-green-500" },
+        { value: "DUE_SOON", label: "Due Soon", color: "bg-amber-500" },
+        { value: "OVERDUE", label: "Overdue", color: "bg-red-500" },
+        { value: "FAILED", label: "Failed", color: "bg-red-500" },
+        { value: "NOT_YET_TESTED", label: "Not Tested", color: "bg-gray-500" },
+        { value: "RETIRED", label: "Retired", color: "bg-gray-500" },
+      ],
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      id: "lastTestDate",
+      header: "Last Tested",
+      responsiveHide: "sm",
+      defaultVisible: false,
+      sortable: false,
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">{formatDate(row.lastTestDate)}</span>
+      ),
+    },
+    {
+      id: "nextDueDate",
+      header: "Next Due",
+      responsiveHide: "sm",
+      sortable: false,
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">{formatDate(row.nextDueDate)}</span>
+      ),
+    },
+    {
+      id: "linkedAsset",
+      header: "Linked Asset",
+      responsiveHide: "md",
+      sortable: false,
+      cell: (row) => {
+        if (row.asset) {
+          return (
+            <Link
+              href={`/assets/registry/${row.asset.id}`}
+              className="text-sm hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {row.asset.assetTag}
+            </Link>
+          );
+        }
+        if (row.bulkAsset) {
+          return (
+            <Link
+              href={`/assets/registry/${row.bulkAsset.id}?type=bulk`}
+              className="text-sm hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {row.bulkAsset.assetTag}
+            </Link>
+          );
+        }
+        return <span className="text-muted-foreground">{"\u2014"}</span>;
+      },
+    },
+  ];
+}
+
 function TestTagTableContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
 
-  const [search, setSearch] = useState(searchParams.get("search") || "");
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [status, setStatus] = useState(searchParams.get("status") || "");
-  const [equipmentClass, setEquipmentClass] = useState(searchParams.get("equipmentClass") || "");
-  const [applianceType, setApplianceType] = useState(searchParams.get("applianceType") || "");
-  const [assetLink, setAssetLink] = useState(searchParams.get("assetLink") || "");
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
-  const pageSize = 25;
+  const {
+    sortBy, sortOrder, pageSize, page,
+    setPage, setPageSize, handleSort,
+    columnVisibility, toggleColumnVisibility, resetPreferences,
+    filters, setFilter,
+  } = useTablePreferences("test-tag-registry", { sortBy: "testTagId", sortOrder: "asc" });
 
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const [search, setSearch] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: [
       "test-tag-assets",
       orgId,
-      { search: debouncedSearch, status, equipmentClass, applianceType, assetLink, page, pageSize },
+      { search, filters, page, pageSize, sortBy, sortOrder },
     ],
     queryFn: () =>
       getTestTagAssets({
-        search: debouncedSearch || undefined,
-        status: status || undefined,
-        equipmentClass: equipmentClass || undefined,
-        applianceType: applianceType || undefined,
-        assetLinkType: (assetLink as "all" | "serialized" | "bulk" | "standalone") || undefined,
+        search: search || undefined,
+        status: Array.isArray(filters.status) ? filters.status[0] : undefined,
+        equipmentClass: Array.isArray(filters.equipmentClass) ? filters.equipmentClass[0] : undefined,
+        applianceType: Array.isArray(filters.applianceType) ? filters.applianceType[0] : undefined,
         page,
         pageSize,
       }),
@@ -101,210 +215,32 @@ function TestTagTableContent() {
 
   const items = data?.items || [];
   const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
-
-  const selectClass =
-    "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
-
-  const getLinkedAssetLabel = useCallback(
-    (item: (typeof items)[number]) => {
-      if (item.asset) {
-        return (
-          <Link
-            href={`/assets/registry/${item.asset.id}`}
-            className="text-sm hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {item.asset.assetTag}
-            {item.asset.customName && (
-              <span className="ml-1 text-muted-foreground">({item.asset.customName})</span>
-            )}
-          </Link>
-        );
-      }
-      if (item.bulkAsset) {
-        return (
-          <Link
-            href={`/assets/registry/${item.bulkAsset.id}?type=bulk`}
-            className="text-sm hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {item.bulkAsset.assetTag}
-          </Link>
-        );
-      }
-      return <span className="text-muted-foreground">\u2014</span>;
-    },
-    []
-  );
+  const columns = useTestTagColumns();
 
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by tag, description, serial, make, model..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-          className={selectClass}
-        >
-          <option value="">All Statuses</option>
-          <option value="CURRENT">Current</option>
-          <option value="DUE_SOON">Due Soon</option>
-          <option value="OVERDUE">Overdue</option>
-          <option value="FAILED">Failed</option>
-          <option value="NOT_YET_TESTED">Not Yet Tested</option>
-          <option value="RETIRED">Retired</option>
-        </select>
-        <select
-          value={equipmentClass}
-          onChange={(e) => {
-            setEquipmentClass(e.target.value);
-            setPage(1);
-          }}
-          className={selectClass}
-        >
-          <option value="">All Classes</option>
-          <option value="CLASS_I">Class I</option>
-          <option value="CLASS_II">Class II</option>
-          <option value="CLASS_II_DOUBLE_INSULATED">Class II (Double Insulated)</option>
-          <option value="LEAD_CORD_ASSEMBLY">Lead / Cord Assembly</option>
-        </select>
-        <select
-          value={applianceType}
-          onChange={(e) => {
-            setApplianceType(e.target.value);
-            setPage(1);
-          }}
-          className={selectClass}
-        >
-          <option value="">All Types</option>
-          <option value="APPLIANCE">Appliance</option>
-          <option value="CORD_SET">Cord Set</option>
-          <option value="EXTENSION_LEAD">Extension Lead</option>
-          <option value="POWER_BOARD">Power Board</option>
-          <option value="RCD_PORTABLE">RCD Portable</option>
-          <option value="RCD_FIXED">RCD Fixed</option>
-          <option value="THREE_PHASE">Three Phase</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <select
-          value={assetLink}
-          onChange={(e) => {
-            setAssetLink(e.target.value);
-            setPage(1);
-          }}
-          className={selectClass}
-        >
-          <option value="">All Assets</option>
-          <option value="serialized">Serialized</option>
-          <option value="bulk">Bulk</option>
-          <option value="standalone">Standalone</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Test Tag ID</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="hidden lg:table-cell">Equipment Class</TableHead>
-              <TableHead className="hidden lg:table-cell">Appliance Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden sm:table-cell">Last Tested</TableHead>
-              <TableHead className="hidden sm:table-cell">Next Due</TableHead>
-              <TableHead className="hidden md:table-cell">Linked Asset</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
-                </TableCell>
-              </TableRow>
-            ) : items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No test tag assets found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              items.map((item) => (
-                <TableRow
-                  key={item.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/test-and-tag/${item.id}`)}
-                >
-                  <TableCell className="font-mono font-medium text-sm">
-                    {item.testTagId}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {item.description}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
-                    {formatEquipmentClass(item.equipmentClass)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
-                    {formatApplianceType(item.applianceType)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={item.status} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
-                    {formatDate(item.lastTestDate)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
-                    {formatDate(item.nextDueDate)}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{getLinkedAssetLabel(item)}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Page {page} of {totalPages} ({total} total)
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
+    <DataTable
+      data={items}
+      columns={columns}
+      totalRows={total}
+      page={page}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={setPageSize}
+      sortField={sortBy}
+      sortDirection={sortOrder}
+      onSortChange={handleSort}
+      filters={filters}
+      onFilterChange={setFilter}
+      searchValue={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1); }}
+      searchPlaceholder="Search by tag, description, serial, make, model..."
+      columnVisibility={columnVisibility}
+      onToggleColumnVisibility={toggleColumnVisibility}
+      onResetPreferences={resetPreferences}
+      isLoading={isLoading}
+      emptyTitle="No test tag assets found"
+      onRowClick={(item) => router.push(`/test-and-tag/${item.id}`)}
+    />
   );
 }
 

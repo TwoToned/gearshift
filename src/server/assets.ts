@@ -8,6 +8,15 @@ import { serialize } from "@/lib/serialize";
 import { reserveAssetTags, getOrgTestTagSettings } from "@/server/settings";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const assetFilterColumns: FilterColumnDef[] = [
+  { id: "status", filterType: "enum" },
+  { id: "condition", filterType: "enum" },
+  { id: "locationId", filterType: "enum" },
+  { id: "categoryId", filterType: "enum", filterKey: "model.categoryId" },
+  { id: "tags", filterType: "enum" },
+];
 
 export type AssetWithRelations = Prisma.AssetGetPayload<{
   include: {
@@ -28,13 +37,25 @@ export async function getAssets(params?: {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  filters?: Record<string, FilterValue>;
 }) {
   const { organizationId } = await getOrgContext();
   const {
     search, categoryId, status, condition, locationId, modelId,
     isActive = true, page = 1, pageSize = 25,
     sortBy = "assetTag", sortOrder = "asc",
+    filters,
   } = params || {};
+
+  // Build filter where from DataTable filters
+  const filterWhere = buildFilterWhere(filters, assetFilterColumns);
+
+  // Handle tags filter specially (hasSome)
+  let tagsFilter: Prisma.AssetWhereInput | undefined;
+  if (filters?.tags && Array.isArray(filters.tags) && filters.tags.length > 0) {
+    tagsFilter = { tags: { hasSome: filters.tags as string[] } };
+    delete (filterWhere as Record<string, unknown>).tags;
+  }
 
   const where: Prisma.AssetWhereInput = {
     organizationId,
@@ -44,6 +65,8 @@ export async function getAssets(params?: {
     ...(locationId && { locationId }),
     ...(modelId && { modelId }),
     ...(categoryId && { model: { categoryId } }),
+    ...filterWhere,
+    ...tagsFilter,
     ...(search && {
       OR: [
         { assetTag: { contains: search, mode: "insensitive" } },

@@ -3,23 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus, Star } from "lucide-react";
+import { Plus, Star } from "lucide-react";
 
 import { getLocations } from "@/server/locations";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const typeColors: Record<string, string> = {
   WAREHOUSE: "bg-blue-500/10 text-blue-500 border-blue-500/20",
@@ -36,7 +27,10 @@ const typeLabels: Record<string, string> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildTreeRows(locations: any[]): { location: any; depth: number }[] {
+type LocationRow = Record<string, any> & { _depth: number };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildTreeRows(locations: any[]): LocationRow[] {
   const childrenMap = new Map<string | null, typeof locations>();
   for (const loc of locations) {
     const pid = loc.parentId || null;
@@ -44,13 +38,12 @@ function buildTreeRows(locations: any[]): { location: any; depth: number }[] {
     childrenMap.get(pid)!.push(loc);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows: { location: any; depth: number }[] = [];
+  const rows: LocationRow[] = [];
 
   function addChildren(parentId: string | null, depth: number) {
     const children = childrenMap.get(parentId) || [];
     for (const child of children) {
-      rows.push({ location: child, depth });
+      rows.push({ ...child, _depth: depth });
       addChildren(child.id, depth + 1);
     }
   }
@@ -60,34 +53,114 @@ function buildTreeRows(locations: any[]): { location: any; depth: number }[] {
   const roots = locations.filter((l) => !l.parentId || !locationIds.has(l.parentId));
 
   for (const root of roots) {
-    rows.push({ location: root, depth: 0 });
+    rows.push({ ...root, _depth: 0 });
     addChildren(root.id, 1);
   }
 
   // If tree-building produced fewer rows than input (shouldn't happen), add missing ones
-  const addedIds = new Set(rows.map((r) => r.location.id));
+  const addedIds = new Set(rows.map((r) => r.id));
   for (const loc of locations) {
     if (!addedIds.has(loc.id)) {
-      rows.push({ location: loc, depth: 0 });
+      rows.push({ ...loc, _depth: 0 });
     }
   }
 
   return rows;
 }
 
+const columns: ColumnDef<LocationRow>[] = [
+  {
+    id: "name",
+    header: "Name",
+    accessorKey: "name",
+    sortKey: "name",
+    alwaysVisible: true,
+    cell: (row) => (
+      <div className="flex items-center gap-2" style={{ paddingLeft: row._depth * 24 }}>
+        <Link href={`/locations/${row.id}`} className="font-medium hover:underline">
+          {row.name}
+        </Link>
+        {row.isDefault && (
+          <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+        )}
+      </div>
+    ),
+  },
+  {
+    id: "type",
+    header: "Type",
+    accessorKey: "type",
+    sortKey: "type",
+    responsiveHide: "sm",
+    filterable: true,
+    filterType: "enum",
+    filterOptions: [
+      { value: "WAREHOUSE", label: "Warehouse", color: "bg-blue-500" },
+      { value: "VENUE", label: "Venue", color: "bg-amber-500" },
+      { value: "VEHICLE", label: "Vehicle", color: "bg-purple-500" },
+      { value: "OFFSITE", label: "Offsite", color: "bg-gray-500" },
+    ],
+    cell: (row) => (
+      <Badge variant="outline" className={typeColors[row.type] || ""}>
+        {typeLabels[row.type] || row.type}
+      </Badge>
+    ),
+  },
+  {
+    id: "address",
+    header: "Address",
+    accessorKey: "address",
+    sortKey: "address",
+    responsiveHide: "md",
+    cell: (row) => (
+      <span className="text-muted-foreground">{row.address || "\u2014"}</span>
+    ),
+  },
+  {
+    id: "assets",
+    header: "Assets",
+    sortKey: "name",
+    sortable: false,
+    align: "right",
+    cell: (row) => {
+      const count = (row._count?.assets || 0) + (row._count?.bulkAssets || 0) + (row._count?.kits || 0);
+      return count;
+    },
+  },
+  {
+    id: "tags",
+    header: "Tags",
+    sortable: false,
+    responsiveHide: "lg",
+    cell: (row) => (
+      <div className="flex flex-wrap gap-1">
+        {row.tags?.map((tag: string) => (
+          <Badge key={tag} variant="secondary" className="text-xs">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    ),
+  },
+];
+
 export function LocationTable() {
-  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
-    useTablePreferences("locations", { sortBy: "name", sortOrder: "asc" });
+  const {
+    sortBy, sortOrder, pageSize, page,
+    setPage, setPageSize, handleSort,
+    columnVisibility, toggleColumnVisibility, resetPreferences,
+    filters, setFilter, clearFilters,
+  } = useTablePreferences("locations", { sortBy: "name", sortOrder: "asc" });
+
   const [search, setSearch] = useState("");
-  const [type, setType] = useState("");
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["locations", orgId, { search, type, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["locations", orgId, { search, filters, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getLocations({
       search: search || undefined,
-      type: type || undefined,
+      filters,
       page,
       pageSize,
       sortBy,
@@ -95,124 +168,38 @@ export function LocationTable() {
     }),
   });
 
-  const totalPages = data?.totalPages || 1;
-  const total = data?.total || 0;
-
   const treeRows = useMemo(() => buildTreeRows(data?.locations || []), [data?.locations]);
 
+  const actionButtons = (
+    <Button render={<Link href="/locations/new" />}>
+      <Plus className="mr-2 h-4 w-4" />
+      New Location
+    </Button>
+  );
+
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or address..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
-          />
-        </div>
-        <select
-          value={type}
-          onChange={(e) => { setType(e.target.value); setPage(1); }}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All Types</option>
-          <option value="WAREHOUSE">Warehouse</option>
-          <option value="VENUE">Venue</option>
-          <option value="VEHICLE">Vehicle</option>
-          <option value="OFFSITE">Offsite</option>
-        </select>
-        <Button render={<Link href="/locations/new" />}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Location
-        </Button>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
-              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden sm:table-cell">Type</SortableTableHead>
-              <SortableTableHead sortKey="address" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="hidden md:table-cell">Address</SortableTableHead>
-              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Assets</SortableTableHead>
-              <TableHead className="hidden lg:table-cell">Tags</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell>
-              </TableRow>
-            ) : treeRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  No locations found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              treeRows.map(({ location, depth }) => {
-                const assetCount = (location._count?.assets || 0) + (location._count?.bulkAssets || 0) + (location._count?.kits || 0);
-                return (
-                  <TableRow key={location.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2" style={{ paddingLeft: depth * 24 }}>
-                        <Link href={`/locations/${location.id}`} className="font-medium hover:underline">
-                          {location.name}
-                        </Link>
-                        {location.isDefault && (
-                          <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge variant="outline" className={typeColors[location.type] || ""}>
-                        {typeLabels[location.type] || location.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {location.address || "\u2014"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {assetCount}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {location.tags?.map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} total)
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            Next
-          </Button>
-        </div>
-      </div>
-    </div>
+    <DataTable
+      data={treeRows}
+      columns={columns}
+      totalRows={data?.total || 0}
+      page={page}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={setPageSize}
+      sortField={sortBy}
+      sortDirection={sortOrder}
+      onSortChange={handleSort}
+      filters={filters}
+      onFilterChange={setFilter}
+      searchValue={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1); }}
+      searchPlaceholder="Search by name or address..."
+      columnVisibility={columnVisibility}
+      onToggleColumnVisibility={toggleColumnVisibility}
+      onResetPreferences={resetPreferences}
+      isLoading={isLoading}
+      emptyTitle="No locations found"
+      toolbarActions={actionButtons}
+    />
   );
 }

@@ -8,6 +8,12 @@ import type { Prisma } from "@/generated/prisma/client";
 import { backfillTestTagAssets } from "@/server/test-tag-assets";
 import { getOrgTestTagSettings } from "@/server/settings";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const modelFilterColumns: FilterColumnDef[] = [
+  { id: "categoryId", filterType: "enum" },
+  { id: "assetType", filterType: "enum" },
+];
 
 export type ModelWithRelations = Prisma.ModelGetPayload<{
   include: {
@@ -25,15 +31,19 @@ export async function getModels(params?: {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  filters?: Record<string, FilterValue>;
 }) {
   const { organizationId } = await getOrgContext();
-  const { search, categoryId, assetType, isActive = true, page = 1, pageSize = 25, sortBy = "name", sortOrder = "asc" } = params || {};
+  const { search, categoryId, assetType, isActive = true, page = 1, pageSize = 25, sortBy = "name", sortOrder = "asc", filters } = params || {};
+
+  const filterWhere = buildFilterWhere(filters, modelFilterColumns);
 
   const where: Prisma.ModelWhereInput = {
     organizationId,
     isActive,
     ...(categoryId && { categoryId }),
     ...(assetType && { assetType }),
+    ...filterWhere,
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" } },

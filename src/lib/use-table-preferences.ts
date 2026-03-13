@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { SortOrder } from "@/components/ui/sortable-table-head";
+import type { FilterValue } from "@/lib/table-utils";
 
 const STORAGE_PREFIX = "gearflow-table-";
 
@@ -43,6 +44,16 @@ export function useTablePreferences(
   );
   const [page, setPage] = useState(1);
 
+  // Column visibility — persisted
+  const [columnVisibility, setColumnVisibilityState] = useState<Record<string, boolean>>(() =>
+    getStored(`${tableId}-colVis`, {}),
+  );
+
+  // Filters — persisted
+  const [filters, setFiltersState] = useState<Record<string, FilterValue>>(() =>
+    getStored(`${tableId}-filters`, {}),
+  );
+
   const setSortBy = useCallback(
     (value: string) => {
       setSortByState(value);
@@ -77,6 +88,73 @@ export function useTablePreferences(
     [tableId],
   );
 
+  const setColumnVisibility = useCallback(
+    (value: Record<string, boolean>) => {
+      setColumnVisibilityState(value);
+      setStored(`${tableId}-colVis`, value);
+    },
+    [tableId],
+  );
+
+  const toggleColumnVisibility = useCallback(
+    (columnId: string) => {
+      setColumnVisibilityState((prev) => {
+        const next = { ...prev, [columnId]: !prev[columnId] };
+        // Remove the entry if toggling back to undefined (let default apply)
+        if (next[columnId] === undefined) delete next[columnId];
+        setStored(`${tableId}-colVis`, next);
+        return next;
+      });
+    },
+    [tableId],
+  );
+
+  const setFilters = useCallback(
+    (value: Record<string, FilterValue>) => {
+      setFiltersState(value);
+      setStored(`${tableId}-filters`, value);
+      setPage(1);
+    },
+    [tableId],
+  );
+
+  const setFilter = useCallback(
+    (key: string, value: FilterValue | undefined) => {
+      setFiltersState((prev) => {
+        const next = { ...prev };
+        if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+          delete next[key];
+        } else {
+          next[key] = value;
+        }
+        setStored(`${tableId}-filters`, next);
+        setPage(1);
+        return next;
+      });
+    },
+    [tableId],
+  );
+
+  const clearFilters = useCallback(() => {
+    setFiltersState({});
+    setStored(`${tableId}-filters`, {});
+    setPage(1);
+  }, [tableId]);
+
+  const resetPreferences = useCallback(() => {
+    setSortByState(defaults.sortBy);
+    setSortOrderState(defaults.sortOrder);
+    setPageSizeState(defaults.pageSize ?? 25);
+    setColumnVisibilityState({});
+    setFiltersState({});
+    setPage(1);
+    localStorage.removeItem(STORAGE_PREFIX + `${tableId}-sortBy`);
+    localStorage.removeItem(STORAGE_PREFIX + `${tableId}-sortOrder`);
+    localStorage.removeItem(STORAGE_PREFIX + `${tableId}-pageSize`);
+    localStorage.removeItem(STORAGE_PREFIX + `${tableId}-colVis`);
+    localStorage.removeItem(STORAGE_PREFIX + `${tableId}-filters`);
+  }, [tableId, defaults]);
+
   const handleSort = useCallback(
     (key: string) => {
       if (sortBy === key) {
@@ -101,5 +179,13 @@ export function useTablePreferences(
     setPageSize,
     setView,
     handleSort,
+    columnVisibility,
+    setColumnVisibility,
+    toggleColumnVisibility,
+    filters,
+    setFilters,
+    setFilter,
+    clearFilters,
+    resetPreferences,
   };
 }

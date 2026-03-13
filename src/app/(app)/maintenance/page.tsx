@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
-  Search,
   Wrench,
   CalendarClock,
   CheckCircle2,
@@ -22,28 +21,12 @@ import {
 } from "@/server/maintenance";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { useActiveOrganization } from "@/lib/auth-client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const statusConfig: Record<
   string,
@@ -88,23 +71,205 @@ const resultConfig: Record<string, { label: string; color: string }> = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = Record<string, any>;
+
+function useMaintenanceColumns(
+  now: Date,
+  onDelete: (id: string) => void,
+): ColumnDef<AnyRecord>[] {
+  return [
+    {
+      id: "title",
+      header: "Title",
+      accessorKey: "title",
+      alwaysVisible: true,
+      sortKey: "title",
+      cell: (row) => (
+        <Link href={`/maintenance/${row.id}`} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+          {row.title}
+        </Link>
+      ),
+    },
+    {
+      id: "asset",
+      header: "Asset",
+      sortKey: "asset",
+      cell: (row) => {
+        const assets = row.assets || [];
+        if (assets.length === 0) return "—";
+        return (
+          <div className="space-y-0.5">
+            {assets.slice(0, 2).map((link: AnyRecord) => (
+              <div key={link.id}>
+                <span className="font-mono text-xs">{link.asset?.assetTag}</span>
+                <span className="text-muted-foreground text-xs ml-2">{link.asset?.model?.name}</span>
+              </div>
+            ))}
+            {assets.length > 2 && (
+              <span className="text-xs text-muted-foreground">+{assets.length - 2} more</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "type",
+      header: "Type",
+      accessorKey: "type",
+      sortKey: "type",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: [
+        { value: "REPAIR", label: "Repair" },
+        { value: "PREVENTATIVE", label: "Preventative" },
+        { value: "INSPECTION", label: "Inspection" },
+        { value: "CLEANING", label: "Cleaning" },
+        { value: "FIRMWARE_UPDATE", label: "Firmware Update" },
+      ],
+      cell: (row) => <span className="text-sm">{typeLabels[row.type] || row.type}</span>,
+    },
+    {
+      id: "reportedBy",
+      header: "Reported By",
+      sortKey: "reportedBy",
+      defaultVisible: false,
+      responsiveHide: "md",
+      cell: (row) => <span className="text-sm text-muted-foreground">{row.reportedBy?.name || "—"}</span>,
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "status",
+      sortKey: "status",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: [
+        { value: "SCHEDULED", label: "Scheduled", color: "bg-blue-500" },
+        { value: "IN_PROGRESS", label: "In Progress", color: "bg-amber-500" },
+        { value: "COMPLETED", label: "Completed", color: "bg-green-500" },
+        { value: "CANCELLED", label: "Cancelled", color: "bg-red-500" },
+      ],
+      cell: (row) => {
+        const status = statusConfig[row.status];
+        const isOverdue =
+          (row.status === "SCHEDULED" || row.status === "IN_PROGRESS") &&
+          row.scheduledDate && new Date(row.scheduledDate) < now;
+        return (
+          <Badge
+            variant="outline"
+            className={`${status?.color || ""} ${isOverdue ? "ring-1 ring-destructive/50" : ""}`}
+          >
+            {status?.label || row.status}
+            {isOverdue ? " (Overdue)" : null}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "scheduledDate",
+      header: "Scheduled",
+      sortKey: "scheduledDate",
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {row.scheduledDate ? format(new Date(row.scheduledDate), "MMM d, yyyy") : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "completedDate",
+      header: "Completed",
+      sortKey: "completedDate",
+      defaultVisible: false,
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {row.completedDate ? format(new Date(row.completedDate), "MMM d, yyyy") : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "result",
+      header: "Result",
+      accessorKey: "result",
+      sortKey: "result",
+      filterable: true,
+      filterType: "enum",
+      defaultVisible: false,
+      filterOptions: [
+        { value: "PASS", label: "Pass", color: "bg-green-500" },
+        { value: "FAIL", label: "Fail", color: "bg-red-500" },
+        { value: "CONDITIONAL", label: "Conditional", color: "bg-amber-500" },
+      ],
+      cell: (row) =>
+        row.result ? (
+          <Badge variant="outline" className={resultConfig[row.result]?.color || ""}>
+            {resultConfig[row.result]?.label || row.result}
+          </Badge>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      id: "tags",
+      header: "Tags",
+      sortable: false,
+      defaultVisible: true,
+      responsiveHide: "lg",
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.tags?.map((tag: string) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      sortable: false,
+      width: 40,
+      cell: (row) => (
+        <CanDo resource="maintenance" action="delete">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm("Delete this maintenance record?")) {
+                onDelete(row.id);
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+          </Button>
+        </CanDo>
+      ),
+    },
+  ];
+}
+
 export default function MaintenancePage() {
   const queryClient = useQueryClient();
-  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
-    useTablePreferences("maintenance", { sortBy: "", sortOrder: "asc" });
+  const {
+    sortBy, sortOrder, pageSize, page,
+    setPage, setPageSize, handleSort,
+    columnVisibility, toggleColumnVisibility, resetPreferences,
+    filters, setFilter,
+  } = useTablePreferences("maintenance", { sortBy: "scheduledDate", sortOrder: "desc" });
+
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["maintenance", orgId, search, statusFilter, typeFilter, page, pageSize, sortBy, sortOrder],
+    queryKey: ["maintenance", orgId, search, filters, page, pageSize, sortBy, sortOrder],
     queryFn: () =>
       getMaintenanceRecords({
         search: search || undefined,
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        type: typeFilter !== "all" ? typeFilter : undefined,
+        status: Array.isArray(filters.status) ? filters.status[0] : undefined,
+        type: Array.isArray(filters.type) ? filters.type[0] : undefined,
         page,
         pageSize,
         sortBy: sortBy || undefined,
@@ -121,279 +286,72 @@ export default function MaintenancePage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const records = (data?.records || []) as Record<string, unknown>[];
-  const totalPages = data?.totalPages || 1;
+  const records = (data?.records || []) as AnyRecord[];
   const total = data?.total || 0;
   const now = new Date();
 
-  // Summary counts
+  const columns = useMaintenanceColumns(now, (id) => deleteMutation.mutate(id));
+
   const overdueMaintenance = records.filter((r) => {
     if (r.status !== "SCHEDULED" && r.status !== "IN_PROGRESS") return false;
-    return r.scheduledDate && new Date(r.scheduledDate as string) < now;
+    return r.scheduledDate && new Date(r.scheduledDate) < now;
   }).length;
 
   return (
     <RequirePermission resource="maintenance" action="read">
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Maintenance</h1>
-          <p className="text-muted-foreground">
-            Track repairs, inspections, and preventative maintenance.
-          </p>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Maintenance</h1>
+            <p className="text-muted-foreground">
+              Track repairs, inspections, and preventative maintenance.
+            </p>
+          </div>
         </div>
-        <CanDo resource="maintenance" action="create">
-          <Link href="/maintenance/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Record
-            </Button>
-          </Link>
-        </CanDo>
+
+        {overdueMaintenance > 0 && (
+          <Card className="border-destructive/50">
+            <CardContent className="flex items-center gap-3 py-3">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <span className="text-sm font-medium">
+                {overdueMaintenance} overdue maintenance{" "}
+                {overdueMaintenance === 1 ? "record" : "records"}
+              </span>
+            </CardContent>
+          </Card>
+        )}
+
+        <DataTable
+          data={records}
+          columns={columns}
+          totalRows={total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          sortField={sortBy}
+          sortDirection={sortOrder}
+          onSortChange={handleSort}
+          filters={filters}
+          onFilterChange={setFilter}
+          searchValue={search}
+          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          searchPlaceholder="Search records..."
+          columnVisibility={columnVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onResetPreferences={resetPreferences}
+          isLoading={isLoading}
+          emptyTitle="No maintenance records found"
+          toolbarActions={
+            <CanDo resource="maintenance" action="create">
+              <Button size="sm" className="h-8" render={<Link href="/maintenance/new" />}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Record
+              </Button>
+            </CanDo>
+          }
+        />
       </div>
-
-      {overdueMaintenance > 0 && (
-        <Card className="border-destructive/50">
-          <CardContent className="flex items-center gap-3 py-3">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="text-sm font-medium">
-              {overdueMaintenance} overdue maintenance{" "}
-              {overdueMaintenance === 1 ? "record" : "records"}
-            </span>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search records..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="pl-9"
-          />
-        </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => {
-            setStatusFilter(v ?? "all");
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status">
-              {{ all: "All Statuses", SCHEDULED: "Scheduled", IN_PROGRESS: "In Progress", COMPLETED: "Completed", CANCELLED: "Cancelled" }[statusFilter] || statusFilter}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={typeFilter}
-          onValueChange={(v) => {
-            setTypeFilter(v ?? "all");
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Type">
-              {{ all: "All Types", ...typeLabels }[typeFilter] || typeFilter}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="REPAIR">Repair</SelectItem>
-            <SelectItem value="PREVENTATIVE">Preventative</SelectItem>
-            <SelectItem value="INSPECTION">Inspection</SelectItem>
-            <SelectItem value="CLEANING">Cleaning</SelectItem>
-            <SelectItem value="FIRMWARE_UPDATE">Firmware Update</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead sortKey="title" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Title</SortableTableHead>
-              <SortableTableHead sortKey="asset" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset</SortableTableHead>
-              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
-              <SortableTableHead sortKey="reportedBy" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Reported By</SortableTableHead>
-              <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
-              <SortableTableHead sortKey="scheduledDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Scheduled</SortableTableHead>
-              <SortableTableHead sortKey="completedDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Completed</SortableTableHead>
-              <SortableTableHead sortKey="result" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Result</SortableTableHead>
-              <TableHead className="hidden lg:table-cell">Tags</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
-                  No maintenance records found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              records.map((record) => {
-                const assets = (record.assets as Record<string, unknown>[]) || [];
-                const status = statusConfig[record.status as string];
-                const isOverdue =
-                  (record.status === "SCHEDULED" || record.status === "IN_PROGRESS") &&
-                  record.scheduledDate &&
-                  new Date(record.scheduledDate as string) < now;
-
-                return (
-                  <TableRow key={record.id as string}>
-                    <TableCell>
-                      <Link
-                        href={`/maintenance/${record.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {record.title as string}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {assets.length > 0 && (
-                        <div className="space-y-0.5">
-                          {assets.slice(0, 2).map((link) => {
-                            const asset = link.asset as Record<string, unknown>;
-                            const model = asset?.model as Record<string, unknown> | null;
-                            return (
-                              <div key={link.id as string}>
-                                <span className="font-mono text-xs">
-                                  {asset.assetTag as string}
-                                </span>
-                                <span className="text-muted-foreground text-xs ml-2">
-                                  {model?.name as string}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          {assets.length > 2 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{assets.length - 2} more
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">
-                        {typeLabels[record.type as string] || (record.type as string)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {(record.reportedBy as Record<string, unknown>)?.name as string || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`${status?.color || ""} ${isOverdue ? "ring-1 ring-destructive/50" : ""}`}
-                      >
-                        {status?.label || (record.status as string)}
-                        {isOverdue ? " (Overdue)" : null}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {record.scheduledDate
-                        ? format(new Date(record.scheduledDate as string), "MMM d, yyyy")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {record.completedDate
-                        ? format(new Date(record.completedDate as string), "MMM d, yyyy")
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {record.result ? (
-                        <Badge
-                          variant="outline"
-                          className={resultConfig[record.result as string]?.color || ""}
-                        >
-                          {resultConfig[record.result as string]?.label || (record.result as string)}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {(record.tags as string[] | undefined)?.map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <CanDo resource="maintenance" action="delete">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => {
-                            if (confirm("Delete this maintenance record?")) {
-                              deleteMutation.mutate(record.id as string);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      </CanDo>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} total)
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-    </div>
     </RequirePermission>
   );
 }

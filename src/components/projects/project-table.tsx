@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus, AlertTriangle } from "lucide-react";
+import { Plus, AlertTriangle } from "lucide-react";
 
 import { getProjects, getProjectIssueFlags } from "@/server/projects";
 import { useActiveOrganization } from "@/lib/auth-client";
@@ -16,17 +16,8 @@ import {
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const statusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -95,22 +86,164 @@ function formatDateRange(
   return `Until ${fmt(end!)}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyProject = Record<string, any>;
+
+const projectColumns: ColumnDef<AnyProject>[] = [
+  {
+    id: "projectNumber",
+    header: "Project #",
+    accessorKey: "projectNumber",
+    sortKey: "projectNumber",
+    alwaysVisible: true,
+    cell: (row) => (
+      <Link
+        href={`/projects/${row.id}`}
+        className="font-mono text-sm font-medium hover:underline"
+      >
+        {row.projectNumber}
+      </Link>
+    ),
+  },
+  {
+    id: "name",
+    header: "Name",
+    accessorKey: "name",
+    sortKey: "name",
+    alwaysVisible: true,
+    cell: (row) => (
+      <div className="flex items-center gap-1.5">
+        <Link
+          href={`/projects/${row.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.name}
+        </Link>
+        {row._issueFlags && (
+          <ProjectIssueBadge issues={row._issueFlags} />
+        )}
+      </div>
+    ),
+  },
+  {
+    id: "client",
+    header: "Client",
+    sortKey: "client",
+    cell: (row) => (
+      <span className="text-muted-foreground">
+        {row.client?.name || "—"}
+      </span>
+    ),
+  },
+  {
+    id: "type",
+    header: "Type",
+    accessorKey: "type",
+    sortKey: "type",
+    filterable: true,
+    filterType: "enum",
+    filterOptions: [
+      { value: "DRY_HIRE", label: "Dry Hire", color: "bg-blue-500" },
+      { value: "WET_HIRE", label: "Wet Hire", color: "bg-cyan-500" },
+      { value: "INSTALLATION", label: "Installation", color: "bg-orange-500" },
+      { value: "TOUR", label: "Tour", color: "bg-purple-500" },
+      { value: "CORPORATE", label: "Corporate", color: "bg-slate-500" },
+      { value: "THEATRE", label: "Theatre", color: "bg-rose-500" },
+      { value: "FESTIVAL", label: "Festival", color: "bg-amber-500" },
+      { value: "CONFERENCE", label: "Conference", color: "bg-indigo-500" },
+      { value: "OTHER", label: "Other", color: "bg-gray-500" },
+    ],
+    cell: (row) => (
+      <Badge variant="outline" className={typeColors[row.type] || ""}>
+        {typeLabels[row.type] || row.type}
+      </Badge>
+    ),
+  },
+  {
+    id: "status",
+    header: "Status",
+    accessorKey: "status",
+    sortKey: "status",
+    filterable: true,
+    filterType: "enum",
+    filterOptions: [
+      { value: "ENQUIRY", label: "Enquiry", color: "bg-gray-500" },
+      { value: "QUOTING", label: "Quoting", color: "bg-blue-500" },
+      { value: "QUOTED", label: "Quoted", color: "bg-blue-500" },
+      { value: "CONFIRMED", label: "Confirmed", color: "bg-green-500" },
+      { value: "PREPPING", label: "Prepping", color: "bg-amber-500" },
+      { value: "CHECKED_OUT", label: "Checked Out", color: "bg-purple-500" },
+      { value: "ON_SITE", label: "On Site", color: "bg-purple-500" },
+      { value: "RETURNED", label: "Returned", color: "bg-teal-500" },
+      { value: "COMPLETED", label: "Completed", color: "bg-green-500" },
+      { value: "INVOICED", label: "Invoiced", color: "bg-green-500" },
+      { value: "CANCELLED", label: "Cancelled", color: "bg-red-500" },
+    ],
+    cell: (row) => (
+      <Badge variant="outline" className={statusColors[row.status] || ""}>
+        {statusLabels[row.status] || row.status}
+      </Badge>
+    ),
+  },
+  {
+    id: "rentalStartDate",
+    header: "Dates",
+    sortKey: "rentalStartDate",
+    cell: (row) => (
+      <span className="text-muted-foreground text-sm">
+        {formatDateRange(
+          row.rentalStartDate as string | null,
+          row.rentalEndDate as string | null
+        )}
+      </span>
+    ),
+  },
+  {
+    id: "total",
+    header: "Total",
+    sortKey: "total",
+    align: "right",
+    cell: (row) =>
+      (row.invoicedTotal != null || row.total != null)
+        ? `$${Number(row.invoicedTotal ?? row.total).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`
+        : "—",
+  },
+  {
+    id: "tags",
+    header: "Tags",
+    sortable: false,
+    defaultVisible: true,
+    responsiveHide: "lg",
+    cell: (row) => (
+      <div className="flex flex-wrap gap-1">
+        {row.tags?.map((tag: string) => (
+          <Badge key={tag} variant="secondary" className="text-xs">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    ),
+  },
+];
+
 export function ProjectTable() {
-  const { sortBy, sortOrder, pageSize, page, setPage, setPageSize, handleSort } =
-    useTablePreferences("projects", { sortBy: "createdAt", sortOrder: "desc" });
+  const {
+    sortBy, sortOrder, pageSize, page,
+    setPage, setPageSize, handleSort,
+    columnVisibility, toggleColumnVisibility, resetPreferences,
+    filters, setFilter,
+  } = useTablePreferences("projects", { sortBy: "createdAt", sortOrder: "desc" });
+
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [type, setType] = useState("");
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["projects", orgId, { search, status, type, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["projects", orgId, { search, filters, page, pageSize, sortBy, sortOrder }],
     queryFn: () =>
       getProjects({
         search: search || undefined,
-        status: status || undefined,
-        type: type || undefined,
+        filters,
         page,
         pageSize,
         sortBy,
@@ -119,212 +252,54 @@ export function ProjectTable() {
   });
 
   const projects = data?.projects || [];
-  const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
 
-  const projectIds = projects.map((p) => p.id);
+  const projectIds = projects.map((p: AnyProject) => p.id);
   const { data: issueFlags } = useQuery({
     queryKey: ["project-issues", projectIds],
     queryFn: () => getProjectIssueFlags(projectIds),
     enabled: projectIds.length > 0,
   });
 
+  // Enrich projects with issue flags for use in cell renderers
+  const enrichedProjects = projects.map((p: AnyProject) => ({
+    ...p,
+    _issueFlags: issueFlags?.[p.id] || null,
+  }));
+
+  const toolbarActions = (
+    <CanDo resource="project" action="create">
+      <Button render={<Link href="/projects/new" />}>
+        <Plus className="mr-2 h-4 w-4" />
+        New Project
+      </Button>
+    </CanDo>
+  );
+
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, project #, or location..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="pl-9"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All Statuses</option>
-          <option value="ENQUIRY">Enquiry</option>
-          <option value="QUOTING">Quoting</option>
-          <option value="QUOTED">Quoted</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="PREPPING">Prepping</option>
-          <option value="CHECKED_OUT">Checked Out</option>
-          <option value="ON_SITE">On Site</option>
-          <option value="RETURNED">Returned</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="INVOICED">Invoiced</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
-        <select
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value);
-            setPage(1);
-          }}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All Types</option>
-          <option value="DRY_HIRE">Dry Hire</option>
-          <option value="WET_HIRE">Wet Hire</option>
-          <option value="INSTALLATION">Installation</option>
-          <option value="TOUR">Tour</option>
-          <option value="CORPORATE">Corporate</option>
-          <option value="THEATRE">Theatre</option>
-          <option value="FESTIVAL">Festival</option>
-          <option value="CONFERENCE">Conference</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <CanDo resource="project" action="create">
-          <Button render={<Link href="/projects/new" />}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
-        </CanDo>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead sortKey="projectNumber" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Project #</SortableTableHead>
-              <SortableTableHead sortKey="name" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Name</SortableTableHead>
-              <SortableTableHead sortKey="client" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Client</SortableTableHead>
-              <SortableTableHead sortKey="type" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Type</SortableTableHead>
-              <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
-              <SortableTableHead sortKey="rentalStartDate" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Dates</SortableTableHead>
-              <SortableTableHead sortKey="total" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Total</SortableTableHead>
-              <TableHead className="hidden lg:table-cell">Tags</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center text-muted-foreground"
-                >
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : projects.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center text-muted-foreground"
-                >
-                  No projects found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="font-mono text-sm font-medium hover:underline"
-                    >
-                      {project.projectNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {project.name}
-                      </Link>
-                      {issueFlags?.[project.id] && (
-                        <ProjectIssueBadge issues={issueFlags[project.id]} />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {project.client?.name || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={typeColors[project.type] || ""}
-                    >
-                      {typeLabels[project.type] || project.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={statusColors[project.status] || ""}
-                    >
-                      {statusLabels[project.status] || project.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatDateRange(
-                      project.rentalStartDate as string | null,
-                      project.rentalEndDate as string | null
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {(project.invoicedTotal != null || project.total != null)
-                      ? `$${Number(project.invoicedTotal ?? project.total).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {project.tags?.map((tag: string) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} total)
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-    </div>
+    <DataTable
+      data={enrichedProjects}
+      columns={projectColumns}
+      totalRows={total}
+      page={page}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={setPageSize}
+      sortField={sortBy}
+      sortDirection={sortOrder}
+      onSortChange={handleSort}
+      filters={filters}
+      onFilterChange={setFilter}
+      searchValue={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1); }}
+      searchPlaceholder="Search by name, project #, or location..."
+      columnVisibility={columnVisibility}
+      onToggleColumnVisibility={toggleColumnVisibility}
+      onResetPreferences={resetPreferences}
+      isLoading={isLoading}
+      emptyTitle="No projects found"
+      toolbarActions={toolbarActions}
+    />
   );
 }
 

@@ -3,24 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Pencil, Loader2, Download, Upload } from "lucide-react";
+import { Plus, Pencil, Loader2, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { getAssets, bulkUpdateAssets } from "@/server/assets";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { getBulkAssets } from "@/server/bulk-assets";
 import { getLocations } from "@/server/locations";
+import { getCategories } from "@/server/categories";
 import { exportAssetsCSV, exportBulkAssetsCSV } from "@/server/csv";
 import { CSVImportDialog } from "@/components/assets/csv-import-dialog";
 import { CanDo } from "@/components/auth/permission-gate";
 import { useTablePreferences } from "@/lib/use-table-preferences";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ComboboxPicker } from "@/components/ui/combobox-picker";
-import { SortableTableHead, PageSizeSelect } from "@/components/ui/sortable-table-head";
 import {
   Dialog,
   DialogContent,
@@ -28,15 +26,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -58,14 +49,263 @@ const conditionColors: Record<string, string> = {
   DAMAGED: "bg-red-500/10 text-red-500 border-red-500/20",
 };
 
-type ViewMode = "serialized" | "bulk";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyAsset = Record<string, any>;
+
+function useAssetColumns(
+  locations: Array<{ id: string; name: string; type: string; parent?: { name: string } | null }>,
+  categories: Array<{ id: string; name: string }>,
+): ColumnDef<AnyAsset>[] {
+  return [
+    {
+      id: "assetTag",
+      header: "Asset Tag",
+      accessorKey: "assetTag",
+      alwaysVisible: true,
+      sortKey: "assetTag",
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <MediaThumbnail
+            url={row.media?.[0]?.file?.url || row.model?.media?.[0]?.file?.url}
+            thumbnailUrl={row.media?.[0]?.file?.thumbnailUrl || row.model?.media?.[0]?.file?.thumbnailUrl}
+            alt={row.assetTag}
+            size={32}
+          />
+          <div>
+            <Link href={`/assets/registry/${row.id}`} className="font-mono font-medium text-sm hover:underline" onClick={(e) => e.stopPropagation()}>
+              {row.assetTag}
+            </Link>
+            {row.customName && (
+              <p className="text-xs text-muted-foreground">{row.customName}</p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "model",
+      header: "Model",
+      sortKey: "model",
+      cell: (row) => (
+        <div>
+          <Link href={`/assets/models/${row.modelId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+            {row.model?.name}
+          </Link>
+          {row.model?.category && (
+            <p className="text-xs text-muted-foreground">{row.model.category.name}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "serialNumber",
+      header: "Serial #",
+      accessorKey: "serialNumber",
+      sortKey: "serialNumber",
+      defaultVisible: true,
+      cell: (row) => (
+        <span className="font-mono text-sm text-muted-foreground">
+          {row.serialNumber || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "status",
+      sortKey: "status",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: [
+        { value: "AVAILABLE", label: "Available", color: "bg-green-500" },
+        { value: "CHECKED_OUT", label: "Checked Out", color: "bg-blue-500" },
+        { value: "IN_MAINTENANCE", label: "In Maintenance", color: "bg-amber-500" },
+        { value: "RESERVED", label: "Reserved", color: "bg-purple-500" },
+        { value: "RETIRED", label: "Retired", color: "bg-gray-500" },
+        { value: "LOST", label: "Lost", color: "bg-red-500" },
+      ],
+      cell: (row) => (
+        <Badge variant="outline" className={statusColors[row.status] || ""}>
+          {row.status.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      id: "condition",
+      header: "Condition",
+      accessorKey: "condition",
+      sortKey: "condition",
+      filterable: true,
+      filterType: "enum",
+      defaultVisible: false,
+      filterOptions: [
+        { value: "NEW", label: "New", color: "bg-green-500" },
+        { value: "GOOD", label: "Good", color: "bg-blue-500" },
+        { value: "FAIR", label: "Fair", color: "bg-amber-500" },
+        { value: "POOR", label: "Poor", color: "bg-orange-500" },
+        { value: "DAMAGED", label: "Damaged", color: "bg-red-500" },
+      ],
+      cell: (row) => (
+        <Badge variant="outline" className={conditionColors[row.condition] || ""}>
+          {row.condition}
+        </Badge>
+      ),
+    },
+    {
+      id: "locationId",
+      header: "Location",
+      sortKey: "location",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: locations.map((loc) => ({
+        value: loc.id,
+        label: loc.parent ? `${loc.parent.name} > ${loc.name}` : loc.name,
+      })),
+      responsiveHide: "md",
+      cell: (row) => (
+        <span className="text-muted-foreground">{row.location?.name || "—"}</span>
+      ),
+    },
+    {
+      id: "categoryId",
+      header: "Category",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: categories.map((c) => ({ value: c.id, label: c.name })),
+      defaultVisible: false,
+      responsiveHide: "lg",
+      cell: (row) => (
+        <span className="text-muted-foreground">{row.model?.category?.name || "—"}</span>
+      ),
+    },
+    {
+      id: "tags",
+      header: "Tags",
+      filterable: false,
+      defaultVisible: true,
+      responsiveHide: "lg",
+      sortable: false,
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.tags?.map((tag: string) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+  ];
+}
+
+function useBulkAssetColumns(
+  locations: Array<{ id: string; name: string; type: string; parent?: { name: string } | null }>,
+): ColumnDef<AnyAsset>[] {
+  return [
+    {
+      id: "assetTag",
+      header: "Asset Tag",
+      accessorKey: "assetTag",
+      alwaysVisible: true,
+      sortKey: "assetTag",
+      cell: (row) => (
+        <Link href={`/assets/registry/${row.id}?type=bulk`} className="font-mono font-medium text-sm hover:underline" onClick={(e) => e.stopPropagation()}>
+          {row.assetTag}
+        </Link>
+      ),
+    },
+    {
+      id: "model",
+      header: "Model",
+      sortKey: "model",
+      cell: (row) => (
+        <div>
+          <Link href={`/assets/models/${row.modelId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+            {row.model?.name}
+          </Link>
+          {row.model?.category && (
+            <p className="text-xs text-muted-foreground">{row.model.category.name}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "availableQuantity",
+      header: "Available",
+      accessorKey: "availableQuantity",
+      sortKey: "availableQuantity",
+      align: "right",
+      cell: (row) => <span className="font-medium">{row.availableQuantity}</span>,
+    },
+    {
+      id: "totalQuantity",
+      header: "Total",
+      accessorKey: "totalQuantity",
+      sortKey: "totalQuantity",
+      align: "right",
+      cell: (row) => <span className="text-muted-foreground">{row.totalQuantity}</span>,
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "status",
+      sortKey: "status",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: [
+        { value: "ACTIVE", label: "Active", color: "bg-green-500" },
+        { value: "LOW_STOCK", label: "Low Stock", color: "bg-amber-500" },
+        { value: "OUT_OF_STOCK", label: "Out of Stock", color: "bg-red-500" },
+        { value: "RETIRED", label: "Retired", color: "bg-gray-500" },
+      ],
+      cell: (row) => (
+        <Badge variant="outline" className={statusColors[row.status] || ""}>
+          {row.status.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      id: "locationId",
+      header: "Location",
+      sortKey: "location",
+      filterable: true,
+      filterType: "enum",
+      filterOptions: locations.map((loc) => ({
+        value: loc.id,
+        label: loc.parent ? `${loc.parent.name} > ${loc.name}` : loc.name,
+      })),
+      cell: (row) => (
+        <span className="text-muted-foreground">{row.location?.name || "—"}</span>
+      ),
+    },
+    {
+      id: "tags",
+      header: "Tags",
+      sortable: false,
+      defaultVisible: true,
+      responsiveHide: "lg",
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.tags?.map((tag: string) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+  ];
+}
 
 export function AssetTable() {
-  const { sortBy, sortOrder, pageSize, view, page, setPage, setPageSize, setView, handleSort } =
-    useTablePreferences("assets", { sortBy: "assetTag", sortOrder: "asc", view: "serialized" });
+  const {
+    sortBy, sortOrder, pageSize, view, page,
+    setPage, setPageSize, setView, handleSort,
+    columnVisibility, toggleColumnVisibility, resetPreferences,
+    filters, setFilter, clearFilters,
+  } = useTablePreferences("assets", { sortBy: "assetTag", sortOrder: "asc", view: "serialized" });
+
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [locationId, setLocationId] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -78,14 +318,22 @@ export function AssetTable() {
     queryKey: ["locations", orgId],
     queryFn: () => getLocations({ pageSize: 100 }),
   });
-  const locations = locationsData?.locations || [];
+  const locations = (locationsData?.locations || []) as Array<{ id: string; name: string; type: string; parent?: { name: string } | null }>;
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories", orgId],
+    queryFn: () => getCategories(),
+  });
+  const categories = (categoriesData || []) as Array<{ id: string; name: string }>;
+
+  const serializedColumns = useAssetColumns(locations, categories);
+  const bulkColumns = useBulkAssetColumns(locations);
 
   const serializedQuery = useQuery({
-    queryKey: ["assets", orgId, { search, status, locationId, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["assets", orgId, { search, filters, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getAssets({
       search: search || undefined,
-      status: status || undefined,
-      locationId: locationId || undefined,
+      filters,
       page,
       pageSize,
       sortBy,
@@ -95,11 +343,11 @@ export function AssetTable() {
   });
 
   const bulkQuery = useQuery({
-    queryKey: ["bulk-assets", orgId, { search, status, locationId, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["bulk-assets", orgId, { search, filters, page, pageSize, sortBy, sortOrder }],
     queryFn: () => getBulkAssets({
       search: search || undefined,
-      status: status || undefined,
-      locationId: locationId || undefined,
+      status: Array.isArray(filters.status) ? filters.status[0] : undefined,
+      locationId: Array.isArray(filters.locationId) ? filters.locationId[0] : undefined,
       page,
       pageSize,
       sortBy,
@@ -109,130 +357,140 @@ export function AssetTable() {
   });
 
   const isLoading = view === "serialized" ? serializedQuery.isLoading : bulkQuery.isLoading;
-  const totalPages = view === "serialized"
-    ? serializedQuery.data?.totalPages || 1
-    : bulkQuery.data?.totalPages || 1;
   const total = view === "serialized"
     ? serializedQuery.data?.total || 0
     : bulkQuery.data?.total || 0;
 
   const assets = serializedQuery.data?.assets || [];
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === assets.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(assets.map((a) => a.id)));
-    }
-  };
+  const bulkAssets = bulkQuery.data?.bulkAssets || [];
 
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkEditOpen(false);
   };
 
+  const viewToggle = (
+    <div className="flex rounded-md border">
+      <button
+        onClick={() => { setView("serialized"); clearFilters(); setSelectedIds(new Set()); }}
+        className={`px-3 py-1.5 text-sm font-medium transition-colors ${view === "serialized" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+      >
+        Serialized
+      </button>
+      <button
+        onClick={() => { setView("bulk"); clearFilters(); setSelectedIds(new Set()); }}
+        className={`px-3 py-1.5 text-sm font-medium transition-colors ${view === "bulk" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+      >
+        Bulk
+      </button>
+    </div>
+  );
+
+  const actionButtons = (
+    <CanDo resource="asset" action="create">
+      <Button
+        variant="outline"
+        size="sm"
+        className="hidden sm:inline-flex h-8"
+        onClick={async () => {
+          const csv = view === "serialized" ? await exportAssetsCSV() : await exportBulkAssetsCSV();
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = view === "serialized" ? "assets.csv" : "bulk-assets.csv";
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+      >
+        <Download className="mr-2 h-4 w-4" />
+        Export
+      </Button>
+      <Button variant="outline" size="sm" className="hidden sm:inline-flex h-8" onClick={() => setImportOpen(true)}>
+        <Upload className="mr-2 h-4 w-4" />
+        Import
+      </Button>
+      <Button size="sm" className="h-8" render={<Link href={`/assets/registry/new?type=${view}`} />}>
+        <Plus className="mr-2 h-4 w-4" />
+        New {view === "serialized" ? "Asset" : "Bulk Asset"}
+      </Button>
+    </CanDo>
+  );
+
   return (
     <div className="space-y-4">
-      {/* View Toggle + Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex rounded-md border">
-          <button
-            onClick={() => { setView("serialized"); setStatus(""); setSelectedIds(new Set()); }}
-            className={`px-3 py-1.5 text-sm font-medium transition-colors ${view === "serialized" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-          >
-            Serialized
-          </button>
-          <button
-            onClick={() => { setView("bulk"); setStatus(""); setSelectedIds(new Set()); }}
-            className={`px-3 py-1.5 text-sm font-medium transition-colors ${view === "bulk" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-          >
-            Bulk
-          </button>
-        </div>
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by tag, serial, or name..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All Statuses</option>
-          {view === "serialized" ? (
-            <>
-              <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
-              <option value="IN_MAINTENANCE">In Maintenance</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="RETIRED">Retired</option>
-              <option value="LOST">Lost</option>
-            </>
-          ) : (
-            <>
-              <option value="ACTIVE">Active</option>
-              <option value="LOW_STOCK">Low Stock</option>
-              <option value="OUT_OF_STOCK">Out of Stock</option>
-              <option value="RETIRED">Retired</option>
-            </>
-          )}
-        </select>
-        <div className="w-48">
-          <ComboboxPicker
-            value={locationId}
-            onChange={(v) => { setLocationId(v); setPage(1); }}
-            options={locations.map((loc) => ({
-              value: loc.id,
-              label: loc.parent ? `${loc.parent.name} → ${loc.name}` : loc.name,
-              description: loc.type,
-            }))}
-            placeholder="All Locations"
-            searchPlaceholder="Search locations..."
-            allowClear
-          />
-        </div>
-        <CanDo resource="asset" action="create">
-          <Button
-            variant="outline"
-            className="hidden sm:inline-flex"
-            onClick={async () => {
-              const csv = view === "serialized" ? await exportAssetsCSV() : await exportBulkAssetsCSV();
-              const blob = new Blob([csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = view === "serialized" ? "assets.csv" : "bulk-assets.csv";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
+      {/* Bulk Edit Bar */}
+      {view === "serialized" && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <CanDo resource="asset" action="update">
+            <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)}>
+              <Pencil className="mr-2 h-3 w-3" />
+              Bulk Edit
+            </Button>
+          </CanDo>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            Clear
           </Button>
-          <Button variant="outline" className="hidden sm:inline-flex" onClick={() => setImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Button render={<Link href={`/assets/registry/new?type=${view}`} />}>
-            <Plus className="mr-2 h-4 w-4" />
-            New {view === "serialized" ? "Asset" : "Bulk Asset"}
-          </Button>
-        </CanDo>
-      </div>
+        </div>
+      )}
+
+      {view === "serialized" ? (
+        <DataTable
+          data={assets}
+          columns={serializedColumns}
+          totalRows={total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          sortField={sortBy}
+          sortDirection={sortOrder}
+          onSortChange={handleSort}
+          filters={filters}
+          onFilterChange={setFilter}
+          searchValue={search}
+          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          searchPlaceholder="Search by tag, serial, or name..."
+          columnVisibility={columnVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onResetPreferences={resetPreferences}
+          isLoading={isLoading}
+          emptyTitle="No assets found"
+          enableRowSelection
+          selectedRows={selectedIds}
+          onSelectionChange={setSelectedIds}
+          toolbarPrefix={viewToggle}
+          toolbarActions={actionButtons}
+        />
+      ) : (
+        <DataTable
+          data={bulkAssets}
+          columns={bulkColumns}
+          totalRows={total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          sortField={sortBy}
+          sortDirection={sortOrder}
+          onSortChange={handleSort}
+          filters={filters}
+          onFilterChange={setFilter}
+          searchValue={search}
+          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          searchPlaceholder="Search bulk assets..."
+          columnVisibility={columnVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onResetPreferences={resetPreferences}
+          isLoading={isLoading}
+          emptyTitle="No bulk assets found"
+          toolbarPrefix={viewToggle}
+          toolbarActions={actionButtons}
+        />
+      )}
+
+      {/* Mobile export/import buttons */}
       <CanDo resource="asset" action="create">
         <div className="flex gap-2 sm:hidden">
           <Button
@@ -259,211 +517,6 @@ export function AssetTable() {
         </div>
       </CanDo>
 
-      {/* Bulk Edit Bar */}
-      {view === "serialized" && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
-          <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <CanDo resource="asset" action="update">
-            <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)}>
-              <Pencil className="mr-2 h-3 w-3" />
-              Bulk Edit
-            </Button>
-          </CanDo>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            Clear
-          </Button>
-        </div>
-      )}
-
-      {/* Serialized Table */}
-      {view === "serialized" && (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={assets.length > 0 && selectedIds.size === assets.length}
-                    indeterminate={selectedIds.size > 0 && selectedIds.size < assets.length}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </TableHead>
-                <SortableTableHead sortKey="assetTag" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset Tag</SortableTableHead>
-                <SortableTableHead sortKey="model" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Model</SortableTableHead>
-                <SortableTableHead sortKey="serialNumber" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Serial #</SortableTableHead>
-                <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
-                <SortableTableHead sortKey="condition" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Condition</SortableTableHead>
-                <SortableTableHead sortKey="location" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Location</SortableTableHead>
-                <TableHead className="hidden lg:table-cell">Tags</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">Loading...</TableCell>
-                </TableRow>
-              ) : assets.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No assets found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assets.map((asset) => (
-                  <TableRow key={asset.id} className={selectedIds.has(asset.id) ? "bg-muted/50" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(asset.id)}
-                        onCheckedChange={() => toggleSelect(asset.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <MediaThumbnail
-                          url={asset.media?.[0]?.file?.url || asset.model?.media?.[0]?.file?.url}
-                          thumbnailUrl={asset.media?.[0]?.file?.thumbnailUrl || asset.model?.media?.[0]?.file?.thumbnailUrl}
-                          alt={asset.assetTag}
-                          size={32}
-                        />
-                        <div>
-                          <Link href={`/assets/registry/${asset.id}`} className="font-mono font-medium text-sm hover:underline">
-                            {asset.assetTag}
-                          </Link>
-                          {asset.customName && (
-                            <p className="text-xs text-muted-foreground">{asset.customName}</p>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/assets/models/${asset.modelId}`} className="hover:underline">
-                        {asset.model.name}
-                      </Link>
-                      {asset.model.category && (
-                        <p className="text-xs text-muted-foreground">{asset.model.category.name}</p>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {asset.serialNumber || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusColors[asset.status] || ""}>
-                        {asset.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={conditionColors[asset.condition] || ""}>
-                        {asset.condition}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {asset.location?.name || "—"}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {asset.tags?.map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* Bulk Table */}
-      {view === "bulk" && (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead sortKey="assetTag" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Asset Tag</SortableTableHead>
-                <SortableTableHead sortKey="model" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Model</SortableTableHead>
-                <SortableTableHead sortKey="availableQuantity" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Available</SortableTableHead>
-                <SortableTableHead sortKey="totalQuantity" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort} className="text-right">Total</SortableTableHead>
-                <SortableTableHead sortKey="status" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Status</SortableTableHead>
-                <SortableTableHead sortKey="location" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={handleSort}>Location</SortableTableHead>
-                <TableHead className="hidden lg:table-cell">Tags</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell>
-                </TableRow>
-              ) : (bulkQuery.data?.bulkAssets || []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No bulk assets found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                (bulkQuery.data?.bulkAssets || []).map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell>
-                      <Link href={`/assets/registry/${asset.id}?type=bulk`} className="font-mono font-medium text-sm hover:underline">
-                        {asset.assetTag}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/assets/models/${asset.modelId}`} className="hover:underline">
-                        {asset.model.name}
-                      </Link>
-                      {asset.model.category && (
-                        <p className="text-xs text-muted-foreground">{asset.model.category.name}</p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{asset.availableQuantity}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{asset.totalQuantity}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusColors[asset.status] || ""}>
-                        {asset.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {asset.location?.name || "—"}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {asset.tags?.map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} total)
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            Next
-          </Button>
-        </div>
-      </div>
-
-      {/* Bulk Edit Dialog */}
       <BulkEditDialog
         open={bulkEditOpen}
         onOpenChange={setBulkEditOpen}
@@ -564,7 +617,7 @@ function BulkEditDialog({
               onChange={(v) => setBulkLocationId(v)}
               options={locations.map((loc) => ({
                 value: loc.id,
-                label: loc.parent ? `${loc.parent.name} → ${loc.name}` : loc.name,
+                label: loc.parent ? `${loc.parent.name} > ${loc.name}` : loc.name,
                 description: loc.type,
               }))}
               placeholder="— No change —"

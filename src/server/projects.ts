@@ -11,6 +11,12 @@ import { serialize } from "@/lib/serialize";
 import { computeOverbookedStatus } from "@/lib/availability";
 import { recalculateProjectTotals } from "@/server/line-items";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const projectFilterColumns: FilterColumnDef[] = [
+  { id: "status", filterType: "enum" },
+  { id: "type", filterType: "enum" },
+];
 
 async function generateTemplateCode(organizationId: string): Promise<string> {
   const count = await prisma.project.count({
@@ -39,6 +45,7 @@ export async function getProjects(params?: {
   includeLineItems?: boolean;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  filters?: Record<string, FilterValue>;
 }) {
   const { organizationId } = await getOrgContext();
   const {
@@ -53,7 +60,11 @@ export async function getProjects(params?: {
     includeLineItems = false,
     sortBy = "createdAt",
     sortOrder = "desc",
+    filters,
   } = params || {};
+
+  // Build filter where from DataTable filters
+  const filterWhere = buildFilterWhere(filters, projectFilterColumns);
 
   const where: Prisma.ProjectWhereInput = {
     organizationId,
@@ -78,6 +89,7 @@ export async function getProjects(params?: {
     ...(rentalEndDate && {
       rentalEndDate: { lte: new Date(rentalEndDate) },
     }),
+    ...filterWhere,
   };
 
   const [projects, total] = await Promise.all([

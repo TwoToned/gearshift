@@ -38,8 +38,9 @@ This document provides an exhaustive technical reference for every feature, syst
 30. [Dashboard & Reporting](#30-dashboard--reporting)
 31. [Universal Tags System](#31-universal-tags-system)
 32. [Activity Log (Audit Trail)](#32-activity-log-audit-trail)
-33. [Key Patterns & Conventions](#33-key-patterns--conventions)
-34. [Integration Checklist for New Features](#34-integration-checklist-for-new-features)
+33. [Advanced DataTable System](#33-advanced-datatable-system)
+34. [Key Patterns & Conventions](#34-key-patterns--conventions)
+35. [Integration Checklist for New Features](#35-integration-checklist-for-new-features)
 
 ---
 
@@ -1107,7 +1108,57 @@ ActivityLog records included in org export/import. On import, `userId`, `project
 
 ---
 
-## 33. Key Patterns & Conventions
+## 33. Advanced DataTable System
+
+### Overview
+All list/table pages use a shared `DataTable` component (`src/components/ui/data-table.tsx`) that replaces hand-built tables with a consistent, feature-rich table system.
+
+### Core Component: `DataTable<TData>`
+- **Location**: `src/components/ui/data-table.tsx`
+- **Props**: `data`, `columns`, `totalRows`, `page`, `pageSize`, `sortField`, `sortDirection`, `filters`, `searchValue`, `columnVisibility`, plus callbacks for all state changes
+- **Features**: Server-side pagination/sorting, column visibility toggles (persisted to localStorage), enum filter dropdowns as checkbox popovers, text search, row selection, active filter chips
+- **Column definitions**: Each table defines its own `ColumnDef<TData>[]` array with `id`, `header`, `accessorKey`, `cell` renderer, `sortKey`, `filterable`, `filterType`, `filterOptions`, `defaultVisible`, `alwaysVisible`, `responsiveHide`
+
+### Filter System
+- **Enum filters**: Checkbox popover dropdowns anchored to filter buttons in the toolbar. Multi-select, with search for long lists. Active filters shown as removable chips below the toolbar.
+- **Filter state**: `Record<string, FilterValue>` where `FilterValue = string[] | string | { from?: string; to?: string } | { min?: number; max?: number } | boolean`
+- **Server-side**: `buildFilterWhere(filters, columnDefs)` utility in `src/lib/table-utils.ts` translates filter state to Prisma `where` clauses. Supports nested dot-paths (e.g., `model.categoryId`).
+
+### Column Visibility
+- Column visibility popover with checkboxes for each column
+- `alwaysVisible` columns cannot be hidden
+- `defaultVisible: false` columns are hidden by default but can be enabled
+- Visibility persisted to localStorage via enhanced `useTablePreferences`
+
+### Enhanced `useTablePreferences` Hook
+- **Location**: `src/lib/use-table-preferences.ts`
+- **New fields**: `columnVisibility`, `toggleColumnVisibility`, `filters`, `setFilter`, `clearFilters`, `resetPreferences`
+- **Storage**: `gearflow-table-{tableKey}-colVis` and `gearflow-table-{tableKey}-filters` in localStorage
+
+### Tables Using DataTable
+| Table | Location | Key Filters |
+|-------|----------|-------------|
+| Assets Registry | `src/components/assets/asset-table.tsx` | Status, Condition, Location, Category |
+| Equipment Models | `src/components/assets/model-table.tsx` | Category, Asset Type |
+| Projects | `src/components/projects/project-table.tsx` | Status, Type |
+| Kits | `src/app/(app)/kits/page.tsx` | Status, Condition, Location, Category |
+| Clients | `src/components/clients/client-table.tsx` | Type |
+| Locations | `src/components/locations/location-table.tsx` | Type |
+| Maintenance | `src/app/(app)/maintenance/page.tsx` | Status, Type, Result |
+| T&T Registry | `src/components/test-tag/test-tag-table.tsx` | Equipment Class, Appliance Type, Status |
+| Activity Log | `src/app/(app)/activity/page.tsx` | Action, Entity Type |
+
+### Adding a New Table
+1. Define `ColumnDef<TData>[]` with filterable columns and cell renderers
+2. Use `useTablePreferences(tableKey, defaults)` for state management
+3. Add `filters?: Record<string, FilterValue>` to the server action
+4. Call `buildFilterWhere(filters, filterColumnDefs)` in the server action
+5. Pass all state to `<DataTable>` component
+6. For `tags` filters: handle separately with `{ hasSome: values }` (Prisma array filter)
+
+---
+
+## 34. Key Patterns & Conventions
 
 ### Server Action Pattern
 ```typescript
@@ -1154,7 +1205,7 @@ const date = input.scheduledDate ? new Date(input.scheduledDate) : null;
 
 ---
 
-## 34. Integration Checklist for New Features
+## 35. Integration Checklist for New Features
 
 When implementing a new feature, ensure it integrates with ALL existing systems.
 

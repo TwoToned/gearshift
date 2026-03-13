@@ -14,6 +14,15 @@ import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { reserveAssetTags } from "@/server/settings";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const kitFilterColumns: FilterColumnDef[] = [
+  { id: "status", filterType: "enum" },
+  { id: "condition", filterType: "enum" },
+  { id: "locationId", filterType: "enum" },
+  { id: "categoryId", filterType: "enum" },
+  { id: "tags", filterType: "enum" },
+];
 
 // ---------------------------------------------------------------------------
 // getKits – paginated list with optional filters
@@ -28,6 +37,7 @@ export async function getKits(params?: {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  filters?: Record<string, FilterValue>;
 }) {
   const { organizationId } = await getOrgContext();
   const {
@@ -40,7 +50,17 @@ export async function getKits(params?: {
     pageSize = 25,
     sortBy = "assetTag",
     sortOrder = "asc",
+    filters,
   } = params || {};
+
+  const filterWhere = buildFilterWhere(filters, kitFilterColumns);
+
+  // Handle tags filter specially (hasSome)
+  let tagsFilter: Prisma.KitWhereInput | undefined;
+  if (filters?.tags && Array.isArray(filters.tags) && filters.tags.length > 0) {
+    tagsFilter = { tags: { hasSome: filters.tags as string[] } };
+    delete (filterWhere as Record<string, unknown>).tags;
+  }
 
   const where: Prisma.KitWhereInput = {
     organizationId,
@@ -48,6 +68,8 @@ export async function getKits(params?: {
     ...(status && { status: status as Prisma.EnumKitStatusFilter }),
     ...(categoryId && { categoryId }),
     ...(locationId && { locationId }),
+    ...filterWhere,
+    ...tagsFilter,
     ...(search && {
       OR: [
         { assetTag: { contains: search, mode: "insensitive" } },

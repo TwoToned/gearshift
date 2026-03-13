@@ -6,10 +6,16 @@ import { locationSchema, type LocationFormValues } from "@/lib/validations/asset
 import type { Prisma } from "@/generated/prisma/client";
 import { serialize } from "@/lib/serialize";
 import { logActivity } from "@/lib/activity-log";
+import { buildFilterWhere, type FilterValue, type FilterColumnDef } from "@/lib/table-utils";
+
+const locationFilterColumns: FilterColumnDef[] = [
+  { id: "type", filterType: "enum", filterKey: "type" },
+];
 
 export async function getLocations(params?: {
   search?: string;
   type?: string;
+  filters?: Record<string, FilterValue>;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -19,11 +25,14 @@ export async function getLocations(params?: {
   const {
     search,
     type,
+    filters,
     page = 1,
     pageSize = 25,
     sortBy = "name",
     sortOrder = "asc",
   } = params || {};
+
+  const filterWhere = buildFilterWhere(filters, locationFilterColumns);
 
   const where: Prisma.LocationWhereInput = {
     organizationId,
@@ -34,6 +43,7 @@ export async function getLocations(params?: {
         { address: { contains: search, mode: "insensitive" } },
       ],
     }),
+    ...filterWhere,
   };
 
   const [locations, total] = await Promise.all([
