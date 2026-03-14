@@ -194,6 +194,13 @@ export const shiftStatusLabels: Record<string, string> = {
   NO_SHOW: "No Show",
 };
 
+// --- Availability Type ---
+export const availabilityTypeLabels: Record<string, string> = {
+  UNAVAILABLE: "Unavailable",
+  TENTATIVE: "Tentative",
+  PREFERRED: "Preferred",
+};
+
 /**
  * Generic fallback: converts ANY_ENUM_VALUE to "Any Enum Value".
  * Use the specific label maps above when possible.

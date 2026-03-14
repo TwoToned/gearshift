@@ -17,6 +17,7 @@ import {
   FileText,
   Star,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ import {
   getProjectLabourCost,
   getCrewMembersForAssignment,
 } from "@/server/crew-assignments";
+import { checkCrewConflicts, type CrewConflict } from "@/server/crew-availability";
 import { getCrewRoleOptions, createCrewRole } from "@/server/crew";
 import {
   crewAssignmentSchema,
@@ -606,6 +608,45 @@ function AssignmentDialog({
         },
   });
 
+  // Conflict detection
+  const watchCrewMemberId = form.watch("crewMemberId");
+  const watchStartDate = form.watch("startDate");
+  const watchEndDate = form.watch("endDate");
+
+  const startDateStr =
+    watchStartDate && watchStartDate !== ""
+      ? new Date(watchStartDate as string | Date).toISOString().split("T")[0]
+      : "";
+  const endDateStr =
+    watchEndDate && watchEndDate !== ""
+      ? new Date(watchEndDate as string | Date).toISOString().split("T")[0]
+      : "";
+
+  const { data: conflicts } = useQuery({
+    queryKey: [
+      "crew-conflicts",
+      watchCrewMemberId,
+      startDateStr,
+      endDateStr,
+      mode === "edit" ? assignment?.id : null,
+    ],
+    queryFn: () =>
+      checkCrewConflicts(
+        watchCrewMemberId,
+        startDateStr,
+        endDateStr,
+        mode === "edit" ? (assignment?.id as string) : undefined
+      ),
+    enabled: !!watchCrewMemberId && !!startDateStr && !!endDateStr,
+  });
+
+  const hardConflicts = (conflicts || []).filter(
+    (c: CrewConflict) => c.severity === "hard"
+  );
+  const softConflicts = (conflicts || []).filter(
+    (c: CrewConflict) => c.severity === "soft"
+  );
+
   const createMut = useMutation({
     mutationFn: (data: CrewAssignmentFormValues) =>
       createAssignment(projectId, data),
@@ -945,6 +986,38 @@ function AssignmentDialog({
               {...form.register("internalNotes")}
             />
           </div>
+
+          {/* Conflict Warnings */}
+          {(hardConflicts.length > 0 || softConflicts.length > 0) && (
+            <div className="space-y-2">
+              {hardConflicts.length > 0 && (
+                <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-500 mb-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Conflicts
+                  </div>
+                  {hardConflicts.map((c: CrewConflict, i: number) => (
+                    <p key={i} className="text-xs text-red-400">
+                      {c.label}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {softConflicts.length > 0 && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-500 mb-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Warnings
+                  </div>
+                  {softConflicts.map((c: CrewConflict, i: number) => (
+                    <p key={i} className="text-xs text-amber-400">
+                      {c.label}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button

@@ -1,7 +1,7 @@
 # Crew Management
 
 ## Overview
-Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1) and project crew assignments with scheduling and call sheets (Phase 2).
+Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1), project crew assignments with scheduling and call sheets (Phase 2), and availability management with conflict detection and crew planner (Phase 3).
 
 ## Data Models
 
@@ -54,6 +54,14 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 - `breakMinutes?, location?, notes?`
 - `status` — SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
 
+### CrewAvailability
+- `id, crewMemberId, startDate, endDate`
+- `type` — UNAVAILABLE, TENTATIVE, PREFERRED
+- `reason?` — freeform text
+- `isAllDay` — boolean (default true)
+- `startTime?, endTime?` — for partial-day blocks
+- Indexes: `[crewMemberId]`, `[crewMemberId, startDate, endDate]`
+
 ## Server Actions
 
 ### `src/server/crew.ts` (Phase 1)
@@ -91,6 +99,16 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 | `getProjectLabourCost(projectId)` | crew.read | Aggregate estimated cost |
 | `getCrewMembersForAssignment(projectId)` | crew.read | Available crew for picker |
 
+### `src/server/crew-availability.ts` (Phase 3)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getCrewAvailability(crewMemberId, start?, end?)` | crew.read | Availability blocks for a member |
+| `addAvailability(data)` | crew.update | Add availability block |
+| `removeAvailability(id)` | crew.update | Remove availability block |
+| `checkCrewConflicts(crewMemberId, start, end, excludeId?)` | crew.read | Conflict detection (availability + assignments) |
+| `getCrewPlannerData(start, end)` | crew.read | All crew with assignments/availability in range |
+| `getCrewAvailabilityStatus(ids[], start, end)` | crew.read | Status map for visual indicators |
+
 ## Rate Cascade
 Assignment rate is resolved in this order:
 1. `rateOverride` on the assignment (if set and > 0)
@@ -108,8 +126,10 @@ Assignment rate is resolved in this order:
 |------|-----------|-------------|
 | `/crew` | CrewTable | Paginated list with search/filter |
 | `/crew/new` | CrewMemberForm | Create crew member |
-| `/crew/[id]` | Detail page | Contact, rates, skills, certifications |
+| `/crew/[id]` | Detail page | Contact, rates, skills, assignments, availability, certifications |
 | `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
+| `/crew/planner` | CrewPlannerPage | 14-day Gantt-style timeline of all crew |
+| `/crew/settings` | CrewSettingsPage | Manage roles and skills |
 
 ## Project Detail Integration
 - **Crew tab** on project detail page (`/projects/[id]`) via `CrewPanel` component
@@ -126,6 +146,23 @@ Assignment rate is resolved in this order:
 - Includes: project info, location, site contact, crew table (name, role, phase, call/wrap times, phone, notes)
 - Uses shift-specific times when available for the requested date
 
+## Availability Management (Phase 3)
+- Crew member detail page has an "Availability" tab to add/view/remove blocks
+- Types: UNAVAILABLE (hard block, red), TENTATIVE (soft, amber), PREFERRED (wants work, green)
+- Conflict detection integrated in assignment dialog — shows warnings when assigning crew with conflicts
+- Hard conflicts (UNAVAILABLE) shown in red, soft conflicts (TENTATIVE, double-booked) in amber
+- Allows override — admin can still assign despite warnings
+
+## Crew Planner
+- 14-day Gantt-style timeline at `/crew/planner`
+- Shows all active crew with their assignments and availability blocks
+- Color-coded cells: primary (assignment), red (unavailable), amber (tentative), green (preferred)
+- Sticky crew name column, scrollable date columns
+- Weekend/today highlighting
+- Tooltip on hover showing project details or availability reason
+- Navigation: back/forward by week, "Today" button
+- Sidebar: "Planner" link under Crew
+
 ## Permissions
 Resource `crew` with actions: `read, create, update, delete`
 - owner/admin: all
@@ -133,11 +170,11 @@ Resource `crew` with actions: `read, create, update, delete`
 - member/staff/warehouse/viewer: read
 
 ## Integration Points
-- **Sidebar**: "Crew" with HardHat icon, gated by `crew` resource
+- **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Roles & Skills. Gated by `crew` resource
 - **Top bar**: `crew` segment label
 - **Page commands**: searchable crew page with aliases
 - **Global search**: searches first/last name, email, department
-- **Activity log**: CREATE/UPDATE/DELETE logged for crew members, roles, and assignments
+- **Activity log**: CREATE/UPDATE/DELETE logged for crew members, roles, assignments, and availability
 
 ## Validation Schemas (`src/lib/validations/crew.ts`)
 - `crewMemberSchema` — full member form
@@ -146,13 +183,14 @@ Resource `crew` with actions: `read, create, update, delete`
 - `crewCertificationSchema` — certification form
 - `crewAssignmentSchema` — project assignment form
 - `crewShiftSchema` — individual shift form
+- `crewAvailabilitySchema` — availability block form
 
 ## Status Labels (`src/lib/status-labels.ts`)
 - `crewMemberStatusLabels`, `crewMemberTypeLabels`, `crewCertStatusLabels`
 - `crewRateTypeLabels`, `assignmentStatusLabels`, `phaseLabels`, `shiftStatusLabels`
+- `availabilityTypeLabels`
 
 ## Future Phases (not yet implemented)
-- Phase 3: Availability management & conflict detection
 - Phase 4: Calendar integration (iCal feeds)
 - Phase 5: Communication & offer flow
 - Phase 6: Time tracking & payroll

@@ -14,6 +14,7 @@ import {
   Plus,
   Loader2,
   Briefcase,
+  CalendarOff,
 } from "lucide-react";
 import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
@@ -26,16 +27,24 @@ import {
   removeCertification,
 } from "@/server/crew";
 import {
+  getCrewAvailability,
+  addAvailability,
+  removeAvailability,
+} from "@/server/crew-availability";
+import {
   crewMemberStatusLabels,
   crewMemberTypeLabels,
   crewCertStatusLabels,
   assignmentStatusLabels,
   phaseLabels,
+  availabilityTypeLabels,
   formatLabel,
 } from "@/lib/status-labels";
 import {
   crewCertificationSchema,
   type CrewCertificationFormValues,
+  crewAvailabilitySchema,
+  type CrewAvailabilityFormValues,
 } from "@/lib/validations/crew";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
@@ -46,6 +55,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -107,6 +117,12 @@ const projectStatusColors: Record<string, string> = {
   CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
 };
 
+const availabilityTypeColors: Record<string, string> = {
+  UNAVAILABLE: "bg-red-500/10 text-red-500 border-red-500/20",
+  TENTATIVE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  PREFERRED: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
 const projectStatusLabels: Record<string, string> = {
   ENQUIRY: "Enquiry",
   QUOTING: "Quoting",
@@ -142,6 +158,7 @@ export default function CrewMemberDetailPage({
   const orgId = activeOrg?.id;
 
   const [addCertOpen, setAddCertOpen] = useState(false);
+  const [addAvailOpen, setAddAvailOpen] = useState(false);
 
   const { data: member, isLoading } = useQuery({
     queryKey: ["crew-member", orgId, id],
@@ -164,6 +181,22 @@ export default function CrewMemberDetailPage({
       toast.success("Certification removed");
       queryClient.invalidateQueries({
         queryKey: ["crew-member", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const { data: availabilityRecords } = useQuery({
+    queryKey: ["crew-availability", orgId, id],
+    queryFn: () => getCrewAvailability(id),
+  });
+
+  const removeAvailMutation = useMutation({
+    mutationFn: (availId: string) => removeAvailability(availId),
+    onSuccess: () => {
+      toast.success("Availability block removed");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-availability", orgId, id],
       });
     },
     onError: (e) => toast.error(e.message),
@@ -420,6 +453,9 @@ export default function CrewMemberDetailPage({
             <TabsTrigger value="assignments">
               Assignments ({assignments.length})
             </TabsTrigger>
+            <TabsTrigger value="availability">
+              Availability ({availabilityRecords?.length || 0})
+            </TabsTrigger>
             <TabsTrigger value="certifications">
               Certifications ({certifications.length})
             </TabsTrigger>
@@ -559,6 +595,115 @@ export default function CrewMemberDetailPage({
             </Card>
           </TabsContent>
 
+          {/* Availability Tab */}
+          <TabsContent value="availability" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">
+                  Availability Blocks
+                </CardTitle>
+                <CanDo resource="crew" action="update">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddAvailOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Block
+                  </Button>
+                </CanDo>
+              </CardHeader>
+              <CardContent>
+                {!availabilityRecords || availabilityRecords.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No availability blocks set. Add blocks to indicate when this
+                    crew member is unavailable, tentative, or preferred.
+                  </p>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Dates</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Time
+                          </TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Reason
+                          </TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {availabilityRecords.map(
+                          (av: {
+                            id: string;
+                            type: string;
+                            startDate: string | Date;
+                            endDate: string | Date;
+                            isAllDay: boolean;
+                            startTime: string | null;
+                            endTime: string | null;
+                            reason: string | null;
+                          }) => (
+                            <TableRow key={av.id}>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    availabilityTypeColors[av.type] || ""
+                                  }
+                                >
+                                  <CalendarOff className="mr-1 h-3 w-3" />
+                                  {availabilityTypeLabels[av.type] ||
+                                    formatLabel(av.type)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {formatDate(av.startDate)}
+                                {av.endDate !== av.startDate
+                                  ? ` \u2013 ${formatDate(av.endDate)}`
+                                  : ""}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
+                                {av.isAllDay
+                                  ? "All Day"
+                                  : `${av.startTime || ""} \u2013 ${av.endTime || ""}`}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
+                                {av.reason || "\u2014"}
+                              </TableCell>
+                              <TableCell>
+                                <CanDo resource="crew" action="update">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          "Remove this availability block?"
+                                        )
+                                      )
+                                        removeAvailMutation.mutate(av.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </CanDo>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Certifications Tab */}
           <TabsContent value="certifications" className="mt-4">
             <Card>
@@ -685,6 +830,13 @@ export default function CrewMemberDetailPage({
         crewMemberId={id}
         open={addCertOpen}
         onOpenChange={setAddCertOpen}
+      />
+
+      {/* Add Availability Dialog */}
+      <AddAvailabilityDialog
+        crewMemberId={id}
+        open={addAvailOpen}
+        onOpenChange={setAddAvailOpen}
       />
     </RequirePermission>
   );
@@ -815,6 +967,151 @@ function AddCertificationDialog({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Add Certification
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add Availability Dialog ──────────────────────────────────────────────────
+
+function AddAvailabilityDialog({
+  crewMemberId,
+  open,
+  onOpenChange,
+}: {
+  crewMemberId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const form = useForm<CrewAvailabilityFormValues>({
+    resolver: zodResolver(crewAvailabilitySchema),
+    defaultValues: {
+      crewMemberId,
+      type: "UNAVAILABLE",
+      isAllDay: true,
+      reason: "",
+      startTime: "",
+      endTime: "",
+    },
+  });
+
+  const isAllDay = form.watch("isAllDay");
+
+  const mutation = useMutation({
+    mutationFn: (data: CrewAvailabilityFormValues) => addAvailability(data),
+    onSuccess: () => {
+      toast.success("Availability block added");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-availability", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset({ crewMemberId, type: "UNAVAILABLE", isAllDay: true, reason: "", startTime: "", endTime: "" });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Availability Block</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label>Type</Label>
+            <Select
+              value={form.watch("type")}
+              onValueChange={(v) =>
+                form.setValue("type", v as CrewAvailabilityFormValues["type"])
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="UNAVAILABLE">Unavailable</SelectItem>
+                <SelectItem value="TENTATIVE">Tentative</SelectItem>
+                <SelectItem value="PREFERRED">Preferred</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Start Date *</Label>
+              <Input type="date" {...form.register("startDate")} />
+              {form.formState.errors.startDate && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.startDate.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>End Date *</Label>
+              <Input type="date" {...form.register("endDate")} />
+              {form.formState.errors.endDate && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.endDate.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="isAllDay"
+              checked={isAllDay}
+              onCheckedChange={(v) => form.setValue("isAllDay", v === true)}
+            />
+            <Label htmlFor="isAllDay" className="cursor-pointer">
+              All Day
+            </Label>
+          </div>
+
+          {!isAllDay && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start Time</Label>
+                <Input type="time" {...form.register("startTime")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time</Label>
+                <Input type="time" {...form.register("endTime")} />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Reason</Label>
+            <Input
+              placeholder="e.g. Holiday, Another gig, Personal"
+              {...form.register("reason")}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Add Block
             </Button>
           </DialogFooter>
         </form>

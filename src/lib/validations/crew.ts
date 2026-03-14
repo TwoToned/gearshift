@@ -104,3 +104,16 @@ export const crewShiftSchema = z.object({
 });
 
 export type CrewShiftFormValues = z.input<typeof crewShiftSchema>;
+
+export const crewAvailabilitySchema = z.object({
+  crewMemberId: z.string().min(1, "Crew member is required"),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  type: z.enum(["UNAVAILABLE", "TENTATIVE", "PREFERRED"]).default("UNAVAILABLE"),
+  reason: z.string().max(500).optional(),
+  isAllDay: z.boolean().default(true),
+  startTime: z.string().max(5).optional(),
+  endTime: z.string().max(5).optional(),
+});
+
+export type CrewAvailabilityFormValues = z.input<typeof crewAvailabilitySchema>;

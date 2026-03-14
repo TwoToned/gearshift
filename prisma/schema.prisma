@@ -1425,6 +1425,7 @@ model CrewMember {
   skills          CrewSkill[]
   certifications  CrewCertification[]
   assignments     CrewAssignment[]
+  availability    CrewAvailability[]
   crewRoleId      String?
   crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
 
@@ -1621,4 +1622,33 @@ enum ShiftStatus {
   COMPLETED
   CANCELLED
   NO_SHOW
+}
+
+// ─── Crew Availability ──────────────────────────────────────────────────────
+
+model CrewAvailability {
+  id              String   @id @default(cuid())
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  startDate       DateTime
+  endDate         DateTime
+  type            AvailabilityType @default(UNAVAILABLE)
+  reason          String?
+  isAllDay        Boolean  @default(true)
+  startTime       String?
+  endTime         String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([crewMemberId])
+  @@index([crewMemberId, startDate, endDate])
+  @@map("crew_availability")
+}
+
+enum AvailabilityType {
+  UNAVAILABLE
+  TENTATIVE
+  PREFERRED
 }

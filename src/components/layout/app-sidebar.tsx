@@ -140,6 +140,7 @@ const navItems: NavItem[] = [
     icon: HardHat,
     resource: "crew",
     items: [
+      { title: "Planner", url: "/crew/planner", icon: CalendarRange, resource: "crew" },
       { title: "Roles & Skills", url: "/crew/settings", icon: Settings, resource: "crew" },
     ],
   },
