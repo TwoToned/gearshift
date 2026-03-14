@@ -126,7 +126,7 @@ Assignment rate is resolved in this order:
 |------|-----------|-------------|
 | `/crew` | CrewTable | Paginated list with search/filter |
 | `/crew/new` | CrewMemberForm | Create crew member |
-| `/crew/[id]` | Detail page | Contact, rates, skills, assignments, availability, certifications |
+| `/crew/[id]` | Detail page | Contact, rates, skills, assignments, availability, certifications, calendar |
 | `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
 | `/crew/planner` | CrewPlannerPage | 14-day Gantt-style timeline of all crew |
 | `/crew/settings` | CrewSettingsPage | Manage roles and skills |
@@ -163,6 +163,43 @@ Assignment rate is resolved in this order:
 - Navigation: back/forward by week, "Today" button
 - Sidebar: "Planner" link under Crew
 
+## Calendar Integration (Phase 4)
+
+### iCal Feed per Crew Member
+- Each crew member can have an iCal feed enabled from their detail page "Calendar" tab
+- Feed URL: `GET /api/crew/calendar/[token]` (or `[token].ics`)
+- Token is a 32-byte cryptographically random URL-safe base64 string
+- No authentication required — the token IS the auth
+- Feed contains all CONFIRMED assignments as VEVENT entries
+- If shifts exist, one event per shift; otherwise one event per assignment
+- Events include: project name, role, phase, location, site contact, notes
+- Token can be regenerated (invalidates old URL) or feed can be disabled
+
+### Schema Fields (CrewMember)
+- `icalEnabled` — Boolean, default false
+- `icalToken` — String, unique, nullable
+
+### Per-Assignment .ics Download
+- API route: `GET /api/crew/calendar/assignment/[id]`
+- Requires authentication (session-based)
+- Downloads a single .ics file for one assignment
+- Available from the assignment row actions dropdown in the project crew panel
+
+### Server Actions (`src/server/crew-calendar.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `enableIcalFeed(crewMemberId)` | crew.update | Enable feed + generate token |
+| `disableIcalFeed(crewMemberId)` | crew.update | Disable feed (keeps token) |
+| `regenerateIcalToken(crewMemberId)` | crew.update | New token, invalidates old URL |
+| `getIcalSettings(crewMemberId)` | crew.read | Get icalEnabled + icalToken |
+| `getAssignmentIcsData(assignmentId)` | crew.read | Full assignment data for .ics |
+
+### iCal Library (`src/lib/ical.ts`)
+- `generateVCalendar(calName, events)` — RFC 5545 compliant VCALENDAR
+- `generateVEvent(event)` — single VEVENT with proper line folding
+- `buildDateTime(date, time?)` — combine date + optional "HH:mm" time string
+- Supports all-day events and timed events
+
 ## Permissions
 Resource `crew` with actions: `read, create, update, delete`
 - owner/admin: all
@@ -191,7 +228,6 @@ Resource `crew` with actions: `read, create, update, delete`
 - `availabilityTypeLabels`
 
 ## Future Phases (not yet implemented)
-- Phase 4: Calendar integration (iCal feeds)
 - Phase 5: Communication & offer flow
 - Phase 6: Time tracking & payroll
 - Phase 7: Crew portal

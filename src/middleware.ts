@@ -15,6 +15,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow public iCal feed routes (token-based auth), but NOT /api/crew/calendar/assignment/
+  if (
+    pathname.startsWith("/api/crew/calendar/") &&
+    !pathname.startsWith("/api/crew/calendar/assignment")
+  ) {
+    return NextResponse.next();
+  }
+
   // Check for session token cookie (Better Auth uses this)
   const sessionToken =
     request.cookies.get("better-auth.session_token")?.value ||

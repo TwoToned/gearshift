@@ -15,6 +15,9 @@ import {
   Loader2,
   Briefcase,
   CalendarOff,
+  CalendarSync,
+  Copy,
+  RefreshCw,
 } from "lucide-react";
 import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
@@ -31,6 +34,12 @@ import {
   addAvailability,
   removeAvailability,
 } from "@/server/crew-availability";
+import {
+  getIcalSettings,
+  enableIcalFeed,
+  disableIcalFeed,
+  regenerateIcalToken,
+} from "@/server/crew-calendar";
 import {
   crewMemberStatusLabels,
   crewMemberTypeLabels,
@@ -189,6 +198,38 @@ export default function CrewMemberDetailPage({
   const { data: availabilityRecords } = useQuery({
     queryKey: ["crew-availability", orgId, id],
     queryFn: () => getCrewAvailability(id),
+  });
+
+  const { data: icalSettings } = useQuery({
+    queryKey: ["crew-ical", orgId, id],
+    queryFn: () => getIcalSettings(id),
+  });
+
+  const enableIcalMutation = useMutation({
+    mutationFn: () => enableIcalFeed(id),
+    onSuccess: () => {
+      toast.success("iCal feed enabled");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const disableIcalMutation = useMutation({
+    mutationFn: () => disableIcalFeed(id),
+    onSuccess: () => {
+      toast.success("iCal feed disabled");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const regenerateTokenMutation = useMutation({
+    mutationFn: () => regenerateIcalToken(id),
+    onSuccess: () => {
+      toast.success("iCal token regenerated — old URL is now invalid");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const removeAvailMutation = useMutation({
@@ -459,6 +500,7 @@ export default function CrewMemberDetailPage({
             <TabsTrigger value="certifications">
               Certifications ({certifications.length})
             </TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
           </TabsList>
 
           {/* Assignments Tab */}
@@ -818,6 +860,98 @@ export default function CrewMemberDetailPage({
                       </TableBody>
                     </Table>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Calendar Tab */}
+          <TabsContent value="calendar" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarSync className="h-4 w-4" />
+                  iCal Feed
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enable an iCal feed URL that can be subscribed to from Google
+                  Calendar, Apple Calendar, Outlook, or any calendar app. The
+                  feed includes all confirmed assignments.
+                </p>
+
+                {icalSettings?.icalEnabled && icalSettings?.icalToken ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        Feed URL
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/crew/calendar/${icalSettings.icalToken}`}
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/api/crew/calendar/${icalSettings.icalToken}`
+                            );
+                            toast.success("Feed URL copied to clipboard");
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <CanDo resource="crew" action="update">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Regenerate token? The old URL will stop working."
+                              )
+                            )
+                              regenerateTokenMutation.mutate();
+                          }}
+                          disabled={regenerateTokenMutation.isPending}
+                        >
+                          <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                          Regenerate URL
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => disableIcalMutation.mutate()}
+                          disabled={disableIcalMutation.isPending}
+                        >
+                          Disable Feed
+                        </Button>
+                      </div>
+                    </CanDo>
+                  </div>
+                ) : (
+                  <CanDo resource="crew" action="update">
+                    <Button
+                      variant="outline"
+                      onClick={() => enableIcalMutation.mutate()}
+                      disabled={enableIcalMutation.isPending}
+                    >
+                      {enableIcalMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      <CalendarSync className="mr-2 h-4 w-4" />
+                      Enable iCal Feed
+                    </Button>
+                  </CanDo>
                 )}
               </CardContent>
             </Card>

@@ -12,6 +12,7 @@ import {
   Users,
   DollarSign,
   Calendar,
+  CalendarPlus,
   Clock,
   ChevronDown,
   FileText,
@@ -145,6 +146,7 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
       toast.success("Crew member removed");
       queryClient.invalidateQueries({ queryKey: ["project-crew", orgId, projectId] });
       queryClient.invalidateQueries({ queryKey: ["project-labour-cost", orgId, projectId] });
+      queryClient.invalidateQueries({ queryKey: ["crew-member"] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -518,6 +520,17 @@ function AssignmentRow({
                 Edit Assignment
               </DropdownMenuItem>
               <DropdownMenuItem
+                onClick={() =>
+                  window.open(
+                    `/api/crew/calendar/assignment/${a.id as string}`,
+                    "_blank"
+                  )
+                }
+              >
+                <CalendarPlus className="mr-2 h-3.5 w-3.5" />
+                Download .ics
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 className="text-destructive"
                 onClick={onDelete}
               >
@@ -658,6 +671,7 @@ function AssignmentDialog({
       queryClient.invalidateQueries({
         queryKey: ["project-labour-cost", orgId, projectId],
       });
+      queryClient.invalidateQueries({ queryKey: ["crew-member"] });
       onOpenChange(false);
       form.reset();
     },
@@ -675,6 +689,7 @@ function AssignmentDialog({
       queryClient.invalidateQueries({
         queryKey: ["project-labour-cost", orgId, projectId],
       });
+      queryClient.invalidateQueries({ queryKey: ["crew-member"] });
       onOpenChange(false);
     },
     onError: (e) => toast.error(e.message),
