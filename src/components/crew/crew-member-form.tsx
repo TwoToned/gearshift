@@ -3,12 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { crewMemberSchema, type CrewMemberFormValues } from "@/lib/validations/crew";
-import { createCrewMember, updateCrewMember, getCrewRoleOptions, getCrewSkillOptions } from "@/server/crew";
+import { createCrewMember, updateCrewMember, getCrewRoleOptions, getCrewSkillOptions, createCrewSkill } from "@/server/crew";
 import { getOrgTags } from "@/server/tags";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { useOrgCountry } from "@/lib/use-org-country";
@@ -35,10 +36,12 @@ interface CrewMemberFormProps {
 
 export function CrewMemberForm({ initialData }: CrewMemberFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEditing = !!initialData;
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
   const orgCountry = useOrgCountry();
+  const [newSkillName, setNewSkillName] = useState("");
 
   const { data: orgTags } = useQuery({
     queryKey: ["org-tags", orgId],
@@ -258,8 +261,50 @@ export function CrewMemberForm({ initialData }: CrewMemberFormProps) {
               );
             })}
             {(!skillOptions || skillOptions.length === 0) && (
-              <p className="text-sm text-muted-foreground">No skills defined yet. Create skills from crew member detail pages.</p>
+              <p className="text-sm text-muted-foreground">No skills defined yet. Add one below.</p>
             )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="New skill name..."
+              value={newSkillName}
+              onChange={(e) => setNewSkillName(e.target.value)}
+              className="max-w-xs"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (newSkillName.trim()) {
+                    createCrewSkill({ name: newSkillName.trim() }).then((skill) => {
+                      setNewSkillName("");
+                      queryClient.invalidateQueries({ queryKey: ["crew-skill-options", orgId] });
+                      const current = form.getValues("skillIds") || [];
+                      form.setValue("skillIds", [...current, skill.id]);
+                      toast.success(`Skill "${skill.name}" created`);
+                    }).catch((err) => toast.error(err.message));
+                  }
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!newSkillName.trim()}
+              onClick={() => {
+                if (newSkillName.trim()) {
+                  createCrewSkill({ name: newSkillName.trim() }).then((skill) => {
+                    setNewSkillName("");
+                    queryClient.invalidateQueries({ queryKey: ["crew-skill-options", orgId] });
+                    const current = form.getValues("skillIds") || [];
+                    form.setValue("skillIds", [...current, skill.id]);
+                    toast.success(`Skill "${skill.name}" created`);
+                  }).catch((err) => toast.error(err.message));
+                }
+              }}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Add Skill
+            </Button>
           </div>
         </CardContent>
       </Card>

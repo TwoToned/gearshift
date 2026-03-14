@@ -86,6 +86,13 @@ export async function getCrewMemberById(id: string) {
         orderBy: { expiryDate: "asc" },
       },
       user: { select: { id: true, name: true, email: true, image: true } },
+      assignments: {
+        include: {
+          project: { select: { id: true, name: true, projectNumber: true, status: true } },
+          crewRole: { select: { id: true, name: true, color: true } },
+        },
+        orderBy: { startDate: "desc" },
+      },
     },
   });
   if (!crewMember) throw new Error("Crew member not found");

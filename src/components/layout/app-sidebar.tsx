@@ -139,6 +139,9 @@ const navItems: NavItem[] = [
     url: "/crew",
     icon: HardHat,
     resource: "crew",
+    items: [
+      { title: "Roles & Skills", url: "/crew/settings", icon: Settings, resource: "crew" },
+    ],
   },
   {
     title: "Locations",

@@ -46,6 +46,7 @@ model User {
   passkeys                Passkey[]
   supplierOrders          SupplierOrder[]
   crewMembers             CrewMember[]
+  confirmedAssignments    CrewAssignment[] @relation("ConfirmedBy")
 
   @@map("user")
 }
@@ -139,6 +140,7 @@ model Organization {
   crewMembers        CrewMember[]
   crewRoles          CrewRole[]
   crewSkills         CrewSkill[]
+  crewAssignments    CrewAssignment[]
   @@map("organization")
 }
 
@@ -914,10 +916,11 @@ model Project {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  lineItems      ProjectLineItem[]
-  scanLogs       AssetScanLog[]
-  media          ProjectMedia[]
-  supplierOrders SupplierOrder[]
+  lineItems        ProjectLineItem[]
+  scanLogs         AssetScanLog[]
+  media            ProjectMedia[]
+  supplierOrders   SupplierOrder[]
+  crewAssignments  CrewAssignment[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId])
@@ -1421,6 +1424,7 @@ model CrewMember {
   // Relations
   skills          CrewSkill[]
   certifications  CrewCertification[]
+  assignments     CrewAssignment[]
   crewRoleId      String?
   crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
 
@@ -1464,6 +1468,7 @@ model CrewRole {
   isActive        Boolean  @default(true)
 
   crewMembers     CrewMember[]
+  assignments     CrewAssignment[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1512,4 +1517,108 @@ enum CrewCertStatus {
   EXPIRING_SOON
   EXPIRED
   NOT_VERIFIED
+}
+
+model CrewAssignment {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  crewRoleId      String?
+  crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
+
+  status          AssignmentStatus @default(PENDING)
+  phase           ProjectPhase?
+  isProjectManager Boolean @default(false)
+
+  // Schedule
+  startDate       DateTime?
+  startTime       String?
+  endDate         DateTime?
+  endTime         String?
+
+  // Rate
+  rateOverride    Decimal?  @db.Decimal(10, 2)
+  rateType        CrewRateType?
+  estimatedHours  Decimal?  @db.Decimal(6, 2)
+  estimatedCost   Decimal?  @db.Decimal(10, 2)
+
+  // Notes
+  notes           String?
+  internalNotes   String?
+
+  // Response tracking
+  offeredAt       DateTime?
+  respondedAt     DateTime?
+  responseNote    String?
+
+  // Confirmation
+  confirmedAt     DateTime?
+  confirmedById   String?
+  confirmedBy     User?    @relation("ConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+
+  shifts          CrewShift[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, crewMemberId, phase])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([crewMemberId])
+  @@index([crewMemberId, startDate])
+  @@map("crew_assignment")
+}
+
+enum AssignmentStatus {
+  PENDING
+  OFFERED
+  ACCEPTED
+  DECLINED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ProjectPhase {
+  BUMP_IN
+  EVENT
+  BUMP_OUT
+  DELIVERY
+  PICKUP
+  SETUP
+  REHEARSAL
+  FULL_DURATION
+}
+
+model CrewShift {
+  id              String   @id @default(cuid())
+  assignmentId    String
+  assignment      CrewAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  callTime        String?
+  endTime         String?
+  breakMinutes    Int?
+  location        String?
+  notes           String?
+  status          ShiftStatus @default(SCHEDULED)
+
+  @@index([assignmentId])
+  @@index([assignmentId, date])
+  @@map("crew_shift")
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
 }

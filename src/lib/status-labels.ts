@@ -162,6 +162,38 @@ export const crewRateTypeLabels: Record<string, string> = {
   FLAT: "Flat",
 };
 
+// --- Crew Assignment Status ---
+export const assignmentStatusLabels: Record<string, string> = {
+  PENDING: "Pending",
+  OFFERED: "Offered",
+  ACCEPTED: "Accepted",
+  DECLINED: "Declined",
+  CONFIRMED: "Confirmed",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+};
+
+// --- Project Phase ---
+export const phaseLabels: Record<string, string> = {
+  BUMP_IN: "Bump In",
+  EVENT: "Event",
+  BUMP_OUT: "Bump Out",
+  DELIVERY: "Delivery",
+  PICKUP: "Pickup",
+  SETUP: "Setup",
+  REHEARSAL: "Rehearsal",
+  FULL_DURATION: "Full Duration",
+};
+
+// --- Shift Status ---
+export const shiftStatusLabels: Record<string, string> = {
+  SCHEDULED: "Scheduled",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  NO_SHOW: "No Show",
+};
+
 /**
  * Generic fallback: converts ANY_ENUM_VALUE to "Any Enum Value".
  * Use the specific label maps above when possible.

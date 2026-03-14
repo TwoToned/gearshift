@@ -67,3 +67,40 @@ export const crewCertificationSchema = z.object({
 });
 
 export type CrewCertificationFormValues = z.input<typeof crewCertificationSchema>;
+
+export const crewAssignmentSchema = z.object({
+  crewMemberId: z.string().min(1, "Crew member is required"),
+  crewRoleId: z.string().optional().or(z.literal("")),
+  status: z.enum(["PENDING", "OFFERED", "ACCEPTED", "DECLINED", "CONFIRMED", "CANCELLED", "COMPLETED"]).default("PENDING"),
+  phase: z.enum(["BUMP_IN", "EVENT", "BUMP_OUT", "DELIVERY", "PICKUP", "SETUP", "REHEARSAL", "FULL_DURATION"]).optional().or(z.literal("")),
+  isProjectManager: z.boolean().default(false),
+  startDate: z.union([z.literal(""), z.coerce.date()]).optional()
+    .transform(v => v === "" ? undefined : v),
+  startTime: z.string().max(5).optional(),
+  endDate: z.union([z.literal(""), z.coerce.date()]).optional()
+    .transform(v => v === "" ? undefined : v),
+  endTime: z.string().max(5).optional(),
+  rateOverride: z.union([z.literal(""), z.coerce.number().min(0)]).optional()
+    .transform(v => v === "" ? undefined : v),
+  rateType: z.enum(["HOURLY", "DAILY", "FLAT"]).optional().or(z.literal("")),
+  estimatedHours: z.union([z.literal(""), z.coerce.number().min(0)]).optional()
+    .transform(v => v === "" ? undefined : v),
+  notes: z.string().max(2000).optional(),
+  internalNotes: z.string().max(2000).optional(),
+  generateShifts: z.boolean().default(false),
+});
+
+export type CrewAssignmentFormValues = z.input<typeof crewAssignmentSchema>;
+
+export const crewShiftSchema = z.object({
+  date: z.coerce.date(),
+  callTime: z.string().max(5).optional(),
+  endTime: z.string().max(5).optional(),
+  breakMinutes: z.union([z.literal(""), z.coerce.number().int().min(0)]).optional()
+    .transform(v => v === "" ? undefined : v),
+  location: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional(),
+  status: z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"]).default("SCHEDULED"),
+});
+
+export type CrewShiftFormValues = z.input<typeof crewShiftSchema>;

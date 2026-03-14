@@ -56,6 +56,8 @@
 - **CrewRole** — `id, organizationId, name, description?, department?, color?, defaultRate?, rateType (HOURLY|DAILY|FLAT)?, sortOrder, isActive`. Unique: `[organizationId, name]`
 - **CrewSkill** — `id, organizationId, name, category?`. Many-to-many with CrewMember. Unique: `[organizationId, name]`
 - **CrewCertification** — `id, crewMemberId, name, issuedBy?, certificateNumber?, issuedDate?, expiryDate?, status (CURRENT|EXPIRING_SOON|EXPIRED|NOT_VERIFIED)`
+- **CrewAssignment** — `id, organizationId, projectId, crewMemberId, crewRoleId?, status (PENDING|OFFERED|ACCEPTED|DECLINED|CONFIRMED|CANCELLED|COMPLETED), phase (BUMP_IN|EVENT|BUMP_OUT|DELIVERY|PICKUP|SETUP|REHEARSAL|FULL_DURATION)?, isProjectManager, startDate?, startTime?, endDate?, endTime?, rateOverride?, rateType?, estimatedHours?, estimatedCost?, notes?, internalNotes?, confirmedAt?, confirmedById?`. Unique: `[projectId, crewMemberId, phase]`
+- **CrewShift** — `id, assignmentId, date, callTime?, endTime?, breakMinutes?, location?, notes?, status (SCHEDULED|IN_PROGRESS|COMPLETED|CANCELLED|NO_SHOW)`
 
 ## Activity & Scan Logs
 - **ActivityLog** — `id, organizationId, action, entityType, entityId, entityName, userId, userName, summary, details (JSON), metadata (JSON), projectId, assetId, kitId, createdAt`

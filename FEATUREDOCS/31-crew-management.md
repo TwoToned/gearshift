@@ -1,7 +1,7 @@
-# Crew Management (Phase 1 — Core Entity CRUD)
+# Crew Management
 
 ## Overview
-Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Phase 1 covers core entity CRUD — crew members, roles, skills, and certifications.
+Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1) and project crew assignments with scheduling and call sheets (Phase 2).
 
 ## Data Models
 
@@ -37,7 +37,26 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 - `issuedDate?, expiryDate?`
 - `status` — CURRENT, EXPIRING_SOON, EXPIRED, NOT_VERIFIED
 
-## Server Actions (`src/server/crew.ts`)
+### CrewAssignment
+- `id, organizationId, projectId, crewMemberId`
+- `crewRoleId?` — role for this assignment
+- `status` — PENDING, OFFERED, ACCEPTED, DECLINED, CONFIRMED, CANCELLED, COMPLETED
+- `phase?` — BUMP_IN, EVENT, BUMP_OUT, DELIVERY, PICKUP, SETUP, REHEARSAL, FULL_DURATION
+- `isProjectManager` — boolean, PMs shown first
+- `startDate?, startTime?, endDate?, endTime?`
+- `rateOverride?, rateType?, estimatedHours?, estimatedCost?`
+- `notes?, internalNotes?`
+- `confirmedAt?, confirmedById?`
+- Unique: `[projectId, crewMemberId, phase]`
+
+### CrewShift
+- `id, assignmentId, date, callTime?, endTime?`
+- `breakMinutes?, location?, notes?`
+- `status` — SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+
+## Server Actions
+
+### `src/server/crew.ts` (Phase 1)
 | Function | Permission | Description |
 |----------|-----------|-------------|
 | `getCrewMembers(params)` | crew.read | Paginated list with search, filters, sorting |
@@ -58,6 +77,32 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 | `getCrewSkillOptions()` | crew.read | Multi-select options |
 | `getCrewDepartments()` | crew.read | Distinct departments |
 
+### `src/server/crew-assignments.ts` (Phase 2)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getProjectCrew(projectId)` | crew.read | All assignments for a project |
+| `createAssignment(projectId, data)` | crew.create | Assign crew to project |
+| `updateAssignment(id, data)` | crew.update | Update assignment |
+| `deleteAssignment(id)` | crew.delete | Remove assignment |
+| `updateAssignmentStatus(id, status)` | crew.update | Change status |
+| `generateShifts(assignmentId)` | crew.update | Auto-generate daily shifts |
+| `updateShift(shiftId, data)` | crew.update | Edit individual shift |
+| `deleteShift(shiftId)` | crew.update | Remove shift |
+| `getProjectLabourCost(projectId)` | crew.read | Aggregate estimated cost |
+| `getCrewMembersForAssignment(projectId)` | crew.read | Available crew for picker |
+
+## Rate Cascade
+Assignment rate is resolved in this order:
+1. `rateOverride` on the assignment (if set and > 0)
+2. `crewMember.defaultDayRate` (daily) or `crewMember.defaultHourlyRate` (hourly)
+3. `crewRole.defaultRate` (with role's rate type)
+4. Fallback: $0 daily
+
+## Cost Calculation
+- **DAILY**: rate × number of days (start to end inclusive)
+- **HOURLY**: rate × estimatedHours
+- **FLAT**: rate (fixed amount)
+
 ## Pages
 | Path | Component | Description |
 |------|-----------|-------------|
@@ -65,6 +110,21 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 | `/crew/new` | CrewMemberForm | Create crew member |
 | `/crew/[id]` | Detail page | Contact, rates, skills, certifications |
 | `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
+
+## Project Detail Integration
+- **Crew tab** on project detail page (`/projects/[id]`) via `CrewPanel` component
+- Assignment list with phase grouping, PM highlighting
+- Add/edit assignment dialogs with crew picker, role, phase, dates, rate override
+- Status dropdown (Pending → Offered → Accepted → Confirmed → Completed)
+- **Labour cost** shown in project financial summary
+- **Call Sheet** button in crew tab and Documents dropdown
+
+## Call Sheet PDF
+- `src/lib/pdf/call-sheet-pdf.tsx` — landscape A4 document
+- API route: `GET /api/documents/call-sheet/[projectId]?date=YYYY-MM-DD`
+- Lists all non-cancelled crew sorted by call time then role
+- Includes: project info, location, site contact, crew table (name, role, phase, call/wrap times, phone, notes)
+- Uses shift-specific times when available for the requested date
 
 ## Permissions
 Resource `crew` with actions: `read, create, update, delete`
@@ -77,18 +137,23 @@ Resource `crew` with actions: `read, create, update, delete`
 - **Top bar**: `crew` segment label
 - **Page commands**: searchable crew page with aliases
 - **Global search**: searches first/last name, email, department
-- **Activity log**: CREATE/UPDATE/DELETE logged for crew members and roles
+- **Activity log**: CREATE/UPDATE/DELETE logged for crew members, roles, and assignments
 
-## Validation Schema (`src/lib/validations/crew.ts`)
+## Validation Schemas (`src/lib/validations/crew.ts`)
 - `crewMemberSchema` — full member form
 - `crewRoleSchema` — role form
 - `crewSkillSchema` — skill creation
 - `crewCertificationSchema` — certification form
+- `crewAssignmentSchema` — project assignment form
+- `crewShiftSchema` — individual shift form
+
+## Status Labels (`src/lib/status-labels.ts`)
+- `crewMemberStatusLabels`, `crewMemberTypeLabels`, `crewCertStatusLabels`
+- `crewRateTypeLabels`, `assignmentStatusLabels`, `phaseLabels`, `shiftStatusLabels`
 
 ## Future Phases (not yet implemented)
-- Phase 2: Project crew assignments (CrewAssignment model)
-- Phase 3: Shifts & scheduling
-- Phase 4: Availability management
-- Phase 5: Calendar integration (iCal)
-- Phase 6: Crew portal
-- Phase 7: Time tracking & call sheets
+- Phase 3: Availability management & conflict detection
+- Phase 4: Calendar integration (iCal feeds)
+- Phase 5: Communication & offer flow
+- Phase 6: Time tracking & payroll
+- Phase 7: Crew portal
