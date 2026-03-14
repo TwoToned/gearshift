@@ -1559,6 +1559,7 @@ model CrewAssignment {
   internalNotes   String?
 
   // Response tracking
+  responseToken   String?  @unique
   offeredAt       DateTime?
   respondedAt     DateTime?
   responseNote    String?

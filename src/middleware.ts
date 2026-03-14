@@ -15,10 +15,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow public iCal feed routes (token-based auth), but NOT /api/crew/calendar/assignment/
+  // Allow public crew routes (token-based auth)
+  // - iCal feeds: /api/crew/calendar/[token] (but NOT /api/crew/calendar/assignment/)
+  // - Offer responses: /api/crew/respond/[token]
   if (
-    pathname.startsWith("/api/crew/calendar/") &&
-    !pathname.startsWith("/api/crew/calendar/assignment")
+    (pathname.startsWith("/api/crew/calendar/") &&
+      !pathname.startsWith("/api/crew/calendar/assignment")) ||
+    pathname.startsWith("/api/crew/respond/")
   ) {
     return NextResponse.next();
   }

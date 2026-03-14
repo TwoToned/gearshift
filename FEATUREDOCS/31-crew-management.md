@@ -200,6 +200,40 @@ Assignment rate is resolved in this order:
 - `buildDateTime(date, time?)` — combine date + optional "HH:mm" time string
 - Supports all-day events and timed events
 
+## Communication & Offers (Phase 5)
+
+### Offer Flow
+- Admin creates assignment (PENDING) then sends offer via "Send Offer" action
+- Status changes: PENDING -> OFFERED (email sent with Accept/Decline links)
+- Crew responds via token-based links: OFFERED -> ACCEPTED or DECLINED
+- Admin confirms: ACCEPTED -> CONFIRMED (confirmation email sent)
+- `responseToken` on CrewAssignment — unique, one-time use, cleared after response
+
+### Email Templates (`src/lib/crew-emails.ts`)
+- `crewOfferEmail` — project details + Accept/Decline buttons
+- `crewConfirmationEmail` — confirmed assignment details
+- `crewCancellationEmail` — cancellation notice
+- `crewUpdateEmail` — updated assignment details
+- `crewBulkMessageEmail` — freeform message with project context
+
+### Server Actions (`src/server/crew-communication.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `sendCrewOffer(assignmentId)` | crew.update | Send offer email, set status to OFFERED |
+| `sendCrewOfferAll(projectId)` | crew.update | Offer all PENDING assignments |
+| `sendConfirmationEmail(assignmentId)` | crew.update | Send confirmation email |
+| `sendCancellationEmail(assignmentId)` | crew.update | Send cancellation email |
+| `sendBulkMessage(projectId, message, filter?)` | crew.update | Email all active crew on project |
+
+### API Routes
+- `GET /api/crew/respond/[token]?action=accept|decline` — Public, token-based response page
+- Returns styled HTML confirmation page after updating assignment status
+
+### UI Integration
+- **Per-assignment**: "Send Offer" in row actions dropdown (only for PENDING)
+- **Bulk**: "Offer All" button (sends to all PENDING with email), "Message" button opens dialog
+- **Middleware**: `/api/crew/respond/` added to public routes (no auth required)
+
 ## Permissions
 Resource `crew` with actions: `read, create, update, delete`
 - owner/admin: all
@@ -228,6 +262,5 @@ Resource `crew` with actions: `read, create, update, delete`
 - `availabilityTypeLabels`
 
 ## Future Phases (not yet implemented)
-- Phase 5: Communication & offer flow
 - Phase 6: Time tracking & payroll
 - Phase 7: Crew portal

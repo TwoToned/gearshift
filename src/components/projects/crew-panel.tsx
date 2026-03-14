@@ -19,6 +19,8 @@ import {
   Star,
   Loader2,
   AlertTriangle,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +34,11 @@ import {
   getCrewMembersForAssignment,
 } from "@/server/crew-assignments";
 import { checkCrewConflicts, type CrewConflict } from "@/server/crew-availability";
+import {
+  sendCrewOffer,
+  sendCrewOfferAll,
+  sendBulkMessage,
+} from "@/server/crew-communication";
 import { getCrewRoleOptions, createCrewRole } from "@/server/crew";
 import {
   crewAssignmentSchema,
@@ -129,6 +136,7 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [messageOpen, setMessageOpen] = useState(false);
 
   const { data: assignments, isLoading } = useQuery({
     queryKey: ["project-crew", orgId, projectId],
@@ -160,6 +168,28 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const offerMutation = useMutation({
+    mutationFn: (id: string) => sendCrewOffer(id),
+    onSuccess: () => {
+      toast.success("Offer sent");
+      queryClient.invalidateQueries({ queryKey: ["project-crew", orgId, projectId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const offerAllMutation = useMutation({
+    mutationFn: () => sendCrewOfferAll(projectId),
+    onSuccess: (result) => {
+      toast.success(`${result.sent} offer(s) sent`);
+      queryClient.invalidateQueries({ queryKey: ["project-crew", orgId, projectId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const pendingCount = assignments?.filter(
+    (a: Assignment) => a.status === "PENDING"
+  ).length || 0;
 
   // Group assignments by phase
   const grouped = new Map<string, Assignment[]>();
@@ -202,6 +232,35 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <CanDo resource="crew" action="update">
+            {pendingCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Send offers to ${pendingCount} pending crew member(s)?`
+                    )
+                  )
+                    offerAllMutation.mutate();
+                }}
+                disabled={offerAllMutation.isPending}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Offer All ({pendingCount})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMessageOpen(true)}
+              disabled={!assignments || assignments.length === 0}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Message
+            </Button>
+          </CanDo>
           <Button
             variant="outline"
             size="sm"
@@ -271,6 +330,7 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
                     onStatusChange={(status) =>
                       statusMutation.mutate({ id: a.id as string, status })
                     }
+                    onSendOffer={() => offerMutation.mutate(a.id as string)}
                   />
                 ))}
               {/* Then by phase group */}
@@ -289,6 +349,7 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
                   onStatusChange={(id, status) =>
                     statusMutation.mutate({ id, status })
                   }
+                  onSendOffer={(id) => offerMutation.mutate(id)}
                 />
               ))}
               {/* Ungrouped */}
@@ -306,6 +367,7 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
                     onStatusChange={(status) =>
                       statusMutation.mutate({ id: a.id as string, status })
                     }
+                    onSendOffer={() => offerMutation.mutate(a.id as string)}
                   />
                 ))}
             </TableBody>
@@ -331,6 +393,13 @@ export function CrewPanel({ projectId }: CrewPanelProps) {
           assignment={editingAssignment}
         />
       )}
+
+      {/* Bulk message dialog */}
+      <BulkMessageDialog
+        projectId={projectId}
+        open={messageOpen}
+        onOpenChange={setMessageOpen}
+      />
     </div>
   );
 }
@@ -343,12 +412,14 @@ function PhaseGroup({
   onEdit,
   onDelete,
   onStatusChange,
+  onSendOffer,
 }: {
   phase: string;
   assignments: Assignment[];
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: string) => void;
+  onSendOffer?: (id: string) => void;
 }) {
   if (assignments.length === 0) return null;
   return (
@@ -367,6 +438,9 @@ function PhaseGroup({
           onEdit={() => onEdit(a.id as string)}
           onDelete={() => onDelete(a.id as string)}
           onStatusChange={(status) => onStatusChange(a.id as string, status)}
+          onSendOffer={
+            onSendOffer ? () => onSendOffer(a.id as string) : undefined
+          }
         />
       ))}
     </>
@@ -380,11 +454,13 @@ function AssignmentRow({
   onEdit,
   onDelete,
   onStatusChange,
+  onSendOffer,
 }: {
   assignment: Assignment;
   onEdit: () => void;
   onDelete: () => void;
   onStatusChange: (status: string) => void;
+  onSendOffer?: () => void;
 }) {
   const member = a.crewMember as {
     id: string;
@@ -519,6 +595,12 @@ function AssignmentRow({
                 <Pencil className="mr-2 h-3.5 w-3.5" />
                 Edit Assignment
               </DropdownMenuItem>
+              {onSendOffer && a.status === "PENDING" && (
+                <DropdownMenuItem onClick={onSendOffer}>
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                  Send Offer
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() =>
                   window.open(
@@ -1048,6 +1130,76 @@ function AssignmentDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Bulk Message Dialog ──────────────────────────────────────────────────────
+
+function BulkMessageDialog({
+  projectId,
+  open,
+  onOpenChange,
+}: {
+  projectId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [message, setMessage] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () => sendBulkMessage(projectId, message),
+    onSuccess: (result) => {
+      toast.success(`Message sent to ${result.sent} crew member(s)`);
+      if (result.errors?.length > 0) {
+        toast.error(`${result.errors.length} failed to send`);
+      }
+      onOpenChange(false);
+      setMessage("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Message Project Crew</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Send an email to all active crew members on this project.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Message</Label>
+            <Textarea
+              rows={5}
+              placeholder="Type your message..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending || !message.trim()}
+            >
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              <Send className="mr-2 h-4 w-4" />
+              Send Message
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
