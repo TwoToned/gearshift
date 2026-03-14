@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Tags,
   Truck,
+  HardHat,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -132,6 +133,12 @@ const navItems: NavItem[] = [
     url: "/suppliers",
     icon: Truck,
     resource: "supplier",
+  },
+  {
+    title: "Crew",
+    url: "/crew",
+    icon: HardHat,
+    resource: "crew",
   },
   {
     title: "Locations",

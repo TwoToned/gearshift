@@ -57,6 +57,10 @@ div.app-shell (fixed inset-0 on mobile, relative on desktop)
 | `/projects/[id]/edit` | Edit project |
 | `/projects/templates` | Template list |
 | `/projects/templates/new` | Create template |
+| `/crew` | Crew member list |
+| `/crew/new` | Create crew member |
+| `/crew/[id]` | Crew member detail (contact, rates, skills, certifications) |
+| `/crew/[id]/edit` | Edit crew member |
 | `/clients` | Client list |
 | `/clients/new` | Create client |
 | `/clients/[id]` | Client detail |

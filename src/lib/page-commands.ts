@@ -157,6 +157,15 @@ export const PAGE_COMMANDS: PageCommand[] = [
     searchType: "supplier",
   },
   {
+    label: "Crew",
+    href: "/crew",
+    aliases: ["crew", "crewmembers", "staff", "labour", "labor", "techs", "technicians", "freelancers"],
+    icon: "HardHat",
+    description: "Crew member management",
+    searchable: true,
+    searchType: "crew",
+  },
+  {
     label: "Locations",
     href: "/locations",
     aliases: ["locations", "location", "venues", "sites", "places", "venue"],

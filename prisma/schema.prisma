@@ -45,6 +45,7 @@ model User {
   activityLogs            ActivityLog[]
   passkeys                Passkey[]
   supplierOrders          SupplierOrder[]
+  crewMembers             CrewMember[]
 
   @@map("user")
 }
@@ -135,6 +136,9 @@ model Organization {
   testTagAssets      TestTagAsset[]
   testTagRecords     TestTagRecord[]
   activityLogs       ActivityLog[]
+  crewMembers        CrewMember[]
+  crewRoles          CrewRole[]
+  crewSkills         CrewSkill[]
   @@map("organization")
 }
 
@@ -1370,4 +1374,142 @@ model ActivityLog {
   @@index([organizationId, assetId])
   @@index([organizationId, entityType, entityId])
   @@map("activity_log")
+}
+
+// ─── Crew Management ─────────────────────────────────────────────────────────
+
+model CrewMember {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Identity
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  image           String?
+
+  // Link to platform user (optional)
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Employment type
+  type            CrewMemberType  @default(FREELANCER)
+  status          CrewMemberStatus @default(ACTIVE)
+  department      String?
+
+  // Rates
+  defaultDayRate    Decimal?  @db.Decimal(10, 2)
+  defaultHourlyRate Decimal?  @db.Decimal(10, 2)
+  overtimeMultiplier Decimal? @db.Decimal(3, 2)
+  currency          String?
+
+  // Contact & personal
+  address           String?
+  addressLatitude   Float?
+  addressLongitude  Float?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  dateOfBirth     DateTime?
+  abnOrGst        String?
+
+  // Notes & tags
+  notes           String?
+  tags            String[] @default([])
+
+  // Relations
+  skills          CrewSkill[]
+  certifications  CrewCertification[]
+  crewRoleId      String?
+  crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isActive        Boolean  @default(true)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([userId])
+  @@map("crew_member")
+}
+
+enum CrewMemberType {
+  EMPLOYEE
+  FREELANCER
+  CONTRACTOR
+  VOLUNTEER
+}
+
+enum CrewMemberStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  ARCHIVED
+}
+
+model CrewRole {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?
+  department      String?
+  color           String?
+  defaultRate     Decimal? @db.Decimal(10, 2)
+  rateType        CrewRateType?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+
+  crewMembers     CrewMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("crew_role")
+}
+
+enum CrewRateType {
+  HOURLY
+  DAILY
+  FLAT
+}
+
+model CrewSkill {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  category        String?
+
+  crewMembers     CrewMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("crew_skill")
+}
+
+model CrewCertification {
+  id              String   @id @default(cuid())
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  name            String
+  issuedBy        String?
+  certificateNumber String?
+  issuedDate      DateTime?
+  expiryDate      DateTime?
+  status          CrewCertStatus @default(NOT_VERIFIED)
+
+  @@index([crewMemberId])
+  @@map("crew_certification")
+}
+
+enum CrewCertStatus {
+  CURRENT
+  EXPIRING_SOON
+  EXPIRED
+  NOT_VERIFIED
 }

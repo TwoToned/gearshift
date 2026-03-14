@@ -34,7 +34,7 @@
 2. **Org-level**: `Member.role` = `owner | admin | manager | member | viewer` (legacy: `staff`, `warehouse`)
 
 ## Resource-Action Matrix (`src/lib/permissions.ts`)
-15 resources: `asset, bulkAsset, model, kit, project, client, supplier, warehouse, testTag, maintenance, location, document, orgSettings, orgMembers, reports`
+16 resources: `asset, bulkAsset, model, kit, project, client, supplier, warehouse, testTag, maintenance, location, document, orgSettings, orgMembers, crew, reports`
 
 Actions per resource: `create, read, update, delete` (varies by resource)
 

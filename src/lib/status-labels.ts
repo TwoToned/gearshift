@@ -131,6 +131,37 @@ export const locationTypeLabels: Record<string, string> = {
   OFFSITE: "Offsite",
 };
 
+// --- Crew Member Status ---
+export const crewMemberStatusLabels: Record<string, string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  ON_LEAVE: "On Leave",
+  ARCHIVED: "Archived",
+};
+
+// --- Crew Member Type ---
+export const crewMemberTypeLabels: Record<string, string> = {
+  EMPLOYEE: "Employee",
+  FREELANCER: "Freelancer",
+  CONTRACTOR: "Contractor",
+  VOLUNTEER: "Volunteer",
+};
+
+// --- Crew Certification Status ---
+export const crewCertStatusLabels: Record<string, string> = {
+  CURRENT: "Current",
+  EXPIRING_SOON: "Expiring Soon",
+  EXPIRED: "Expired",
+  NOT_VERIFIED: "Not Verified",
+};
+
+// --- Crew Rate Type ---
+export const crewRateTypeLabels: Record<string, string> = {
+  HOURLY: "Hourly",
+  DAILY: "Daily",
+  FLAT: "Flat",
+};
+
 /**
  * Generic fallback: converts ANY_ENUM_VALUE to "Any Enum Value".
  * Use the specific label maps above when possible.

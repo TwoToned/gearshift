@@ -50,6 +50,7 @@ import {
   CircleX,
   StickyNote,
   Share2,
+  HardHat,
 } from "lucide-react";
 import {
   Dialog,
@@ -76,6 +77,7 @@ const typeIcons: Record<SearchResultType, React.ComponentType<{ className?: stri
   category: Layers,
   supplier: Truck,
   maintenance: Wrench,
+  crew: Users,
 };
 
 const typeLabels: Record<SearchResultType, string> = {
@@ -89,6 +91,7 @@ const typeLabels: Record<SearchResultType, string> = {
   location: "Location",
   category: "Category",
   maintenance: "Maintenance",
+  crew: "Crew",
 };
 
 const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -97,7 +100,7 @@ const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   ShieldCheck, BarChart3, Settings, UserCircle, PackageCheck, PackageX,
   CreditCard, Palette, Truck, FileText, ClipboardList, Pencil, Copy,
   Upload, Download, QrCode, ScrollText, ScanBarcode, PackagePlus,
-  LogOut, CheckCircle, CircleCheck, CircleX, StickyNote, Share2,
+  LogOut, CheckCircle, CircleCheck, CircleX, StickyNote, Share2, HardHat,
 };
 
 function normalize(s: string): string {

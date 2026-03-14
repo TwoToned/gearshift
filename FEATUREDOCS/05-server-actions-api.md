@@ -40,7 +40,8 @@ export async function getItems({ page, pageSize, search, sort, order }) {
 | `line-items.ts` | `addLineItem`, `updateLineItem`, `deleteLineItem`, `reorderLineItems`, `checkAvailability`, `checkKitAvailability` |
 | `warehouse.ts` | `getProjectForWarehouse`, `lookupAssetForScan`, `checkOutItems`, `checkInItems`, `checkOutKit`, `checkInKit`, `getWarehouseProjects`, `getAvailableAssetsForModel`, `quickAddAndCheckOut` |
 | `maintenance.ts` | `createMaintenanceRecord`, `updateMaintenanceRecord`, `deleteMaintenanceRecord`, `getMaintenanceRecords`, `getMaintenanceRecordById` |
-| `search.ts` | `globalSearch(query)` — searches models, assets, bulk assets, kits, projects, clients, locations, categories, suppliers, maintenance |
+| `crew.ts` | `getCrewMembers`, `getCrewMemberById`, `createCrewMember`, `updateCrewMember`, `deleteCrewMember`, `getCrewRoles`, `createCrewRole`, `updateCrewRole`, `deleteCrewRole`, `getCrewSkills`, `createCrewSkill`, `deleteCrewSkill`, `addCertification`, `removeCertification`, `getCrewRoleOptions`, `getCrewSkillOptions`, `getCrewDepartments` |
+| `search.ts` | `globalSearch(query)` — searches models, assets, bulk assets, kits, projects, clients, locations, categories, suppliers, maintenance, crew |
 | `scan-lookup.ts` | `scanLookup(value)` — resolves barcode to `{ url, label }` by checking Asset → Kit → BulkAsset → TestTagAsset |
 | `notifications.ts` | `getNotifications()` — 5 types: overdue_maintenance, overdue_return, upcoming_project, low_stock, pending_invitation |
 | `dashboard.ts` | `getDashboardStats`, `getRecentActivity`, `getUpcomingProjects` |
