@@ -1,7 +1,7 @@
 # Crew Management
 
 ## Overview
-Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1), project crew assignments with scheduling and call sheets (Phase 2), and availability management with conflict detection and crew planner (Phase 3).
+Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1), project crew assignments with scheduling and call sheets (Phase 2), availability management with conflict detection and crew planner (Phase 3), iCal calendar integration (Phase 4), communication and offer flow (Phase 5), and time tracking with timesheets (Phase 6).
 
 ## Data Models
 
@@ -126,9 +126,10 @@ Assignment rate is resolved in this order:
 |------|-----------|-------------|
 | `/crew` | CrewDashboard / CrewTable | Manager+ sees dashboard with stats, timesheets, assignments, offers; others see crew list |
 | `/crew/new` | CrewMemberForm | Create crew member |
-| `/crew/[id]` | Detail page | Contact, rates, skills, assignments, availability, certifications, calendar |
+| `/crew/[id]` | Detail page | Contact, rates, skills, assignments (with status management), availability, certifications, time entries, calendar |
 | `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
 | `/crew/planner` | CrewPlannerPage | 14-day Gantt-style timeline of all crew |
+| `/crew/timesheets` | TimesheetsPage | All time entries with DataTable, filtering, search, edit/delete, export |
 | `/crew/settings` | CrewSettingsPage | Manage roles and skills |
 
 ## Project Detail Integration
@@ -245,12 +246,14 @@ Resource `crew` with actions: `read, create, update, delete`
 - **Stats**: active crew, assignments, pending offers, submitted timesheets, hours (7d), expiring certs
 - **Pending Timesheets**: approve/dispute individual or bulk from dashboard
 - **Active Assignments**: links to project detail
-- **Upcoming Shifts**: next 10 scheduled shifts
+- **Upcoming Shifts**: next 10 scheduled shifts, consecutive shifts for same assignment grouped as date ranges
 - **Pending Offers**: send offer directly from dashboard
+- **Log Time**: multi-select crew member dialog, then time entry form with Project/General toggle
+- **Export Timesheets**: dialog with date range picker, downloads CSV
 - **Crew List**: embedded crew table at the bottom
 
 ## Integration Points
-- **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Roles & Skills. Gated by `crew` resource
+- **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Timesheets, Roles & Skills. Gated by `crew` resource
 - **Top bar**: `crew` segment label
 - **Page commands**: searchable crew page with aliases
 - **Global search**: searches first/last name, email, department
