@@ -265,13 +265,14 @@ export async function globalSearch(query: string) {
                ) AS match_quality
         FROM "public"."crew_member" cm
         LEFT JOIN "public"."crew_role" cr ON cm."crewRoleId" = cr.id
-        WHERE cm."organizationId" = ${organizationId} AND cm."isActive" = true
+        WHERE cm."organizationId" = ${organizationId} AND cm."status" != 'ARCHIVED'
           AND (
             cm."firstName" ILIKE ${ilikePattern} OR cm."lastName" ILIKE ${ilikePattern}
             OR (cm."firstName" || ' ' || cm."lastName") ILIKE ${ilikePattern}
             OR COALESCE(cm.email, '') ILIKE ${ilikePattern}
             OR COALESCE(cm.phone, '') ILIKE ${ilikePattern}
             OR COALESCE(cm.department, '') ILIKE ${ilikePattern}
+            OR COALESCE(cr.name, '') ILIKE ${ilikePattern}
             OR lower(regexp_replace(cm."firstName" || cm."lastName", '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
             OR similarity(cm."firstName" || ' ' || cm."lastName", ${q}) > ${trigramThreshold}
             OR EXISTS(SELECT 1 FROM unnest(cm.tags) t WHERE t ILIKE ${ilikePattern})

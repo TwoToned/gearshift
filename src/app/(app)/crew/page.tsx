@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -115,6 +115,18 @@ function CrewDashboard() {
   const queryClient = useQueryClient();
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+
+  // Slash command listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { dialog } = ce.detail || {};
+      if (dialog === "log-time") setLogTimeOpen(true);
+      if (dialog === "export-timesheets") setExportOpen(true);
+    };
+    window.addEventListener("slash-command", handler);
+    return () => window.removeEventListener("slash-command", handler);
+  }, []);
 
   const { data: stats } = useQuery({
     queryKey: ["crew-dashboard-stats", orgId],

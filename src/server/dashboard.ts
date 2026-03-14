@@ -16,6 +16,8 @@ export async function getDashboardStats() {
     activeProjects,
     maintenanceDue,
     overdueReturns,
+    activeCrew,
+    pendingCrewOffers,
   ] = await Promise.all([
     prisma.asset.count({
       where: { organizationId, isActive: true },
@@ -52,6 +54,12 @@ export async function getDashboardStats() {
         },
       },
     }),
+    prisma.crewMember.count({
+      where: { organizationId, status: "ACTIVE" },
+    }),
+    prisma.crewAssignment.count({
+      where: { organizationId, status: { in: ["OFFERED", "PENDING"] } },
+    }),
   ]);
 
   return {
@@ -60,6 +68,8 @@ export async function getDashboardStats() {
     activeProjects,
     maintenanceDue,
     overdueReturns,
+    activeCrew,
+    pendingCrewOffers,
   };
 }
 

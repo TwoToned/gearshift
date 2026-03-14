@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -204,10 +204,33 @@ export default function CrewMemberDetailPage({
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
 
+  const [tabValue, setTabValue] = useState("assignments");
   const [addCertOpen, setAddCertOpen] = useState(false);
   const [addAvailOpen, setAddAvailOpen] = useState(false);
   const [addTimeOpen, setAddTimeOpen] = useState(false);
   const [editingTimeEntry, setEditingTimeEntry] = useState<string | null>(null);
+
+  // Slash command listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { event, dialog } = ce.detail || {};
+
+      // Tab switching
+      if (event?.startsWith("switch-tab:")) {
+        const tab = event.replace("switch-tab:", "");
+        setTabValue(tab);
+      }
+
+      // Dialog opening
+      if (dialog === "add-availability") setAddAvailOpen(true);
+      if (dialog === "add-certification") setAddCertOpen(true);
+      if (dialog === "add-time-entry") setAddTimeOpen(true);
+    };
+
+    window.addEventListener("slash-command", handler);
+    return () => window.removeEventListener("slash-command", handler);
+  }, []);
 
   const { data: member, isLoading } = useQuery({
     queryKey: ["crew-member", orgId, id],
@@ -600,7 +623,7 @@ export default function CrewMemberDetailPage({
         )}
 
         {/* Tabs */}
-        <Tabs defaultValue="assignments">
+        <Tabs value={tabValue} onValueChange={setTabValue}>
           <TabsList>
             <TabsTrigger value="assignments">
               Assignments ({assignments.length})

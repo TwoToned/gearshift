@@ -254,9 +254,15 @@ Resource `crew` with actions: `read, create, update, delete`
 
 ## Integration Points
 - **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Timesheets, Roles & Skills. Gated by `crew` resource
-- **Top bar**: `crew` segment label
-- **Page commands**: searchable crew page with aliases
-- **Global search**: searches first/last name, email, department
+- **Top bar**: `crew`, `timesheets`, `planner` segment labels
+- **Page commands**: searchable crew page with children (Planner, Timesheets, Roles & Skills)
+- **Global search**: searches first/last name, email, phone, department, role name, tags
+- **Slash commands**:
+  - `/crew` list page: `/new`, `/planner`, `/timesheets`, `/roles`, `/log-time`, `/export`
+  - `/crew/[id]` detail page: `/edit`, `/assignments`, `/availability`, `/certifications`, `/time`, `/calendar`, `/add-availability`, `/add-cert`, `/log-time`
+  - `/crew/timesheets` page: `/log-time`, `/export`
+- **Notifications**: expiring certifications (30 days), pending crew offers, submitted timesheets awaiting approval
+- **Dashboard**: active crew count and pending crew offers shown in main dashboard stats
 - **Activity log**: CREATE/UPDATE/DELETE logged for crew members, roles, assignments, and availability
 
 ## Validation Schemas (`src/lib/validations/crew.ts`)

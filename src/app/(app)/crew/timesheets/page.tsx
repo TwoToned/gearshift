@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -113,6 +113,18 @@ export default function TimesheetsPage() {
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any>(null);
+
+  // Slash command listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { dialog } = ce.detail || {};
+      if (dialog === "log-time") setLogTimeOpen(true);
+      if (dialog === "export-timesheets") setExportOpen(true);
+    };
+    window.addEventListener("slash-command", handler);
+    return () => window.removeEventListener("slash-command", handler);
+  }, []);
 
   // Fetch crew list for filter options
   const { data: crewList } = useQuery({

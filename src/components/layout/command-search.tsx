@@ -51,6 +51,9 @@ import {
   StickyNote,
   Share2,
   HardHat,
+  Briefcase,
+  Clock,
+  CalendarOff,
 } from "lucide-react";
 import {
   Dialog,
@@ -77,7 +80,7 @@ const typeIcons: Record<SearchResultType, React.ComponentType<{ className?: stri
   category: Layers,
   supplier: Truck,
   maintenance: Wrench,
-  crew: Users,
+  crew: HardHat,
 };
 
 const typeLabels: Record<SearchResultType, string> = {
@@ -101,6 +104,7 @@ const pageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   CreditCard, Palette, Truck, FileText, ClipboardList, Pencil, Copy,
   Upload, Download, QrCode, ScrollText, ScanBarcode, PackagePlus,
   LogOut, CheckCircle, CircleCheck, CircleX, StickyNote, Share2, HardHat,
+  Briefcase, Clock, CalendarOff,
 };
 
 function normalize(s: string): string {

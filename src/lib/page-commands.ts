@@ -164,6 +164,29 @@ export const PAGE_COMMANDS: PageCommand[] = [
     description: "Crew member management",
     searchable: true,
     searchType: "crew",
+    children: [
+      {
+        label: "Planner",
+        href: "/crew/planner",
+        aliases: ["planner", "crewplanner", "schedule", "crewschedule", "gantt", "timeline"],
+        icon: "CalendarRange",
+        description: "Crew planner timeline",
+      },
+      {
+        label: "Timesheets",
+        href: "/crew/timesheets",
+        aliases: ["timesheets", "timesheet", "time", "hours", "timetracking"],
+        icon: "Clock",
+        description: "Time tracking and timesheets",
+      },
+      {
+        label: "Roles & Skills",
+        href: "/crew/settings",
+        aliases: ["crewsettings", "crewroles", "crewskills", "roles", "skills"],
+        icon: "Settings",
+        description: "Manage crew roles and skills",
+      },
+    ],
   },
   {
     label: "Locations",
