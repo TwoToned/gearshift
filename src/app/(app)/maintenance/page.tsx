@@ -257,7 +257,7 @@ export default function MaintenancePage() {
     setPage, setPageSize, handleSort,
     columnVisibility, toggleColumnVisibility, resetPreferences,
     filters, setFilter,
-  } = useTablePreferences("maintenance", { sortBy: "scheduledDate", sortOrder: "desc" });
+  } = useTablePreferences("maintenance", { sortBy: "scheduledDate", sortOrder: "asc" });
 
   const [search, setSearch] = useState("");
   const { data: activeOrg } = useActiveOrganization();
