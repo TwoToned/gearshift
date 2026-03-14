@@ -17,6 +17,9 @@ import {
   Circle,
   ClipboardList,
   MoreVertical,
+  FileText,
+  ChevronDown,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -945,11 +948,37 @@ function WarehouseProjectPage({
           <Button variant="outline" className="sm:hidden" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
             <Printer className="h-4 w-4" />
           </Button>
-          {/* Desktop: Pull Slip button + more menu */}
-          <Button variant="outline" className="hidden sm:flex" onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
-            <Printer className="mr-2 h-4 w-4" />
-            Pull Slip
+          {/* Desktop: Documents dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" className="hidden sm:flex" />}>
+              <FileText className="mr-2 h-4 w-4" />
+              Documents
+              <ChevronDown className="ml-1 h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => window.open(`/api/documents/${projectId}?type=pull-slip`, "_blank")}>
+                Pull Slip
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/api/documents/${projectId}?type=delivery-docket`, "_blank")}>
+                Delivery Docket
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/api/documents/${projectId}?type=return-sheet`, "_blank")}>
+                Return Sheet
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/api/documents/${projectId}?type=quote`, "_blank")}>
+                Quote / Proposal
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/api/documents/${projectId}?type=invoice`, "_blank")}>
+                Invoice
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* Desktop: View Project button */}
+          <Button variant="outline" className="hidden sm:flex" render={<Link href={`/projects/${projectId}`} />}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            View Project
           </Button>
+          {/* Desktop: more menu */}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" className="hidden sm:flex" />}>
               <MoreVertical className="h-4 w-4" />
