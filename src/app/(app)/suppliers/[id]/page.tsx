@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getSupplierById, getSupplierAssets, getSupplierSubhires, deleteSupplier } from "@/server/suppliers";
+import { assetStatusLabels, supplierOrderStatusLabels, projectStatusLabels, formatLabel } from "@/lib/status-labels";
 import { getSupplierOrders } from "@/server/supplier-orders";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
@@ -293,7 +294,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={orderStatusColors[order.status] || ""}>
-                                {order.status}
+                                {supplierOrderStatusLabels[order.status] || formatLabel(order.status)}
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
@@ -358,7 +359,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                               {asset.purchaseOrderNumber || "\u2014"}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{asset.status}</Badge>
+                              <Badge variant="outline">{assetStatusLabels[asset.status] || formatLabel(asset.status)}</Badge>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -405,7 +406,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={projectStatusColors[item.project?.status] || ""}>
-                                {item.project?.status?.replace("_", " ")}
+                                {item.project?.status ? (projectStatusLabels[item.project.status] || formatLabel(item.project.status)) : ""}
                               </Badge>
                             </TableCell>
                           </TableRow>

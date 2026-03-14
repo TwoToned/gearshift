@@ -14,36 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { getReportsSummary } from "@/server/reports";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { useActiveOrganization } from "@/lib/auth-client";
-
-const assetStatusLabels: Record<string, string> = {
-  AVAILABLE: "Available",
-  CHECKED_OUT: "Checked Out",
-  IN_MAINTENANCE: "In Maintenance",
-  RETIRED: "Retired",
-  LOST: "Lost",
-  RESERVED: "Reserved",
-};
-
-const projectStatusLabels: Record<string, string> = {
-  ENQUIRY: "Enquiry",
-  QUOTING: "Quoting",
-  QUOTED: "Quoted",
-  CONFIRMED: "Confirmed",
-  PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
-  ON_SITE: "On Site",
-  RETURNED: "Returned",
-  COMPLETED: "Completed",
-  INVOICED: "Invoiced",
-  CANCELLED: "Cancelled",
-};
-
-const maintenanceStatusLabels: Record<string, string> = {
-  SCHEDULED: "Scheduled",
-  IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-};
+import { assetStatusLabels, projectStatusLabels, maintenanceStatusLabels, formatLabel } from "@/lib/status-labels";
 
 export default function ReportsPage() {
   const { data: activeOrg } = useActiveOrganization();
@@ -132,7 +103,7 @@ export default function ReportsPage() {
               <div className="space-y-2">
                 {assetsByStatus.map((g) => (
                   <div key={g.status} className="flex items-center justify-between">
-                    <span className="text-sm">{assetStatusLabels[g.status] || g.status}</span>
+                    <span className="text-sm">{assetStatusLabels[g.status] || formatLabel(g.status)}</span>
                     <Badge variant="secondary">{g.count}</Badge>
                   </div>
                 ))}
@@ -155,7 +126,7 @@ export default function ReportsPage() {
               <div className="space-y-2">
                 {projectsByStatus.map((g) => (
                   <div key={g.status} className="flex items-center justify-between">
-                    <span className="text-sm">{projectStatusLabels[g.status] || g.status}</span>
+                    <span className="text-sm">{projectStatusLabels[g.status] || formatLabel(g.status)}</span>
                     <Badge variant="secondary">{g.count}</Badge>
                   </div>
                 ))}
@@ -179,7 +150,7 @@ export default function ReportsPage() {
                 {maintenanceSummary.map((g) => (
                   <div key={g.status} className="flex items-center justify-between">
                     <span className="text-sm">
-                      {maintenanceStatusLabels[g.status] || g.status}
+                      {maintenanceStatusLabels[g.status] || formatLabel(g.status)}
                     </span>
                     <Badge variant="secondary">{g.count}</Badge>
                   </div>

@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
                       <p className="text-sm font-medium truncate">{inv.email}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         Invited to {inv.organization.name}
-                        {inv.role ? ` as ${inv.role}` : ""}
+                        {inv.role ? ` as ${inv.role.charAt(0).toUpperCase() + inv.role.slice(1)}` : ""}
                         {" - "}
                         {new Date(inv.createdAt).toLocaleDateString()}
                       </p>
@@ -283,7 +283,7 @@ export default function AdminUsersPage() {
                                     variant="outline"
                                     className="text-xs"
                                   >
-                                    {m.organization.name} ({m.role})
+                                    {m.organization.name} ({m.role.charAt(0).toUpperCase() + m.role.slice(1)})
                                   </Badge>
                                 ),
                               )

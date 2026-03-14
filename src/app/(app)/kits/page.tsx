@@ -19,11 +19,13 @@ import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
   INCOMPLETE: "bg-red-500/10 text-red-500 border-red-500/20",
 };
+
+import { kitStatusLabels, conditionLabels, formatLabel } from "@/lib/status-labels";
 
 const conditionColors: Record<string, string> = {
   NEW: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -86,14 +88,14 @@ function useKitColumns(
       filterType: "enum",
       filterOptions: [
         { value: "AVAILABLE", label: "Available", color: "bg-green-500" },
-        { value: "CHECKED_OUT", label: "Checked Out", color: "bg-blue-500" },
+        { value: "CHECKED_OUT", label: "Deployed", color: "bg-purple-500" },
         { value: "IN_MAINTENANCE", label: "In Maintenance", color: "bg-amber-500" },
         { value: "RETIRED", label: "Retired", color: "bg-gray-500" },
         { value: "INCOMPLETE", label: "Incomplete", color: "bg-red-500" },
       ],
       cell: (row) => (
         <Badge variant="outline" className={statusColors[row.status] || ""}>
-          {row.status.replace(/_/g, " ")}
+          {kitStatusLabels[row.status] || formatLabel(row.status)}
         </Badge>
       ),
     },
@@ -114,7 +116,7 @@ function useKitColumns(
       ],
       cell: (row) => (
         <Badge variant="outline" className={conditionColors[row.condition] || ""}>
-          {row.condition}
+          {conditionLabels[row.condition] || formatLabel(row.condition)}
         </Badge>
       ),
     },

@@ -108,6 +108,8 @@ const statusColors: Record<string, string> = {
   CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
 };
 
+import { lineItemStatusLabels, formatLabel } from "@/lib/status-labels";
+
 function formatCurrency(value: number | null | undefined): string {
   if (value == null) return "--";
   return `$${Number(value).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
@@ -464,7 +466,7 @@ function SortableItemRow({
             variant="outline"
             className={statusColors[item.status] || ""}
           >
-            {item.status}
+            {lineItemStatusLabels[item.status] || formatLabel(item.status)}
           </Badge>
         </TableCell>
         <TableCell>
@@ -626,7 +628,7 @@ function SortableGroupHeader({
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <Badge variant="outline" className={`text-xs ${statusColors[item.status] || ""}`}>
-                  {item.status}
+                  {lineItemStatusLabels[item.status] || formatLabel(item.status)}
                 </Badge>
               </TableCell>
               <TableCell />

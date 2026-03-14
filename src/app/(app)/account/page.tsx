@@ -698,7 +698,7 @@ export default function AccountPage() {
                   >
                     <div>
                       <div className="font-medium">{m.organization.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground capitalize">
                         {m.role}
                       </div>
                     </div>

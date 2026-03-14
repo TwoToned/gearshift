@@ -68,7 +68,7 @@ export default function DashboardPage() {
           href="/assets/registry"
         />
         <StatCard
-          title="Checked Out"
+          title="Deployed"
           value={stats?.checkedOutAssets ?? "—"}
           description="Currently on projects"
           icon={PackageCheck}
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                               </span>
                               {" "}
                               <span className="text-muted-foreground">
-                                {isCheckOut ? "checked out to" : "returned from"}
+                                {isCheckOut ? "deployed to" : "returned from"}
                               </span>
                               {" "}
                               {project ? (

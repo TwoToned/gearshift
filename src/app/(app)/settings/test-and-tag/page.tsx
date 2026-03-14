@@ -140,7 +140,7 @@ export default function TestTagSettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ttCheckoutPolicy">Checkout Policy</Label>
+            <Label htmlFor="ttCheckoutPolicy">Deployment Policy</Label>
             <select
               id="ttCheckoutPolicy"
               value={settings.testTag?.checkoutPolicy || "WARN"}
@@ -149,10 +149,10 @@ export default function TestTagSettingsPage() {
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="WARN">Warn on overdue items</option>
-              <option value="BLOCK">Block checkout of overdue items</option>
+              <option value="BLOCK">Block deployment of overdue items</option>
             </select>
             <p className="text-xs text-muted-foreground">
-              What happens when checking out an asset with an overdue test tag
+              What happens when deploying an asset with an overdue test tag
             </p>
           </div>
         </div>

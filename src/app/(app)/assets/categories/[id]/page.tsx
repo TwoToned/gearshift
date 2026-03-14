@@ -31,10 +31,12 @@ import { useActiveOrganization } from "@/lib/auth-client";
 
 const kitStatusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
+
+import { kitStatusLabels, formatLabel } from "@/lib/status-labels";
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -260,7 +262,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                           <TableCell className="hidden md:table-cell">
                             {kit.status && (
                               <Badge className={kitStatusColors[kit.status] || ""}>
-                                {kit.status.replace(/_/g, " ")}
+                                {kitStatusLabels[kit.status] || formatLabel(kit.status)}
                               </Badge>
                             )}
                           </TableCell>

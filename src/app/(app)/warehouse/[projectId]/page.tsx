@@ -30,6 +30,7 @@ import {
   getAvailableAssetsForModel,
   quickAddAndCheckOut,
 } from "@/server/warehouse";
+import { lineItemStatusLabels, formatLabel } from "@/lib/status-labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -97,7 +98,7 @@ const statusLabels: Record<string, string> = {
   QUOTED: "Quoted",
   CONFIRMED: "Confirmed",
   PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
+  CHECKED_OUT: "Deployed",
   ON_SITE: "On Site",
   RETURNED: "Returned",
   COMPLETED: "Completed",
@@ -368,7 +369,7 @@ function WarehouseProjectPage({
       quickAddAndCheckOut(projectId, data),
     onSuccess: () => {
       invalidate();
-      toast.success(`Added to project and checked out: ${addPromptData?.assetName || "Asset"}`);
+      toast.success(`Added to project and deployed: ${addPromptData?.assetName || "Asset"}`);
       setAddPromptOpen(false);
       setAddPromptData(null);
       setScanValue("");
@@ -400,7 +401,7 @@ function WarehouseProjectPage({
         if (kitResult.lineItemId && !kitResult.reason) {
           kitCheckOutMutation.mutate(kitResult.kitId, {
             onSuccess: () => {
-              toast.success(`Kit checked out: ${kitResult.assetName}`);
+              toast.success(`Kit deployed: ${kitResult.assetName}`);
               setScanValue("");
               scanInputRef.current?.focus();
             },
@@ -408,9 +409,9 @@ function WarehouseProjectPage({
         } else {
           const messages: Record<string, string> = {
             not_on_project: "Kit not assigned to this project",
-            already_checked_out: "Kit already checked out",
+            already_checked_out: "Kit already deployed",
           };
-          toast.error(messages[kitResult.reason as string] || "Cannot check out this kit");
+          toast.error(messages[kitResult.reason as string] || "Cannot deploy this kit");
           setScanValue("");
           scanInputRef.current?.focus();
         }
@@ -450,7 +451,7 @@ function WarehouseProjectPage({
           ...(result.assetId ? { assetId: result.assetId } : {}),
         }], {
           onSuccess: () => {
-            toast.success(`Checked out: ${result.assetName || "Asset"}`);
+            toast.success(`Deployed: ${result.assetName || "Asset"}`);
             setScanValue("");
             scanInputRef.current?.focus();
           },
@@ -472,14 +473,14 @@ function WarehouseProjectPage({
         const detail = "detail" in result ? (result.detail as string) : "";
         const assetStatus = "assetStatus" in result ? (result.assetStatus as string) : "";
         const messages: Record<string, string> = {
-          already_checked_out: "Already checked out on this project",
-          asset_checked_out_elsewhere: `Already checked out${detail}`,
+          already_checked_out: "Already deployed on this project",
+          asset_checked_out_elsewhere: `Already deployed${detail}`,
           not_on_project: "Asset not assigned to this project",
-          not_checked_out: "Asset is not checked out on this project",
+          not_checked_out: "Asset is not deployed on this project",
           already_returned: "All units already returned",
-          asset_unavailable: `Asset is ${assetStatus.replace("_", " ").toLowerCase()} and cannot be checked out`,
+          asset_unavailable: `Asset is ${assetStatus.replace("_", " ").toLowerCase()} and cannot be deployed`,
         };
-        toast.error(messages[result.reason as string] || "Cannot check out this asset");
+        toast.error(messages[result.reason as string] || "Cannot deploy this asset");
         setScanValue("");
         scanInputRef.current?.focus();
       } else {
@@ -516,7 +517,7 @@ function WarehouseProjectPage({
         } else {
           const messages: Record<string, string> = {
             not_on_project: "Kit not assigned to this project",
-            not_checked_out: "Kit is not checked out",
+            not_checked_out: "Kit is not deployed",
           };
           toast.error(messages[kitResult.reason as string] || "Cannot return this kit");
           setReturnScanValue("");
@@ -570,10 +571,10 @@ function WarehouseProjectPage({
         );
       } else if (result.found && !result.lineItemId) {
         const messages: Record<string, string> = {
-          not_checked_out: "Asset is not checked out on this project",
+          not_checked_out: "Asset is not deployed on this project",
           not_on_project: "Asset not assigned to this project",
           already_returned: "All units already returned",
-          already_checked_out: "Already checked out",
+          already_checked_out: "Already deployed",
         };
         toast.error(messages[result.reason as string] || "Cannot return this asset");
         setReturnScanValue("");
@@ -982,11 +983,11 @@ function WarehouseProjectPage({
         <TabsList>
           <TabsTrigger value="check-out">
             <PackageCheck className="mr-1.5 h-4 w-4" />
-            Check Out ({checkOutItemsList.length})
+            Deploy ({checkOutItemsList.length})
           </TabsTrigger>
           <TabsTrigger value="check-in">
             <PackageX className="mr-1.5 h-4 w-4" />
-            Check In ({checkedOutItems.length})
+            Return ({checkedOutItems.length})
           </TabsTrigger>
         </TabsList>
 
@@ -1009,7 +1010,7 @@ function WarehouseProjectPage({
                       onChange={(e) => setScanValue(e.target.value)}
                       onKeyDown={handleScanKeyDown}
                       onScan={(value) => scanMutation.mutate(value)}
-                      scannerTitle="Scan asset to check out"
+                      scannerTitle="Scan asset to deploy"
                       continuous
                       disabled={scanMutation.isPending || checkOutMutation.isPending}
                       autoFocus
@@ -1020,8 +1021,8 @@ function WarehouseProjectPage({
                     disabled={selectedOutCount === 0 || checkOutMutation.isPending}
                     className="shrink-0"
                   >
-                    <span className="hidden sm:inline">Check Out</span>
-                    <span className="sm:hidden">Out</span>
+                    <span className="hidden sm:inline">Deploy</span>
+                    <span className="sm:hidden">Deploy</span>
                     {selectedOutCount > 0 ? ` (${selectedOutCount})` : ""}
                   </Button>
                 </div>
@@ -1032,7 +1033,7 @@ function WarehouseProjectPage({
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p>All items checked out.</p>
+                  <p>All items deployed.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -1086,7 +1087,7 @@ function WarehouseProjectPage({
                                 <TableCell className="text-center">1</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
-                                    {item.status}
+                                    {lineItemStatusLabels[item.status] || formatLabel(item.status)}
                                   </Badge>
                                 </TableCell>
                               </TableRow>
@@ -1111,7 +1112,7 @@ function WarehouseProjectPage({
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className={lineItemStatusColors[entry.item.status] || ""}>
-                                    {entry.item.status}
+                                    {lineItemStatusLabels[entry.item.status] || formatLabel(entry.item.status)}
                                   </Badge>
                                 )}
                               </TableCell>
@@ -1207,7 +1208,7 @@ function WarehouseProjectPage({
                                   <TableCell>
                                     {isVerified
                                       ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
-                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
+                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{lineItemStatusLabels[child.status] || formatLabel(child.status)}</Badge>
                                     }
                                   </TableCell>
                                 </TableRow>
@@ -1239,7 +1240,7 @@ function WarehouseProjectPage({
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={lineItemStatusColors[item.status] || ""}>
-                              {item.status}
+                              {lineItemStatusLabels[item.status] || formatLabel(item.status)}
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -1319,7 +1320,7 @@ function WarehouseProjectPage({
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p>No items currently checked out.</p>
+                  <p>No items currently deployed.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -1352,7 +1353,7 @@ function WarehouseProjectPage({
                               entry, childKeys, selectedIn, setSelectedIn,
                               <TableCell>
                                 <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                                  Checked Out
+                                  Deployed
                                 </Badge>
                               </TableCell>
                             )}
@@ -1373,7 +1374,7 @@ function WarehouseProjectPage({
                                 <TableCell className="text-center">1</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                                    Checked Out
+                                    Deployed
                                   </Badge>
                                 </TableCell>
                               </TableRow>
@@ -1398,7 +1399,7 @@ function WarehouseProjectPage({
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                                    Checked Out
+                                    Deployed
                                   </Badge>
                                 )}
                               </TableCell>
@@ -1470,7 +1471,7 @@ function WarehouseProjectPage({
                               <TableCell className="text-center">{entry.children.length}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                                  Checked Out
+                                  Deployed
                                 </Badge>
                               </TableCell>
                             </TableRow>
@@ -1494,7 +1495,7 @@ function WarehouseProjectPage({
                                   <TableCell>
                                     {isVerified
                                       ? <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
-                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{child.status}</Badge>
+                                      : <Badge variant="outline" className={lineItemStatusColors[child.status] || ""}>{lineItemStatusLabels[child.status] || formatLabel(child.status)}</Badge>
                                     }
                                   </TableCell>
                                 </TableRow>
@@ -1539,7 +1540,7 @@ function WarehouseProjectPage({
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={lineItemStatusColors["CHECKED_OUT"]}>
-                              Checked Out
+                              Deployed
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -1586,7 +1587,7 @@ function WarehouseProjectPage({
                 });
               }}
             >
-              {quickAddMutation.isPending ? "Adding..." : "Add & Check Out"}
+              {quickAddMutation.isPending ? "Adding..." : "Add & Deploy"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1600,7 +1601,7 @@ function WarehouseProjectPage({
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Select which specific asset to check out for each item.
+              Select which specific asset to deploy for each item.
             </p>
             {assetPickerItems.map((pickerItem, idx) => (
               <div key={pickerItem.lineItemId} className="space-y-1.5">
@@ -1651,7 +1652,7 @@ function WarehouseProjectPage({
               onClick={handleAssetPickerConfirm}
               disabled={assetPickerItems.some((i) => !i.selectedAssetId)}
             >
-              Check Out
+              Deploy
             </Button>
           </DialogFooter>
         </DialogContent>

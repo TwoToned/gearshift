@@ -323,10 +323,10 @@ export async function checkOutItems(
             select: { status: true, assetTag: true },
           });
           if (assetRecord && assetRecord.status === "CHECKED_OUT") {
-            throw new Error(`Asset ${assetRecord.assetTag} is already checked out`);
+            throw new Error(`Asset ${assetRecord.assetTag} is already deployed`);
           }
           if (assetRecord && (assetRecord.status === "RETIRED" || assetRecord.status === "IN_MAINTENANCE" || assetRecord.status === "LOST")) {
-            throw new Error(`Asset ${assetRecord.assetTag} is ${assetRecord.status.replace("_", " ").toLowerCase()} and cannot be checked out`);
+            throw new Error(`Asset ${assetRecord.assetTag} is ${assetRecord.status.replace("_", " ").toLowerCase()} and cannot be deployed`);
           }
         }
 
@@ -599,7 +599,7 @@ export async function checkOutKit(projectId: string, kitId: string) {
 
     // Create scan log for the kit
     await tx.assetScanLog.create({
-      data: { organizationId, kitId, projectId, action: "CHECK_OUT", scannedById: userId, notes: "Kit checked out with all contents" },
+      data: { organizationId, kitId, projectId, action: "CHECK_OUT", scannedById: userId, notes: "Kit deployed with all contents" },
     });
 
     return { success: true, kitId };
@@ -810,7 +810,7 @@ export async function quickAddAndCheckOut(
         projectId,
         action: "CHECK_OUT",
         scannedById: userId,
-        notes: "Added to project and checked out via warehouse scan",
+        notes: "Added to project and deployed via warehouse scan",
       },
     });
 

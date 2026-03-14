@@ -88,7 +88,7 @@ export default function NoOrganizationPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{inv.organization.name}</p>
                     {inv.role && (
-                      <p className="text-xs text-muted-foreground">as {inv.role}</p>
+                      <p className="text-xs text-muted-foreground capitalize">as {inv.role}</p>
                     )}
                   </div>
                 </div>

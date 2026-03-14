@@ -48,7 +48,7 @@ const statusLabels: Record<string, string> = {
   QUOTED: "Quoted",
   CONFIRMED: "Confirmed",
   PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
+  CHECKED_OUT: "Deployed",
   ON_SITE: "On Site",
   RETURNED: "Returned",
   COMPLETED: "Completed",

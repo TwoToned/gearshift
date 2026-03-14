@@ -35,7 +35,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   CONFIRMED: "Confirmed",
   PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
+  CHECKED_OUT: "Deployed",
   ON_SITE: "On Site",
   RETURNED: "Returned",
 };

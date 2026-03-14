@@ -156,7 +156,7 @@ export function KitForm({ initialData }: KitFormProps) {
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
+              <option value="CHECKED_OUT">Deployed</option>
               <option value="IN_MAINTENANCE">In Maintenance</option>
               <option value="RETIRED">Retired</option>
               <option value="INCOMPLETE">Incomplete</option>
