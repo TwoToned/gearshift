@@ -51,6 +51,7 @@ export default function EditCrewMemberPage({ params }: { params: Promise<{ id: s
         notes: member.notes || "",
         tags: member.tags || [],
         skillIds: member.skills?.map((s: { id: string }) => s.id) || [],
+        userId: member.userId || "",
         isActive: member.isActive,
       }} />
     </div>

@@ -63,6 +63,7 @@ export async function getCrewMembers(params: {
       include: {
         crewRole: { select: { id: true, name: true, color: true } },
         skills: { select: { id: true, name: true, category: true } },
+        user: { select: { id: true, name: true, image: true } },
         _count: { select: { certifications: true } },
       },
       orderBy: { [sortBy]: sortOrder },
@@ -76,7 +77,7 @@ export async function getCrewMembers(params: {
 }
 
 export async function getCrewMemberById(id: string) {
-  const { organizationId } = await getOrgContext();
+  const { organizationId, userId } = await getOrgContext();
   const crewMember = await prisma.crewMember.findUnique({
     where: { id, organizationId },
     include: {
@@ -96,14 +97,25 @@ export async function getCrewMemberById(id: string) {
     },
   });
   if (!crewMember) throw new Error("Crew member not found");
-  return serialize(crewMember);
+  // Include whether this is the current user's own crew profile
+  return serialize({ ...crewMember, isOwnProfile: crewMember.userId === userId });
+}
+
+/** Get the current user's crew member ID (if they have a linked crew profile) */
+export async function getMyCrewMemberId() {
+  const { organizationId, userId } = await getOrgContext();
+  const crewMember = await prisma.crewMember.findFirst({
+    where: { organizationId, userId },
+    select: { id: true },
+  });
+  return crewMember?.id ?? null;
 }
 
 export async function createCrewMember(data: CrewMemberFormValues) {
   const { organizationId, userId, userName } = await requirePermission("crew", "create");
   const parsed = crewMemberSchema.parse(data);
 
-  const { skillIds, ...rest } = parsed;
+  const { skillIds, userId: linkUserId, ...rest } = parsed;
 
   const cleaned = {
     firstName: rest.firstName,
@@ -127,6 +139,7 @@ export async function createCrewMember(data: CrewMemberFormValues) {
     abnOrGst: rest.abnOrGst || null,
     notes: rest.notes || null,
     tags: (rest.tags || []).map((t: string) => t.toLowerCase()),
+    userId: linkUserId || null,
   };
 
   const result = await prisma.crewMember.create({
@@ -163,7 +176,7 @@ export async function updateCrewMember(id: string, data: CrewMemberFormValues) {
   });
   if (!before) throw new Error("Crew member not found");
 
-  const { skillIds, ...rest } = parsed;
+  const { skillIds, userId: linkUserId, ...rest } = parsed;
 
   const cleaned = {
     firstName: rest.firstName,
@@ -187,6 +200,7 @@ export async function updateCrewMember(id: string, data: CrewMemberFormValues) {
     abnOrGst: rest.abnOrGst || null,
     notes: rest.notes || null,
     tags: (rest.tags || []).map((t: string) => t.toLowerCase()),
+    userId: linkUserId || null,
   };
 
   const updated = await prisma.crewMember.update({
@@ -445,6 +459,98 @@ export async function getCrewSkillOptions() {
       orderBy: { name: "asc" },
     })
   );
+}
+
+/** Get org users that can be linked to crew members */
+export async function getOrgUsersForCrewLink() {
+  const { organizationId } = await getOrgContext();
+
+  // Get all org members with user info
+  const members = await prisma.member.findMany({
+    where: { organizationId },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, image: true },
+      },
+    },
+  });
+
+  // Get already-linked user IDs in this org
+  const linked = await prisma.crewMember.findMany({
+    where: { organizationId, userId: { not: null } },
+    select: { userId: true },
+  });
+  const linkedIds = new Set(linked.map((c) => c.userId));
+
+  return serialize(
+    members.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      image: m.user.image,
+      alreadyLinked: linkedIds.has(m.user.id),
+    }))
+  );
+}
+
+/** Update crew member profile image */
+export async function updateCrewMemberImage(id: string, image: string | null) {
+  const { organizationId } = await requirePermission("crew", "update");
+  const member = await prisma.crewMember.findUnique({
+    where: { id, organizationId },
+  });
+  if (!member) throw new Error("Crew member not found");
+
+  await prisma.crewMember.update({
+    where: { id, organizationId },
+    data: { image },
+  });
+
+  return serialize({ success: true, image });
+}
+
+/** Link/unlink a crew member to a platform user */
+export async function linkCrewMemberToUser(id: string, userId: string | null) {
+  const { organizationId, userId: actorId, userName } = await requirePermission("crew", "update");
+
+  const member = await prisma.crewMember.findUnique({
+    where: { id, organizationId },
+  });
+  if (!member) throw new Error("Crew member not found");
+
+  // If linking, verify the user is a member of this org
+  if (userId) {
+    const orgMember = await prisma.member.findFirst({
+      where: { organizationId, userId },
+    });
+    if (!orgMember) throw new Error("User is not a member of this organization");
+
+    // Check not already linked to another crew member
+    const existing = await prisma.crewMember.findFirst({
+      where: { organizationId, userId, id: { not: id } },
+    });
+    if (existing) throw new Error("This user is already linked to another crew member");
+  }
+
+  const updated = await prisma.crewMember.update({
+    where: { id, organizationId },
+    data: { userId: userId || null },
+  });
+
+  await logActivity({
+    organizationId,
+    userId: actorId,
+    userName,
+    action: "UPDATE",
+    entityType: "crew_member",
+    entityId: id,
+    entityName: `${member.firstName} ${member.lastName}`,
+    summary: userId
+      ? `Linked crew member ${member.firstName} ${member.lastName} to a platform user`
+      : `Unlinked crew member ${member.firstName} ${member.lastName} from platform user`,
+  });
+
+  return serialize(updated);
 }
 
 /** Get distinct departments for filter options */

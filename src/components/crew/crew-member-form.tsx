@@ -5,12 +5,13 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { crewMemberSchema, type CrewMemberFormValues } from "@/lib/validations/crew";
-import { createCrewMember, updateCrewMember, getCrewRoleOptions, getCrewSkillOptions, createCrewSkill } from "@/server/crew";
+import { createCrewMember, updateCrewMember, getCrewRoleOptions, getCrewSkillOptions, createCrewSkill, getOrgUsersForCrewLink } from "@/server/crew";
 import { getOrgTags } from "@/server/tags";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { useOrgCountry } from "@/lib/use-org-country";
 import { TagInput } from "@/components/ui/tag-input";
@@ -58,6 +59,11 @@ export function CrewMemberForm({ initialData }: CrewMemberFormProps) {
     queryFn: () => getCrewSkillOptions(),
   });
 
+  const { data: linkableUsers } = useQuery({
+    queryKey: ["crew-linkable-users", orgId],
+    queryFn: () => getOrgUsersForCrewLink(),
+  });
+
   const form = useForm<CrewMemberFormValues>({
     resolver: zodResolver(crewMemberSchema),
     defaultValues: initialData || {
@@ -83,6 +89,7 @@ export function CrewMemberForm({ initialData }: CrewMemberFormProps) {
       notes: "",
       tags: [],
       skillIds: [],
+      userId: "",
       isActive: true,
     },
   });
@@ -98,9 +105,77 @@ export function CrewMemberForm({ initialData }: CrewMemberFormProps) {
   });
 
   const selectedSkillIds = form.watch("skillIds") || [];
+  const watchedUserId = form.watch("userId");
+  const linkedUser = (linkableUsers || []).find(
+    (u: { id: string }) => u.id === watchedUserId
+  );
+
+  // Auto-fill name and email when a user is selected
+  function handleUserChange(newUserId: string) {
+    form.setValue("userId", newUserId);
+    if (newUserId) {
+      const user = (linkableUsers || []).find((u: { id: string }) => u.id === newUserId);
+      if (user) {
+        // Auto-fill name from user account
+        if (user.name) {
+          const parts = user.name.split(" ");
+          form.setValue("firstName", parts[0] || "");
+          form.setValue("lastName", parts.slice(1).join(" ") || "");
+        }
+        if (user.email) {
+          form.setValue("email", user.email);
+        }
+      }
+    }
+  }
 
   return (
     <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            Platform Account
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Link this crew member to a platform user to sync their name, email, and profile picture.
+          </p>
+          <Controller
+            name="userId"
+            control={form.control}
+            render={({ field }) => (
+              <div className="space-y-2">
+                <ComboboxPicker
+                  value={field.value || ""}
+                  onChange={(v) => handleUserChange(v)}
+                  options={(linkableUsers || [])
+                    .filter((u: { id: string; alreadyLinked: boolean }) => !u.alreadyLinked || u.id === field.value)
+                    .map((u: { id: string; name: string | null; email: string }) => ({
+                      value: u.id,
+                      label: u.name || u.email,
+                      description: u.name ? u.email : undefined,
+                    }))}
+                  placeholder="Select user account..."
+                  allowClear
+                />
+                {linkedUser && (
+                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 p-2.5">
+                    <UserAvatar user={{ name: linkedUser.name, image: linkedUser.image }} size="md" />
+                    <div className="text-sm">
+                      <p className="font-medium">{linkedUser.name}</p>
+                      <p className="text-muted-foreground text-xs">{linkedUser.email}</p>
+                    </div>
+                    <p className="ml-auto text-xs text-muted-foreground">Name, email &amp; photo synced from account</p>
+                  </div>
+                )}
+              </div>
+            )}
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Personal Details</CardTitle>
