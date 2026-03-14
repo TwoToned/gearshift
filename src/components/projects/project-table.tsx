@@ -232,7 +232,7 @@ export function ProjectTable() {
     setPage, setPageSize, handleSort,
     columnVisibility, toggleColumnVisibility, resetPreferences,
     filters, setFilter,
-  } = useTablePreferences("projects", { sortBy: "createdAt", sortOrder: "desc" });
+  } = useTablePreferences("projects", { sortBy: "rentalStartDate", sortOrder: "asc" });
 
   const [search, setSearch] = useState("");
   const { data: activeOrg } = useActiveOrganization();

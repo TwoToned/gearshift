@@ -107,6 +107,8 @@ export default function WarehousePage() {
         search: search || undefined,
         pageSize: 100,
         includeLineItems: true,
+        sortBy: "rentalStartDate",
+        sortOrder: "asc",
       }),
   });
 
