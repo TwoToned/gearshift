@@ -103,7 +103,7 @@ export async function GET(
       );
       const dtend = buildDateTime(
         assignment.endDate || assignment.startDate || new Date(),
-        assignment.endTime
+        assignment.endTime || assignment.startTime || "23:59"
       );
 
       events.push({

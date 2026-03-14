@@ -31,7 +31,7 @@ export async function GET(
       organizationId: true,
       assignments: {
         where: {
-          status: "CONFIRMED",
+          status: { in: ["CONFIRMED", "ACCEPTED"] },
         },
         include: {
           crewRole: { select: { name: true } },
@@ -113,7 +113,7 @@ export async function GET(
       );
       const dtend = buildDateTime(
         a.endDate || a.startDate || new Date(),
-        a.endTime
+        a.endTime || a.startTime || "23:59"
       );
 
       events.push({
