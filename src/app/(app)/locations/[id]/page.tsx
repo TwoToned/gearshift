@@ -131,11 +131,11 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
         </CanDo>
       </div>
 
-      {/* Address Map */}
+      {/* Address Map — inherit from parent if child has none */}
       <AddressDisplay
-        address={location.address}
-        latitude={location.latitude}
-        longitude={location.longitude}
+        address={location.address || location.parent?.address}
+        latitude={location.latitude ?? location.parent?.latitude}
+        longitude={location.longitude ?? location.parent?.longitude}
         label={location.name}
       />
 

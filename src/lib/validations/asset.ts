@@ -42,8 +42,8 @@ export type BulkAssetFormValues = z.input<typeof bulkAssetSchema>;
 export const locationSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   address: z.string().max(500).optional(),
-  latitude: z.coerce.number().optional().nullable(),
-  longitude: z.coerce.number().optional().nullable(),
+  latitude: z.union([z.null(), z.coerce.number()]).optional(),
+  longitude: z.union([z.null(), z.coerce.number()]).optional(),
   type: z.enum(["WAREHOUSE", "VENUE", "VEHICLE", "OFFSITE"]).default("WAREHOUSE"),
   isDefault: z.boolean().default(false),
   parentId: z.string().nullable().optional(),

@@ -179,7 +179,9 @@ export function BatchCreateDialog({
                 onValueChange={(v) => v && form.setValue("equipmentClass", v as BatchCreateTestTagFormValues["equipmentClass"])}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {equipmentClassOptions.find((o) => o.value === form.watch("equipmentClass"))?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {equipmentClassOptions.map((opt) => (
@@ -197,7 +199,9 @@ export function BatchCreateDialog({
                 onValueChange={(v) => v && form.setValue("applianceType", v as BatchCreateTestTagFormValues["applianceType"])}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {applianceTypeOptions.find((o) => o.value === form.watch("applianceType"))?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {applianceTypeOptions.map((opt) => (

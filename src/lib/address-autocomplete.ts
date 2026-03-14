@@ -75,11 +75,15 @@ function formatShortAddress(addr: NominatimAddress, name?: string, query?: strin
 
   const street = houseNumber && addr.road
     ? `${houseNumber} ${addr.road}`
-    : addr.road || name || "";
-  if (street) parts.push(street);
+    : addr.road || "";
 
-  // Locality: suburb > city > town > village
+  // Include the place name (e.g. "Qtopia Sydney") if it differs from the street
   const locality = addr.suburb || addr.city || addr.town || addr.village || "";
+  if (name && name !== street && name !== locality && name !== addr.road) {
+    parts.push(name);
+  }
+
+  if (street) parts.push(street);
 
   // State abbreviation
   const cc = addr.country_code?.toLowerCase() || "";
