@@ -12,6 +12,7 @@ import { crewMemberStatusLabels, crewMemberTypeLabels, formatLabel } from "@/lib
 import { Button } from "@/components/ui/button";
 import { CanDo } from "@/components/auth/permission-gate";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,11 +32,21 @@ const columns: ColumnDef<AnyCrewMember>[] = [
     accessorKey: "lastName",
     alwaysVisible: true,
     sortKey: "lastName",
-    cell: (row) => (
-      <Link href={`/crew/${row.id}`} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
-        {row.firstName} {row.lastName}
-      </Link>
-    ),
+    cell: (row) => {
+      const avatarSrc = row.user?.image || row.image;
+      const displayName = row.user?.name || `${row.firstName} ${row.lastName}`;
+      return (
+        <Link href={`/crew/${row.id}`} className="flex items-center gap-2 font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+          <Avatar className="size-7">
+            {avatarSrc ? <AvatarImage src={avatarSrc} alt={displayName} /> : null}
+            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+              {row.firstName?.[0]}{row.lastName?.[0]}
+            </AvatarFallback>
+          </Avatar>
+          {displayName}
+        </Link>
+      );
+    },
   },
   {
     id: "role",

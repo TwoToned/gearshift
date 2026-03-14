@@ -84,6 +84,9 @@ Crew management tracks people (employees, freelancers, contractors, volunteers) 
 | `getCrewRoleOptions()` | crew.read | Dropdown options |
 | `getCrewSkillOptions()` | crew.read | Multi-select options |
 | `getCrewDepartments()` | crew.read | Distinct departments |
+| `getOrgUsersForCrewLink()` | crew.read | Org users available for linking |
+| `updateCrewMemberImage(id, image)` | crew.update | Update profile picture URL |
+| `linkCrewMemberToUser(id, userId)` | crew.update | Link/unlink crew to platform user |
 
 ### `src/server/crew-assignments.ts` (Phase 2)
 | Function | Permission | Description |
@@ -126,11 +129,36 @@ Assignment rate is resolved in this order:
 |------|-----------|-------------|
 | `/crew` | CrewDashboard / CrewTable | Manager+ sees dashboard with stats, timesheets, assignments, offers; others see crew list |
 | `/crew/new` | CrewMemberForm | Create crew member |
-| `/crew/[id]` | Detail page | Contact, rates, skills, assignments (with status management), availability, certifications, time entries, calendar |
-| `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
+| `/crew/[id]` | Detail page | Profile picture (upload/remove), contact, rates, skills, assignments (with status management), availability, certifications, time entries, calendar, linked user display |
+| `/crew/[id]/edit` | CrewMemberForm | Edit crew member (includes user account linking) |
 | `/crew/planner` | CrewPlannerPage | 14-day Gantt-style timeline of all crew |
 | `/crew/timesheets` | TimesheetsPage | All time entries with DataTable, filtering, search, edit/delete, export |
 | `/crew/settings` | CrewSettingsPage | Manage roles and skills |
+
+## Profile Pictures
+- Upload/remove via hover overlay on avatar in crew detail page header (only for unlinked crew members)
+- API route: `POST/DELETE /api/crew/avatar` — validates org ownership, resizes to 256x256 JPEG via sharp
+- Stored in S3 under `{orgId}/crew/{crewMemberId}/avatar.jpg`
+- Avatars shown in: crew table (inline with name), crew detail page header
+- Falls back to initials (first + last name) when no image
+- **Linked crew members** inherit their profile picture from the linked user account — no separate upload
+
+## User Account Linking
+- Crew members can be linked to platform users via `userId` field
+- **"Platform Account" is the first card** in the crew member form — selecting a user auto-fills first name, last name, and email
+- Linked crew members inherit **name, email, and profile picture** from the user account for display
+- Users already linked to another crew member are filtered out of the picker
+- Linked user shown in crew detail page header with link icon (hidden on own profile)
+- Server-side validation: user must be an org member, can't double-link
+- `getOrgUsersForCrewLink()` returns org members with `alreadyLinked` flag
+- `getMyCrewMemberId()` returns current user's linked crew member ID (if any)
+- `linkCrewMemberToUser(id, userId)` for programmatic linking/unlinking
+
+## Self-Access
+- Users with a linked crew profile can **always view their own crew page**, even without `crew.read` permission
+- "My Crew Profile" link appears in the user dropdown menu (next to Account Settings)
+- Own profile page shows a banner: "You are viewing your own crew profile"
+- `getCrewMemberById` returns `isOwnProfile: true` when the logged-in user matches the crew member's `userId`
 
 ## Project Detail Integration
 - **Crew tab** on project detail page (`/projects/[id]`) via `CrewPanel` component

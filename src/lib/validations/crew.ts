@@ -27,6 +27,7 @@ export const crewMemberSchema = z.object({
   notes: z.string().max(2000).optional(),
   tags: z.array(z.string()).default([]),
   skillIds: z.array(z.string()).default([]),
+  userId: z.string().optional().or(z.literal("")),
   isActive: z.boolean().default(true),
 }).refine(
   (data) => (data.addressLatitude != null) === (data.addressLongitude != null),

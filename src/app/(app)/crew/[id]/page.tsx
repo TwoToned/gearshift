@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { PageMeta } from "@/components/layout/page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,9 @@ import {
   CheckCircle,
   AlertTriangle,
   Download,
+  Camera,
+  X,
+  LinkIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -77,9 +80,9 @@ import {
   crewTimeEntrySchema,
   type CrewTimeEntryFormValues,
 } from "@/lib/validations/crew";
-import { useActiveOrganization } from "@/lib/auth-client";
+import { useActiveOrganization, useSession } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
-import { RequirePermission } from "@/components/auth/require-permission";
+import { useCanDo } from "@/lib/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,6 +120,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -203,12 +207,15 @@ export default function CrewMemberDetailPage({
   const queryClient = useQueryClient();
   const { data: activeOrg } = useActiveOrganization();
   const orgId = activeOrg?.id;
+  const { data: session } = useSession();
+  const canReadCrew = useCanDo("crew", "read");
 
   const [tabValue, setTabValue] = useState("assignments");
   const [addCertOpen, setAddCertOpen] = useState(false);
   const [addAvailOpen, setAddAvailOpen] = useState(false);
   const [addTimeOpen, setAddTimeOpen] = useState(false);
   const [editingTimeEntry, setEditingTimeEntry] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Slash command listener
   useEffect(() => {
@@ -383,41 +390,163 @@ export default function CrewMemberDetailPage({
     onError: (e) => toast.error(e.message),
   });
 
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("crewMemberId", id);
+      const res = await fetch("/api/crew/avatar", { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+      toast.success("Profile picture updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/crew/avatar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crewMemberId: id }),
+      });
+      if (!res.ok) throw new Error("Failed to remove image");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+      toast.success("Profile picture removed");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (isLoading)
     return <div className="text-muted-foreground">Loading...</div>;
   if (!member)
     return <div className="text-muted-foreground">Crew member not found.</div>;
 
-  const fullName = `${member.firstName} ${member.lastName}`;
+  const isOwnProfile = !!(member as { isOwnProfile?: boolean }).isOwnProfile;
+
+  // Allow access if user has crew.read permission OR is viewing their own profile
+  if (!canReadCrew && !isOwnProfile) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-xl font-semibold">Access Denied</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          You don&apos;t have permission to access this page.
+        </p>
+      </div>
+    );
+  }
+
+  // Resolve display values — linked users inherit name/email/image from their user account
+  const displayImage = member.user?.image || member.image;
+  const displayName = member.user
+    ? member.user.name || `${member.firstName} ${member.lastName}`
+    : `${member.firstName} ${member.lastName}`;
+  const displayEmail = member.user?.email || member.email;
+
+  const fullName = displayName;
   const certifications = member.certifications || [];
   const skills = member.skills || [];
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const assignments = (member as any).assignments || [];
 
   return (
-    <RequirePermission resource="crew" action="read">
+    <>
       <PageMeta title={fullName} />
       <div className="space-y-6">
+        {/* Own profile banner */}
+        {isOwnProfile && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            You are viewing your own crew profile.
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{fullName}</h1>
-              <Badge
-                variant="outline"
-                className={statusColors[member.status] || ""}
-              >
-                {crewMemberStatusLabels[member.status] ||
-                  formatLabel(member.status)}
-              </Badge>
-              <Badge variant="outline">
-                {crewMemberTypeLabels[member.type] || formatLabel(member.type)}
-              </Badge>
+          <div className="flex items-start gap-4">
+            {/* Profile Picture */}
+            <div className="relative group shrink-0">
+              <Avatar className="size-16 text-lg">
+                {displayImage ? (
+                  <AvatarImage src={displayImage} alt={fullName} />
+                ) : null}
+                <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
+                  {member.firstName[0]}{member.lastName[0]}
+                </AvatarFallback>
+              </Avatar>
+              {/* Only show upload controls for crew without a linked user (linked users sync from account) */}
+              {!member.user && (
+                <CanDo resource="crew" action="update">
+                  <button
+                    type="button"
+                    className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <Camera className="h-5 w-5 text-white" />
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadAvatarMutation.mutate(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {member.image && (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 rounded-full bg-destructive text-destructive-foreground p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeAvatarMutation.mutate()}
+                      title="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </CanDo>
+              )}
+              {uploadAvatarMutation.isPending && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                  <Loader2 className="h-5 w-5 text-white animate-spin" />
+                </div>
+              )}
             </div>
-            <p className="text-muted-foreground">
-              {member.crewRole?.name || "No role assigned"}
-              {member.department && <> &middot; {member.department}</>}
-            </p>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">{fullName}</h1>
+                <Badge
+                  variant="outline"
+                  className={statusColors[member.status] || ""}
+                >
+                  {crewMemberStatusLabels[member.status] ||
+                    formatLabel(member.status)}
+                </Badge>
+                <Badge variant="outline">
+                  {crewMemberTypeLabels[member.type] || formatLabel(member.type)}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground">
+                {member.crewRole?.name || "No role assigned"}
+                {member.department && <> &middot; {member.department}</>}
+              </p>
+              {member.user && !isOwnProfile && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <LinkIcon className="h-3 w-3" />
+                  Linked to {member.user.name || member.user.email}
+                </p>
+              )}
+            </div>
           </div>
           <CanDo resource="crew" action="update">
             <div className="flex gap-2">
@@ -458,14 +587,14 @@ export default function CrewMemberDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {member.email && (
+              {displayEmail && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-3.5 w-3.5" />
                   <a
-                    href={`mailto:${member.email}`}
+                    href={`mailto:${displayEmail}`}
                     className="hover:underline"
                   >
-                    {member.email}
+                    {displayEmail}
                   </a>
                 </div>
               )}
@@ -482,7 +611,7 @@ export default function CrewMemberDetailPage({
                   {member.address}
                 </p>
               )}
-              {!member.email && !member.phone && !member.address && (
+              {!displayEmail && !member.phone && !member.address && (
                 <p className="text-muted-foreground">No contact info</p>
               )}
             </CardContent>
@@ -1424,7 +1553,7 @@ export default function CrewMemberDetailPage({
             : null
         }
       />
-    </RequirePermission>
+    </>
   );
 }
 

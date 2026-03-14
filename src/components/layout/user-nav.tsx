@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut, User, ChevronsUpDown, Shield } from "lucide-react";
-import { useSession, signOut } from "@/lib/auth-client";
+import { LogOut, User, ChevronsUpDown, Shield, HardHat } from "lucide-react";
+import { useSession, signOut, useActiveOrganization } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { getProfile } from "@/server/user-profile";
+import { getMyCrewMemberId } from "@/server/crew";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ export function UserNav() {
 
   const user = session?.user;
   const isSiteAdmin = (user as Record<string, unknown>)?.role === "admin";
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
 
   // Fetch profile for up-to-date avatar (session cookie cache may be stale)
   const { data: profile } = useQuery({
@@ -32,6 +35,14 @@ export function UserNav() {
     staleTime: 60_000,
   });
   const userImage = profile?.image || user?.image;
+
+  // Check if user has a linked crew profile
+  const { data: myCrewId } = useQuery({
+    queryKey: ["my-crew-id", orgId],
+    queryFn: () => getMyCrewMemberId(),
+    staleTime: 120_000,
+    enabled: !!orgId,
+  });
 
   return (
     <DropdownMenu>
@@ -76,6 +87,12 @@ export function UserNav() {
             <User className="mr-2 h-4 w-4" />
             Account Settings
           </DropdownMenuItem>
+          {myCrewId && (
+            <DropdownMenuItem onClick={() => router.push(`/crew/${myCrewId}`)}>
+              <HardHat className="mr-2 h-4 w-4" />
+              My Crew Profile
+            </DropdownMenuItem>
+          )}
           {isSiteAdmin && (
             <DropdownMenuItem onClick={() => router.push("/admin")}>
               <Shield className="mr-2 h-4 w-4" />
