@@ -1,8 +1,9 @@
 "use client";
 
+import * as React from "react";
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
@@ -46,6 +47,32 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { UserNav } from "./user-nav";
+
+/**
+ * A plain <a> that navigates via useRouter instead of Next.js <Link>.
+ * Avoids the "removeChild" DOM conflict caused by <Link>'s internal
+ * DOM manipulation interacting with Base UI's useRender composition.
+ */
+const NavLink = React.forwardRef<
+  HTMLAnchorElement,
+  React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }
+>(function NavLink({ href, onClick, children, ...props }, ref) {
+  const router = useRouter();
+  return (
+    <a
+      ref={ref}
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        onClick?.(e);
+        router.push(href);
+      }}
+      {...props}
+    >
+      {children}
+    </a>
+  );
+});
 
 interface NavItem {
   title: string;
@@ -237,7 +264,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <div className="flex items-center">
                       <SidebarMenuButton
-                        render={<Link href={item.url!} onClick={closeMobile} />}
+                        render={<NavLink href={item.url!} onClick={closeMobile} />}
                         isActive={isActive}
                         className="flex-1"
                       >
@@ -260,7 +287,7 @@ export function AppSidebar() {
                         {visibleSubs.map((sub) => (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton
-                              render={<Link href={sub.url} onClick={closeMobile} />}
+                              render={<NavLink href={sub.url} onClick={closeMobile} />}
                               isActive={pathname === sub.url || pathname.startsWith(sub.url + "/")}
                             >
                               <sub.icon className="h-4 w-4" />
@@ -274,7 +301,7 @@ export function AppSidebar() {
                 ) : (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      render={<Link href={item.url} onClick={closeMobile} />}
+                      render={<NavLink href={item.url} onClick={closeMobile} />}
                       isActive={isActive}
                     >
                       <item.icon className="h-4 w-4" />
@@ -291,7 +318,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem className={(hasAccess("orgSettings") || hasAccess("orgMembers")) ? "" : "hidden"}>
                 <SidebarMenuButton
-                  render={<Link href="/settings" onClick={closeMobile} />}
+                  render={<NavLink href="/settings" onClick={closeMobile} />}
                   isActive={pathname.startsWith("/settings")}
                 >
                   <Settings className="h-4 w-4" />
