@@ -47,6 +47,7 @@ const segmentLabels: Record<string, string> = {
   new: "New",
   edit: "Edit",
   "pull-sheet": "Pull Sheet",
+  timesheets: "Timesheets",
 };
 
 function getPageTitle(pathname: string): string {

@@ -117,3 +117,17 @@ export const crewAvailabilitySchema = z.object({
 });
 
 export type CrewAvailabilityFormValues = z.input<typeof crewAvailabilitySchema>;
+
+export const crewTimeEntrySchema = z.object({
+  assignmentId: z.string().optional().or(z.literal("")),
+  crewMemberId: z.string().min(1, "Crew member is required"),
+  description: z.string().max(500).optional().or(z.literal("")),
+  date: z.coerce.date(),
+  startTime: z.string().min(1, "Start time is required").max(5),
+  endTime: z.string().min(1, "End time is required").max(5),
+  breakMinutes: z.union([z.literal(""), z.coerce.number().int().min(0)]).optional()
+    .transform(v => v === "" ? undefined : v),
+  notes: z.string().max(2000).optional(),
+});
+
+export type CrewTimeEntryFormValues = z.input<typeof crewTimeEntrySchema>;

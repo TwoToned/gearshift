@@ -18,8 +18,13 @@ import {
   CalendarSync,
   Copy,
   RefreshCw,
+  Clock,
+  MoreHorizontal,
+  Send,
+  CheckCircle,
+  AlertTriangle,
+  Download,
 } from "lucide-react";
-import { AddressDisplay } from "@/components/ui/address-display";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -29,6 +34,11 @@ import {
   addCertification,
   removeCertification,
 } from "@/server/crew";
+import {
+  updateAssignmentStatus,
+  deleteAssignment,
+} from "@/server/crew-assignments";
+import { sendCrewOffer } from "@/server/crew-communication";
 import {
   getCrewAvailability,
   addAvailability,
@@ -41,12 +51,22 @@ import {
   regenerateIcalToken,
 } from "@/server/crew-calendar";
 import {
+  getTimeEntriesForMember,
+  createTimeEntry,
+  updateTimeEntry,
+  deleteTimeEntry,
+  submitTimeEntries,
+  approveTimeEntries,
+  disputeTimeEntry,
+} from "@/server/crew-time";
+import {
   crewMemberStatusLabels,
   crewMemberTypeLabels,
   crewCertStatusLabels,
   assignmentStatusLabels,
   phaseLabels,
   availabilityTypeLabels,
+  timeEntryStatusLabels,
   formatLabel,
 } from "@/lib/status-labels";
 import {
@@ -54,6 +74,8 @@ import {
   type CrewCertificationFormValues,
   crewAvailabilitySchema,
   type CrewAvailabilityFormValues,
+  crewTimeEntrySchema,
+  type CrewTimeEntryFormValues,
 } from "@/lib/validations/crew";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
@@ -87,6 +109,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -132,6 +162,14 @@ const availabilityTypeColors: Record<string, string> = {
   PREFERRED: "bg-green-500/10 text-green-500 border-green-500/20",
 };
 
+const timeEntryStatusColors: Record<string, string> = {
+  DRAFT: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  SUBMITTED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  APPROVED: "bg-green-500/10 text-green-500 border-green-500/20",
+  DISPUTED: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  EXPORTED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+};
+
 const projectStatusLabels: Record<string, string> = {
   ENQUIRY: "Enquiry",
   QUOTING: "Quoting",
@@ -168,6 +206,8 @@ export default function CrewMemberDetailPage({
 
   const [addCertOpen, setAddCertOpen] = useState(false);
   const [addAvailOpen, setAddAvailOpen] = useState(false);
+  const [addTimeOpen, setAddTimeOpen] = useState(false);
+  const [editingTimeEntry, setEditingTimeEntry] = useState<string | null>(null);
 
   const { data: member, isLoading } = useQuery({
     queryKey: ["crew-member", orgId, id],
@@ -205,6 +245,11 @@ export default function CrewMemberDetailPage({
     queryFn: () => getIcalSettings(id),
   });
 
+  const { data: timeEntries } = useQuery({
+    queryKey: ["crew-time-entries", orgId, id],
+    queryFn: () => getTimeEntriesForMember(id),
+  });
+
   const enableIcalMutation = useMutation({
     mutationFn: () => enableIcalFeed(id),
     onSuccess: () => {
@@ -239,6 +284,78 @@ export default function CrewMemberDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["crew-availability", orgId, id],
       });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteTimeMutation = useMutation({
+    mutationFn: (entryId: string) => deleteTimeEntry(entryId),
+    onSuccess: () => {
+      toast.success("Time entry deleted");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const submitTimeMutation = useMutation({
+    mutationFn: (ids: string[]) => submitTimeEntries(ids),
+    onSuccess: (result) => {
+      toast.success(`${result.count} entries submitted for approval`);
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const approveTimeMutation = useMutation({
+    mutationFn: (ids: string[]) => approveTimeEntries(ids),
+    onSuccess: (result) => {
+      toast.success(`${result.count} entries approved`);
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const disputeTimeMutation = useMutation({
+    mutationFn: (entryId: string) => disputeTimeEntry(entryId),
+    onSuccess: () => {
+      toast.success("Time entry disputed");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateAssignmentStatusMutation = useMutation({
+    mutationFn: ({ assignmentId, status }: { assignmentId: string; status: string }) =>
+      updateAssignmentStatus(assignmentId, status),
+    onSuccess: () => {
+      toast.success("Assignment status updated");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: string) => deleteAssignment(assignmentId),
+    onSuccess: () => {
+      toast.success("Assignment removed");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const sendOfferMutation = useMutation({
+    mutationFn: (assignmentId: string) => sendCrewOffer(assignmentId),
+    onSuccess: () => {
+      toast.success("Offer sent");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -338,15 +455,9 @@ export default function CrewMemberDetailPage({
                 </div>
               )}
               {member.address && (
-                <div className="mt-2">
-                  <AddressDisplay
-                    address={member.address}
-                    latitude={member.addressLatitude}
-                    longitude={member.addressLongitude}
-                    label={fullName}
-                    compact
-                  />
-                </div>
+                <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
+                  {member.address}
+                </p>
               )}
               {!member.email && !member.phone && !member.address && (
                 <p className="text-muted-foreground">No contact info</p>
@@ -500,6 +611,9 @@ export default function CrewMemberDetailPage({
             <TabsTrigger value="certifications">
               Certifications ({certifications.length})
             </TabsTrigger>
+            <TabsTrigger value="time-entries">
+              Time ({timeEntries?.length || 0})
+            </TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
           </TabsList>
 
@@ -529,10 +643,11 @@ export default function CrewMemberDetailPage({
                             Phase
                           </TableHead>
                           <TableHead>Dates</TableHead>
-                          <TableHead>Assignment</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="hidden md:table-cell">
                             Project Status
                           </TableHead>
+                          <TableHead className="w-[50px]" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -553,7 +668,18 @@ export default function CrewMemberDetailPage({
                               name: string;
                               color: string | null;
                             } | null;
-                          }) => (
+                          }) => {
+                            const statusTransitions: Record<string, string[]> = {
+                              PENDING: ["OFFERED", "CONFIRMED", "CANCELLED"],
+                              OFFERED: ["CONFIRMED", "CANCELLED"],
+                              ACCEPTED: ["CONFIRMED", "CANCELLED"],
+                              DECLINED: ["PENDING"],
+                              CONFIRMED: ["COMPLETED", "CANCELLED"],
+                              CANCELLED: ["PENDING"],
+                              COMPLETED: [],
+                            };
+                            const availableStatuses = statusTransitions[a.status] || [];
+                            return (
                             <TableRow key={a.id}>
                               <TableCell>
                                 <Link
@@ -626,8 +752,58 @@ export default function CrewMemberDetailPage({
                                     a.project.status}
                                 </Badge>
                               </TableCell>
+                              <TableCell>
+                                <CanDo resource="crew" action="update">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuGroup>
+                                        {a.status === "PENDING" && member.email && (
+                                          <DropdownMenuItem
+                                            onClick={() => sendOfferMutation.mutate(a.id)}
+                                          >
+                                            <Send className="mr-2 h-4 w-4" />
+                                            Send Offer
+                                          </DropdownMenuItem>
+                                        )}
+                                        {availableStatuses.map((s) => (
+                                          <DropdownMenuItem
+                                            key={s}
+                                            onClick={() =>
+                                              updateAssignmentStatusMutation.mutate({
+                                                assignmentId: a.id,
+                                                status: s,
+                                              })
+                                            }
+                                          >
+                                            {s === "CONFIRMED" && <CheckCircle className="mr-2 h-4 w-4" />}
+                                            {s === "CANCELLED" && <AlertTriangle className="mr-2 h-4 w-4" />}
+                                            {!["CONFIRMED", "CANCELLED"].includes(s) && <Briefcase className="mr-2 h-4 w-4" />}
+                                            {assignmentStatusLabels[s] || formatLabel(s)}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <CanDo resource="crew" action="delete">
+                                          <DropdownMenuItem
+                                            className="text-destructive"
+                                            onClick={() => {
+                                              if (confirm("Remove this assignment?"))
+                                                deleteAssignmentMutation.mutate(a.id);
+                                            }}
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Remove
+                                          </DropdownMenuItem>
+                                        </CanDo>
+                                      </DropdownMenuGroup>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </CanDo>
+                              </TableCell>
                             </TableRow>
-                          )
+                            );
+                          }
                         )}
                       </TableBody>
                     </Table>
@@ -866,6 +1042,241 @@ export default function CrewMemberDetailPage({
           </TabsContent>
 
           {/* Calendar Tab */}
+          {/* Time Entries Tab */}
+          <TabsContent value="time-entries" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Time Entries
+                </CardTitle>
+                <div className="flex gap-2">
+                  {timeEntries && timeEntries.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={
+                        <a
+                          href={`/api/crew/timesheet?crewMemberId=${id}`}
+                          download
+                        />
+                      }
+                    >
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      Export CSV
+                    </Button>
+                  )}
+                  {/* Bulk submit all drafts */}
+                  {timeEntries &&
+                    timeEntries.filter(
+                      (e: { status: string }) => e.status === "DRAFT"
+                    ).length > 0 && (
+                      <CanDo resource="crew" action="update">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const draftIds = timeEntries
+                              .filter(
+                                (e: { status: string }) =>
+                                  e.status === "DRAFT"
+                              )
+                              .map((e: { id: string }) => e.id);
+                            submitTimeMutation.mutate(draftIds);
+                          }}
+                          disabled={submitTimeMutation.isPending}
+                        >
+                          <Send className="mr-2 h-3.5 w-3.5" />
+                          Submit All Drafts
+                        </Button>
+                      </CanDo>
+                    )}
+                  {/* Bulk approve all submitted */}
+                  {timeEntries &&
+                    timeEntries.filter(
+                      (e: { status: string }) => e.status === "SUBMITTED"
+                    ).length > 0 && (
+                      <CanDo resource="crew" action="update">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const submittedIds = timeEntries
+                              .filter(
+                                (e: { status: string }) =>
+                                  e.status === "SUBMITTED"
+                              )
+                              .map((e: { id: string }) => e.id);
+                            approveTimeMutation.mutate(submittedIds);
+                          }}
+                          disabled={approveTimeMutation.isPending}
+                        >
+                          <CheckCircle className="mr-2 h-3.5 w-3.5" />
+                          Approve All
+                        </Button>
+                      </CanDo>
+                    )}
+                  <CanDo resource="crew" action="create">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingTimeEntry(null);
+                        setAddTimeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-3.5 w-3.5" />
+                      Log Time
+                    </Button>
+                  </CanDo>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!timeEntries || timeEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No time entries recorded yet.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead>Break</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* eslint-disable @typescript-eslint/no-explicit-any */}
+                      {timeEntries.map((entry: any) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="text-sm">
+                            {formatDate(entry.date)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.assignment ? (
+                              <>
+                                {entry.assignment.project?.projectNumber} —{" "}
+                                {entry.assignment.project?.name}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground italic">
+                                {entry.description || "General"}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.assignment?.crewRole?.name || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.startTime}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.endTime}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.breakMinutes > 0
+                              ? `${entry.breakMinutes}m`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.totalHours != null
+                              ? `${Number(entry.totalHours).toFixed(1)}h`
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                timeEntryStatusColors[entry.status] || ""
+                              }
+                            >
+                              {timeEntryStatusLabels[entry.status] ||
+                                formatLabel(entry.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {entry.status !== "EXPORTED" && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button variant="ghost" size="icon" />
+                                  }
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuGroup>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setEditingTimeEntry(entry.id);
+                                        setAddTimeOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    {["DRAFT", "DISPUTED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          submitTimeMutation.mutate([entry.id])
+                                        }
+                                      >
+                                        <Send className="mr-2 h-4 w-4" />
+                                        Submit
+                                      </DropdownMenuItem>
+                                    )}
+                                    {["SUBMITTED", "DISPUTED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          approveTimeMutation.mutate([
+                                            entry.id,
+                                          ])
+                                        }
+                                      >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Approve
+                                      </DropdownMenuItem>
+                                    )}
+                                    {["SUBMITTED", "APPROVED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          disputeTimeMutation.mutate(
+                                            entry.id
+                                          )
+                                        }
+                                      >
+                                        <AlertTriangle className="mr-2 h-4 w-4" />
+                                        Dispute
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() =>
+                                        deleteTimeMutation.mutate(entry.id)
+                                      }
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuGroup>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="calendar" className="mt-4">
             <Card>
               <CardHeader>
@@ -971,6 +1382,24 @@ export default function CrewMemberDetailPage({
         crewMemberId={id}
         open={addAvailOpen}
         onOpenChange={setAddAvailOpen}
+      />
+
+      {/* Add/Edit Time Entry Dialog */}
+      <AddTimeEntryDialog
+        crewMemberId={id}
+        assignments={assignments}
+        open={addTimeOpen}
+        onOpenChange={(open) => {
+          setAddTimeOpen(open);
+          if (!open) setEditingTimeEntry(null);
+        }}
+        editingEntry={
+          editingTimeEntry
+            ? timeEntries?.find(
+                (e: { id: string }) => e.id === editingTimeEntry
+              )
+            : null
+        }
       />
     </RequirePermission>
   );
@@ -1246,6 +1675,268 @@ function AddAvailabilityDialog({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Add Block
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add/Edit Time Entry Dialog ─────────────────────────────────────────────
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function AddTimeEntryDialog({
+  crewMemberId,
+  assignments,
+  open,
+  onOpenChange,
+  editingEntry,
+}: {
+  crewMemberId: string;
+  assignments: any[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingEntry?: any;
+}) {
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const isEditing = !!editingEntry;
+  const [isGeneral, setIsGeneral] = useState(false);
+
+  const form = useForm<CrewTimeEntryFormValues>({
+    resolver: zodResolver(crewTimeEntrySchema),
+    defaultValues: {
+      assignmentId: "",
+      crewMemberId,
+      description: "",
+      date: "",
+      startTime: "",
+      endTime: "",
+      breakMinutes: "",
+      notes: "",
+    },
+  });
+
+  // Reset form when editing entry changes
+  const resetKey = `${open}-${editingEntry?.id}`;
+  const [prevKey, setPrevKey] = useState(resetKey);
+  if (prevKey !== resetKey) {
+    setPrevKey(resetKey);
+    if (open && editingEntry) {
+      const isGen = !editingEntry.assignmentId;
+      setIsGeneral(isGen);
+      form.reset({
+        assignmentId: editingEntry.assignmentId || "",
+        crewMemberId,
+        description: editingEntry.description || "",
+        date: editingEntry.date
+          ? new Date(editingEntry.date).toISOString().split("T")[0]
+          : "",
+        startTime: editingEntry.startTime || "",
+        endTime: editingEntry.endTime || "",
+        breakMinutes: editingEntry.breakMinutes || "",
+        notes: editingEntry.notes || "",
+      });
+    } else if (open) {
+      setIsGeneral(false);
+      form.reset({
+        assignmentId: assignments.length === 1 ? assignments[0].id : "",
+        crewMemberId,
+        description: "",
+        date: new Date().toISOString().split("T")[0],
+        startTime: "",
+        endTime: "",
+        breakMinutes: "",
+        notes: "",
+      });
+    }
+  }
+
+  const createMutation = useMutation({
+    mutationFn: (data: CrewTimeEntryFormValues) => createTimeEntry(data),
+    onSuccess: () => {
+      toast.success("Time entry added");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: CrewTimeEntryFormValues) =>
+      updateTimeEntry(editingEntry?.id, data),
+    onSuccess: () => {
+      toast.success("Time entry updated");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const mutation = isEditing ? updateMutation : createMutation;
+
+  // Active (non-cancelled/declined) assignments for the picker
+  const activeAssignments = assignments.filter(
+    (a: any) => !["CANCELLED", "DECLINED"].includes(a.status)
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? "Edit Time Entry" : "Log Time"}
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={form.handleSubmit((data) => {
+            // Clear assignmentId if general shift
+            if (isGeneral) data.assignmentId = "";
+            mutation.mutate(data);
+          })}
+          className="space-y-4"
+        >
+          {/* Type toggle */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={!isGeneral ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setIsGeneral(false);
+                form.setValue("description", "");
+              }}
+            >
+              <Briefcase className="mr-2 h-3.5 w-3.5" />
+              Project
+            </Button>
+            <Button
+              type="button"
+              variant={isGeneral ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setIsGeneral(true);
+                form.setValue("assignmentId", "");
+              }}
+            >
+              <Clock className="mr-2 h-3.5 w-3.5" />
+              General
+            </Button>
+          </div>
+
+          {!isGeneral ? (
+            <div className="space-y-1.5">
+              <Label>Assignment</Label>
+              <Select
+                value={form.watch("assignmentId") || ""}
+                onValueChange={(v) =>
+                  form.setValue("assignmentId", v || "")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {(() => {
+                      const selected = activeAssignments.find(
+                        (a: any) => a.id === form.watch("assignmentId")
+                      );
+                      if (!selected) return "Select assignment";
+                      return `${selected.project?.projectNumber} — ${selected.project?.name}${selected.crewRole?.name ? ` (${selected.crewRole.name})` : ""}`;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {activeAssignments.map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.project?.projectNumber} — {a.project?.name}
+                      {a.crewRole?.name ? ` (${a.crewRole.name})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input
+                placeholder="e.g. Warehouse maintenance, Office admin..."
+                {...form.register("description")}
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Date</Label>
+            <Input type="date" {...form.register("date")} />
+            {form.formState.errors.date && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.date.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Start Time</Label>
+              <Input type="time" {...form.register("startTime")} />
+              {form.formState.errors.startTime && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.startTime.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>End Time</Label>
+              <Input type="time" {...form.register("endTime")} />
+              {form.formState.errors.endTime && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.endTime.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Break (minutes)</Label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0"
+              {...form.register("breakMinutes")}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Notes</Label>
+            <Textarea
+              placeholder="Optional notes..."
+              {...form.register("notes")}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isEditing ? "Update" : "Log Time"}
             </Button>
           </DialogFooter>
         </form>

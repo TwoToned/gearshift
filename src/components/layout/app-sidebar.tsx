@@ -24,6 +24,7 @@ import {
   Tags,
   Truck,
   HardHat,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { usePlatformBranding } from "@/lib/use-platform-name";
@@ -141,6 +142,7 @@ const navItems: NavItem[] = [
     resource: "crew",
     items: [
       { title: "Planner", url: "/crew/planner", icon: CalendarRange, resource: "crew" },
+      { title: "Timesheets", url: "/crew/timesheets", icon: Clock, resource: "crew" },
       { title: "Roles & Skills", url: "/crew/settings", icon: Settings, resource: "crew" },
     ],
   },

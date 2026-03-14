@@ -124,7 +124,7 @@ Assignment rate is resolved in this order:
 ## Pages
 | Path | Component | Description |
 |------|-----------|-------------|
-| `/crew` | CrewTable | Paginated list with search/filter |
+| `/crew` | CrewDashboard / CrewTable | Manager+ sees dashboard with stats, timesheets, assignments, offers; others see crew list |
 | `/crew/new` | CrewMemberForm | Create crew member |
 | `/crew/[id]` | Detail page | Contact, rates, skills, assignments, availability, certifications, calendar |
 | `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
@@ -240,6 +240,15 @@ Resource `crew` with actions: `read, create, update, delete`
 - manager: create, read, update
 - member/staff/warehouse/viewer: read
 
+## Crew Dashboard (`src/server/crew-dashboard.ts`)
+- Manager/admin/owner only — users with `crew.update` permission see the dashboard; others see the crew table
+- **Stats**: active crew, assignments, pending offers, submitted timesheets, hours (7d), expiring certs
+- **Pending Timesheets**: approve/dispute individual or bulk from dashboard
+- **Active Assignments**: links to project detail
+- **Upcoming Shifts**: next 10 scheduled shifts
+- **Pending Offers**: send offer directly from dashboard
+- **Crew List**: embedded crew table at the bottom
+
 ## Integration Points
 - **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Roles & Skills. Gated by `crew` resource
 - **Top bar**: `crew` segment label
@@ -259,8 +268,44 @@ Resource `crew` with actions: `read, create, update, delete`
 ## Status Labels (`src/lib/status-labels.ts`)
 - `crewMemberStatusLabels`, `crewMemberTypeLabels`, `crewCertStatusLabels`
 - `crewRateTypeLabels`, `assignmentStatusLabels`, `phaseLabels`, `shiftStatusLabels`
-- `availabilityTypeLabels`
+- `availabilityTypeLabels`, `timeEntryStatusLabels`
+
+## Time Tracking (Phase 6)
+
+### Data Model — `CrewTimeEntry`
+- `id, organizationId, assignmentId? (optional — null for general shifts), crewMemberId`
+- `description?` — freeform label for standalone shifts (e.g. "Warehouse maintenance")
+- `date, startTime, endTime, breakMinutes, totalHours?`
+- `status` — DRAFT, SUBMITTED, APPROVED, DISPUTED, EXPORTED
+- `approvedById?, approvedAt?, notes?`
+- Indexes: `[organizationId]`, `[assignmentId]`, `[crewMemberId, date]`
+
+### Status Flow
+```
+DRAFT → SUBMITTED → APPROVED → EXPORTED
+                   → DISPUTED → (edit) → DRAFT
+```
+
+### Server Actions (`src/server/crew-time.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getTimeEntriesForMember(crewMemberId)` | crew.read | All time entries for a crew member |
+| `getTimeEntriesForProject(projectId)` | crew.read | All time entries for a project |
+| `createTimeEntry(data)` | crew.create | Log time entry, auto-calculates totalHours |
+| `updateTimeEntry(id, data)` | crew.update | Edit (only DRAFT/DISPUTED entries) |
+| `deleteTimeEntry(id)` | crew.delete | Delete (only DRAFT entries) |
+| `submitTimeEntries(ids)` | crew.update | Batch DRAFT → SUBMITTED |
+| `approveTimeEntries(ids)` | crew.update | Batch SUBMITTED → APPROVED |
+| `disputeTimeEntry(id, reason?)` | crew.update | SUBMITTED → DISPUTED |
+| `exportTimesheetCSV(filters?)` | crew.read | CSV export with date/project/member filters |
+
+### API Routes
+- `GET /api/crew/timesheet?dateFrom=...&dateTo=...&crewMemberId=...&projectId=...` — CSV download
+
+### UI
+- **Crew detail page**: "Time" tab with table of all entries, add/edit dialog, bulk submit/approve buttons, CSV export
+- **Log Time dialog**: Toggle between "Project" (linked to assignment) and "General" (standalone shift with description)
+- **Actions per entry**: Edit (DRAFT/DISPUTED), Submit (DRAFT), Approve (SUBMITTED), Dispute (SUBMITTED), Delete (DRAFT)
 
 ## Future Phases (not yet implemented)
-- Phase 6: Time tracking & payroll
 - Phase 7: Crew portal

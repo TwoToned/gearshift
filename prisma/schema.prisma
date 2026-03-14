@@ -47,6 +47,7 @@ model User {
   supplierOrders          SupplierOrder[]
   crewMembers             CrewMember[]
   confirmedAssignments    CrewAssignment[] @relation("ConfirmedBy")
+  approvedTimeEntries     CrewTimeEntry[]  @relation("TimeEntryApprovedBy")
 
   @@map("user")
 }
@@ -141,6 +142,7 @@ model Organization {
   crewRoles          CrewRole[]
   crewSkills         CrewSkill[]
   crewAssignments    CrewAssignment[]
+  crewTimeEntries    CrewTimeEntry[]
   @@map("organization")
 }
 
@@ -1430,6 +1432,7 @@ model CrewMember {
   certifications  CrewCertification[]
   assignments     CrewAssignment[]
   availability    CrewAvailability[]
+  timeEntries     CrewTimeEntry[]
   crewRoleId      String?
   crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
 
@@ -1570,6 +1573,7 @@ model CrewAssignment {
   confirmedBy     User?    @relation("ConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
 
   shifts          CrewShift[]
+  timeEntries     CrewTimeEntry[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1656,4 +1660,48 @@ enum AvailabilityType {
   UNAVAILABLE
   TENTATIVE
   PREFERRED
+}
+
+// ── Time Tracking ──────────────────────────────────────────────────
+
+model CrewTimeEntry {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  assignmentId    String?
+  assignment      CrewAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  description     String?          // For standalone shifts not linked to a project
+
+  date            DateTime
+  startTime       String
+  endTime         String
+  breakMinutes    Int      @default(0)
+  totalHours      Decimal? @db.Decimal(6, 2)
+
+  status          TimeEntryStatus @default(DRAFT)
+  approvedById    String?
+  approvedBy      User?    @relation("TimeEntryApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([crewMemberId, date])
+  @@map("crew_time_entry")
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  DISPUTED
+  EXPORTED
 }

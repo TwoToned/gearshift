@@ -194,6 +194,15 @@ export const shiftStatusLabels: Record<string, string> = {
   NO_SHOW: "No Show",
 };
 
+// --- Time Entry Status ---
+export const timeEntryStatusLabels: Record<string, string> = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  DISPUTED: "Disputed",
+  EXPORTED: "Exported",
+};
+
 // --- Availability Type ---
 export const availabilityTypeLabels: Record<string, string> = {
   UNAVAILABLE: "Unavailable",
