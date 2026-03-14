@@ -24,6 +24,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { LineItemsPanel } from "@/components/projects/line-items-panel";
+import { CrewPanel } from "@/components/projects/crew-panel";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useActiveOrganization } from "@/lib/auth-client";
@@ -35,6 +36,7 @@ import {
   archiveProject,
   deleteProject,
 } from "@/server/projects";
+import { getProjectLabourCost } from "@/server/crew-assignments";
 import { DuplicateProjectDialog } from "@/components/projects/duplicate-project-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -277,6 +279,11 @@ export default function ProjectDetailPage({
                 >
                   Return Sheet
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => window.open(`/api/documents/call-sheet/${id}`, "_blank")}
+                >
+                  Call Sheet
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -352,6 +359,7 @@ export default function ProjectDetailPage({
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="equipment">Equipment</TabsTrigger>
+          <TabsTrigger value="crew">Crew</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="files">Files ({(project.media || []).length})</TabsTrigger>
         </TabsList>
@@ -546,7 +554,7 @@ export default function ProjectDetailPage({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-7 text-sm">
+                  <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-8 text-sm">
                     <div>
                       <span className="text-muted-foreground">Subtotal</span>
                       <p className="font-medium">
@@ -600,6 +608,12 @@ export default function ProjectDetailPage({
                       <p className="font-medium">
                         {formatCurrency(project.depositPaid as number | null)}
                       </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Est. Labour
+                      </span>
+                      <LabourCostDisplay projectId={id} />
                     </div>
                   </div>
                 </CardContent>
@@ -669,6 +683,13 @@ export default function ProjectDetailPage({
                   : undefined
               }
             />
+          </div>
+        </TabsContent>
+
+        {/* Crew Tab */}
+        <TabsContent value="crew">
+          <div className="pt-4">
+            <CrewPanel projectId={id} />
           </div>
         </TabsContent>
 
@@ -747,5 +768,19 @@ export default function ProjectDetailPage({
       />
     )}
     </RequirePermission>
+  );
+}
+
+function LabourCostDisplay({ projectId }: { projectId: string }) {
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+  const { data } = useQuery({
+    queryKey: ["project-labour-cost", orgId, projectId],
+    queryFn: () => getProjectLabourCost(projectId),
+  });
+  return (
+    <p className="font-medium">
+      {data ? formatCurrency(Number(data.totalLabourCost)) : "—"}
+    </p>
   );
 }

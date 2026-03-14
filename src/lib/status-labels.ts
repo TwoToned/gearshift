@@ -131,6 +131,85 @@ export const locationTypeLabels: Record<string, string> = {
   OFFSITE: "Offsite",
 };
 
+// --- Crew Member Status ---
+export const crewMemberStatusLabels: Record<string, string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  ON_LEAVE: "On Leave",
+  ARCHIVED: "Archived",
+};
+
+// --- Crew Member Type ---
+export const crewMemberTypeLabels: Record<string, string> = {
+  EMPLOYEE: "Employee",
+  FREELANCER: "Freelancer",
+  CONTRACTOR: "Contractor",
+  VOLUNTEER: "Volunteer",
+};
+
+// --- Crew Certification Status ---
+export const crewCertStatusLabels: Record<string, string> = {
+  CURRENT: "Current",
+  EXPIRING_SOON: "Expiring Soon",
+  EXPIRED: "Expired",
+  NOT_VERIFIED: "Not Verified",
+};
+
+// --- Crew Rate Type ---
+export const crewRateTypeLabels: Record<string, string> = {
+  HOURLY: "Hourly",
+  DAILY: "Daily",
+  FLAT: "Flat",
+};
+
+// --- Crew Assignment Status ---
+export const assignmentStatusLabels: Record<string, string> = {
+  PENDING: "Pending",
+  OFFERED: "Offered",
+  ACCEPTED: "Accepted",
+  DECLINED: "Declined",
+  CONFIRMED: "Confirmed",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+};
+
+// --- Project Phase ---
+export const phaseLabels: Record<string, string> = {
+  BUMP_IN: "Bump In",
+  EVENT: "Event",
+  BUMP_OUT: "Bump Out",
+  DELIVERY: "Delivery",
+  PICKUP: "Pickup",
+  SETUP: "Setup",
+  REHEARSAL: "Rehearsal",
+  FULL_DURATION: "Full Duration",
+};
+
+// --- Shift Status ---
+export const shiftStatusLabels: Record<string, string> = {
+  SCHEDULED: "Scheduled",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  NO_SHOW: "No Show",
+};
+
+// --- Time Entry Status ---
+export const timeEntryStatusLabels: Record<string, string> = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  DISPUTED: "Disputed",
+  EXPORTED: "Exported",
+};
+
+// --- Availability Type ---
+export const availabilityTypeLabels: Record<string, string> = {
+  UNAVAILABLE: "Unavailable",
+  TENTATIVE: "Tentative",
+  PREFERRED: "Preferred",
+};
+
 /**
  * Generic fallback: converts ANY_ENUM_VALUE to "Any Enum Value".
  * Use the specific label maps above when possible.

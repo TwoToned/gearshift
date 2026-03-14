@@ -30,6 +30,7 @@ const segmentLabels: Record<string, string> = {
   clients: "Clients",
   suppliers: "Suppliers",
   orders: "Orders",
+  crew: "Crew",
   locations: "Locations",
   maintenance: "Maintenance",
   "test-and-tag": "Test & Tag",
@@ -46,6 +47,8 @@ const segmentLabels: Record<string, string> = {
   new: "New",
   edit: "Edit",
   "pull-sheet": "Pull Sheet",
+  timesheets: "Timesheets",
+  planner: "Planner",
 };
 
 function getPageTitle(pathname: string): string {

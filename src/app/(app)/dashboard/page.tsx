@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ScanBarcode,
   Zap,
+  HardHat,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +60,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <StatCard
           title="Total Assets"
           value={stats?.totalAssets ?? "—"}
@@ -95,6 +96,21 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           href="/projects"
           alert={!!stats?.overdueReturns}
+        />
+        <StatCard
+          title="Active Crew"
+          value={stats?.activeCrew ?? "—"}
+          description="Crew members"
+          icon={HardHat}
+          href="/crew"
+        />
+        <StatCard
+          title="Crew Offers"
+          value={stats?.pendingCrewOffers ?? "—"}
+          description="Pending & offered"
+          icon={HardHat}
+          href="/crew"
+          alert={!!stats?.pendingCrewOffers}
         />
       </div>
 

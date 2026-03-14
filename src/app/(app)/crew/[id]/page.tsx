@@ -1,0 +1,1969 @@
+"use client";
+
+import { use, useEffect, useState } from "react";
+import Link from "next/link";
+import { PageMeta } from "@/components/layout/page-meta";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Pencil,
+  Mail,
+  Phone,
+  Trash2,
+  Plus,
+  Loader2,
+  Briefcase,
+  CalendarOff,
+  CalendarSync,
+  Copy,
+  RefreshCw,
+  Clock,
+  MoreHorizontal,
+  Send,
+  CheckCircle,
+  AlertTriangle,
+  Download,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import {
+  getCrewMemberById,
+  deleteCrewMember,
+  addCertification,
+  removeCertification,
+} from "@/server/crew";
+import {
+  updateAssignmentStatus,
+  deleteAssignment,
+} from "@/server/crew-assignments";
+import { sendCrewOffer } from "@/server/crew-communication";
+import {
+  getCrewAvailability,
+  addAvailability,
+  removeAvailability,
+} from "@/server/crew-availability";
+import {
+  getIcalSettings,
+  enableIcalFeed,
+  disableIcalFeed,
+  regenerateIcalToken,
+} from "@/server/crew-calendar";
+import {
+  getTimeEntriesForMember,
+  createTimeEntry,
+  updateTimeEntry,
+  deleteTimeEntry,
+  submitTimeEntries,
+  approveTimeEntries,
+  disputeTimeEntry,
+} from "@/server/crew-time";
+import {
+  crewMemberStatusLabels,
+  crewMemberTypeLabels,
+  crewCertStatusLabels,
+  assignmentStatusLabels,
+  phaseLabels,
+  availabilityTypeLabels,
+  timeEntryStatusLabels,
+  formatLabel,
+} from "@/lib/status-labels";
+import {
+  crewCertificationSchema,
+  type CrewCertificationFormValues,
+  crewAvailabilitySchema,
+  type CrewAvailabilityFormValues,
+  crewTimeEntrySchema,
+  type CrewTimeEntryFormValues,
+} from "@/lib/validations/crew";
+import { useActiveOrganization } from "@/lib/auth-client";
+import { CanDo } from "@/components/auth/permission-gate";
+import { RequirePermission } from "@/components/auth/require-permission";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+
+const statusColors: Record<string, string> = {
+  ACTIVE: "bg-green-500/10 text-green-500 border-green-500/20",
+  INACTIVE: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  ON_LEAVE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  ARCHIVED: "bg-red-500/10 text-red-500 border-red-500/20",
+};
+
+const certStatusColors: Record<string, string> = {
+  CURRENT: "bg-green-500/10 text-green-500 border-green-500/20",
+  EXPIRING_SOON: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  EXPIRED: "bg-red-500/10 text-red-500 border-red-500/20",
+  NOT_VERIFIED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+};
+
+const assignmentStatusColors: Record<string, string> = {
+  PENDING: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  OFFERED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  ACCEPTED: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+  DECLINED: "bg-red-500/10 text-red-500 border-red-500/20",
+  CONFIRMED: "bg-green-500/10 text-green-500 border-green-500/20",
+  CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
+  COMPLETED: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
+const projectStatusColors: Record<string, string> = {
+  ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  QUOTING: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  QUOTED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CONFIRMED: "bg-green-500/10 text-green-500 border-green-500/20",
+  PREPPING: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  ON_SITE: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  RETURNED: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+  COMPLETED: "bg-green-500/10 text-green-500 border-green-500/20",
+  INVOICED: "bg-green-500/10 text-green-500 border-green-500/20",
+  CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
+};
+
+const availabilityTypeColors: Record<string, string> = {
+  UNAVAILABLE: "bg-red-500/10 text-red-500 border-red-500/20",
+  TENTATIVE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  PREFERRED: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
+const timeEntryStatusColors: Record<string, string> = {
+  DRAFT: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  SUBMITTED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  APPROVED: "bg-green-500/10 text-green-500 border-green-500/20",
+  DISPUTED: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  EXPORTED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+};
+
+const projectStatusLabels: Record<string, string> = {
+  ENQUIRY: "Enquiry",
+  QUOTING: "Quoting",
+  QUOTED: "Quoted",
+  CONFIRMED: "Confirmed",
+  PREPPING: "Prepping",
+  CHECKED_OUT: "Deployed",
+  ON_SITE: "On Site",
+  RETURNED: "Returned",
+  COMPLETED: "Completed",
+  INVOICED: "Invoiced",
+  CANCELLED: "Cancelled",
+};
+
+function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return "\u2014";
+  return new Date(date).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function CrewMemberDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const [tabValue, setTabValue] = useState("assignments");
+  const [addCertOpen, setAddCertOpen] = useState(false);
+  const [addAvailOpen, setAddAvailOpen] = useState(false);
+  const [addTimeOpen, setAddTimeOpen] = useState(false);
+  const [editingTimeEntry, setEditingTimeEntry] = useState<string | null>(null);
+
+  // Slash command listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { event, dialog } = ce.detail || {};
+
+      // Tab switching
+      if (event?.startsWith("switch-tab:")) {
+        const tab = event.replace("switch-tab:", "");
+        setTabValue(tab);
+      }
+
+      // Dialog opening
+      if (dialog === "add-availability") setAddAvailOpen(true);
+      if (dialog === "add-certification") setAddCertOpen(true);
+      if (dialog === "add-time-entry") setAddTimeOpen(true);
+    };
+
+    window.addEventListener("slash-command", handler);
+    return () => window.removeEventListener("slash-command", handler);
+  }, []);
+
+  const { data: member, isLoading } = useQuery({
+    queryKey: ["crew-member", orgId, id],
+    queryFn: () => getCrewMemberById(id),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCrewMember(id),
+    onSuccess: () => {
+      toast.success("Crew member deleted");
+      queryClient.invalidateQueries({ queryKey: ["crew-members"] });
+      router.push("/crew");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeCertMutation = useMutation({
+    mutationFn: (certId: string) => removeCertification(certId),
+    onSuccess: () => {
+      toast.success("Certification removed");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-member", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const { data: availabilityRecords } = useQuery({
+    queryKey: ["crew-availability", orgId, id],
+    queryFn: () => getCrewAvailability(id),
+  });
+
+  const { data: icalSettings } = useQuery({
+    queryKey: ["crew-ical", orgId, id],
+    queryFn: () => getIcalSettings(id),
+  });
+
+  const { data: timeEntries } = useQuery({
+    queryKey: ["crew-time-entries", orgId, id],
+    queryFn: () => getTimeEntriesForMember(id),
+  });
+
+  const enableIcalMutation = useMutation({
+    mutationFn: () => enableIcalFeed(id),
+    onSuccess: () => {
+      toast.success("iCal feed enabled");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const disableIcalMutation = useMutation({
+    mutationFn: () => disableIcalFeed(id),
+    onSuccess: () => {
+      toast.success("iCal feed disabled");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const regenerateTokenMutation = useMutation({
+    mutationFn: () => regenerateIcalToken(id),
+    onSuccess: () => {
+      toast.success("iCal token regenerated — old URL is now invalid");
+      queryClient.invalidateQueries({ queryKey: ["crew-ical", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeAvailMutation = useMutation({
+    mutationFn: (availId: string) => removeAvailability(availId),
+    onSuccess: () => {
+      toast.success("Availability block removed");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-availability", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteTimeMutation = useMutation({
+    mutationFn: (entryId: string) => deleteTimeEntry(entryId),
+    onSuccess: () => {
+      toast.success("Time entry deleted");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const submitTimeMutation = useMutation({
+    mutationFn: (ids: string[]) => submitTimeEntries(ids),
+    onSuccess: (result) => {
+      toast.success(`${result.count} entries submitted for approval`);
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const approveTimeMutation = useMutation({
+    mutationFn: (ids: string[]) => approveTimeEntries(ids),
+    onSuccess: (result) => {
+      toast.success(`${result.count} entries approved`);
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const disputeTimeMutation = useMutation({
+    mutationFn: (entryId: string) => disputeTimeEntry(entryId),
+    onSuccess: () => {
+      toast.success("Time entry disputed");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, id],
+      });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateAssignmentStatusMutation = useMutation({
+    mutationFn: ({ assignmentId, status }: { assignmentId: string; status: string }) =>
+      updateAssignmentStatus(assignmentId, status),
+    onSuccess: () => {
+      toast.success("Assignment status updated");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: string) => deleteAssignment(assignmentId),
+    onSuccess: () => {
+      toast.success("Assignment removed");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const sendOfferMutation = useMutation({
+    mutationFn: (assignmentId: string) => sendCrewOffer(assignmentId),
+    onSuccess: () => {
+      toast.success("Offer sent");
+      queryClient.invalidateQueries({ queryKey: ["crew-member", orgId, id] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  if (isLoading)
+    return <div className="text-muted-foreground">Loading...</div>;
+  if (!member)
+    return <div className="text-muted-foreground">Crew member not found.</div>;
+
+  const fullName = `${member.firstName} ${member.lastName}`;
+  const certifications = member.certifications || [];
+  const skills = member.skills || [];
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const assignments = (member as any).assignments || [];
+
+  return (
+    <RequirePermission resource="crew" action="read">
+      <PageMeta title={fullName} />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">{fullName}</h1>
+              <Badge
+                variant="outline"
+                className={statusColors[member.status] || ""}
+              >
+                {crewMemberStatusLabels[member.status] ||
+                  formatLabel(member.status)}
+              </Badge>
+              <Badge variant="outline">
+                {crewMemberTypeLabels[member.type] || formatLabel(member.type)}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              {member.crewRole?.name || "No role assigned"}
+              {member.department && <> &middot; {member.department}</>}
+            </p>
+          </div>
+          <CanDo resource="crew" action="update">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                render={<Link href={`/crew/${id}/edit`} />}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              <CanDo resource="crew" action="delete">
+                <Button
+                  variant="outline"
+                  className="text-destructive"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Delete this crew member? This cannot be undone."
+                      )
+                    )
+                      deleteMutation.mutate();
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </CanDo>
+            </div>
+          </CanDo>
+        </div>
+
+        {/* Info Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Contact
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {member.email && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Mail className="h-3.5 w-3.5" />
+                  <a
+                    href={`mailto:${member.email}`}
+                    className="hover:underline"
+                  >
+                    {member.email}
+                  </a>
+                </div>
+              )}
+              {member.phone && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5" />
+                  <a href={`tel:${member.phone}`} className="hover:underline">
+                    {member.phone}
+                  </a>
+                </div>
+              )}
+              {member.address && (
+                <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
+                  {member.address}
+                </p>
+              )}
+              {!member.email && !member.phone && !member.address && (
+                <p className="text-muted-foreground">No contact info</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Rates
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Day Rate</span>
+                <span className="font-medium">
+                  {member.defaultDayRate != null
+                    ? `$${Number(member.defaultDayRate).toFixed(2)}`
+                    : "\u2014"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Hourly Rate</span>
+                <span className="font-medium">
+                  {member.defaultHourlyRate != null
+                    ? `$${Number(member.defaultHourlyRate).toFixed(2)}`
+                    : "\u2014"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>OT Multiplier</span>
+                <span className="font-medium">
+                  {member.overtimeMultiplier != null
+                    ? `${Number(member.overtimeMultiplier)}x`
+                    : "\u2014"}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Emergency Contact
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
+              {member.emergencyContactName ? (
+                <>
+                  <p className="font-medium">{member.emergencyContactName}</p>
+                  {member.emergencyContactPhone && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="h-3.5 w-3.5" />
+                      <a
+                        href={`tel:${member.emergencyContactPhone}`}
+                        className="hover:underline"
+                      >
+                        {member.emergencyContactPhone}
+                      </a>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">Not set</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Skills */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Skills
+            </h3>
+            <CanDo resource="crew" action="update">
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link href={`/crew/${id}/edit`} />}
+              >
+                <Pencil className="mr-1 h-3 w-3" />
+                Edit Skills
+              </Button>
+            </CanDo>
+          </div>
+          {skills.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {skills.map(
+                (skill: {
+                  id: string;
+                  name: string;
+                  category: string | null;
+                }) => (
+                  <Badge key={skill.id} variant="secondary">
+                    {skill.name}
+                  </Badge>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No skills assigned.{" "}
+              <CanDo resource="crew" action="update">
+                <Link
+                  href={`/crew/${id}/edit`}
+                  className="text-primary hover:underline"
+                >
+                  Add skills via Edit
+                </Link>
+              </CanDo>
+            </p>
+          )}
+        </div>
+
+        {/* Tags */}
+        {member.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {member.tags.map((tag: string) => (
+              <Badge key={tag} variant="outline">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Notes */}
+        {member.notes && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Notes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap">{member.notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tabs */}
+        <Tabs value={tabValue} onValueChange={setTabValue}>
+          <TabsList>
+            <TabsTrigger value="assignments">
+              Assignments ({assignments.length})
+            </TabsTrigger>
+            <TabsTrigger value="availability">
+              Availability ({availabilityRecords?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="certifications">
+              Certifications ({certifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="time-entries">
+              Time ({timeEntries?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          </TabsList>
+
+          {/* Assignments Tab */}
+          <TabsContent value="assignments" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Project Assignments
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {assignments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No project assignments yet.
+                  </p>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Project</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Role
+                          </TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Phase
+                          </TableHead>
+                          <TableHead>Dates</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Project Status
+                          </TableHead>
+                          <TableHead className="w-[50px]" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {assignments.map(
+                          (a: {
+                            id: string;
+                            status: string;
+                            phase: string | null;
+                            startDate: string | null;
+                            endDate: string | null;
+                            project: {
+                              id: string;
+                              name: string;
+                              projectNumber: string;
+                              status: string;
+                            };
+                            crewRole: {
+                              name: string;
+                              color: string | null;
+                            } | null;
+                          }) => {
+                            const statusTransitions: Record<string, string[]> = {
+                              PENDING: ["OFFERED", "CONFIRMED", "CANCELLED"],
+                              OFFERED: ["CONFIRMED", "CANCELLED"],
+                              ACCEPTED: ["CONFIRMED", "CANCELLED"],
+                              DECLINED: ["PENDING"],
+                              CONFIRMED: ["COMPLETED", "CANCELLED"],
+                              CANCELLED: ["PENDING"],
+                              COMPLETED: [],
+                            };
+                            const availableStatuses = statusTransitions[a.status] || [];
+                            return (
+                            <TableRow key={a.id}>
+                              <TableCell>
+                                <Link
+                                  href={`/projects/${a.project.id}`}
+                                  className="font-medium hover:underline"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <div>
+                                      <div>{a.project.name}</div>
+                                      <div className="text-xs text-muted-foreground font-mono">
+                                        {a.project.projectNumber}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Link>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {a.crewRole ? (
+                                  <Badge
+                                    variant="outline"
+                                    style={
+                                      a.crewRole.color
+                                        ? {
+                                            borderColor: a.crewRole.color,
+                                            color: a.crewRole.color,
+                                            backgroundColor: `${a.crewRole.color}15`,
+                                          }
+                                        : undefined
+                                    }
+                                  >
+                                    {a.crewRole.name}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    {"\u2014"}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">
+                                {a.phase
+                                  ? phaseLabels[a.phase] || a.phase
+                                  : "\u2014"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {formatDate(a.startDate)}
+                                {a.endDate && a.endDate !== a.startDate
+                                  ? ` \u2013 ${formatDate(a.endDate)}`
+                                  : ""}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    assignmentStatusColors[a.status] || ""
+                                  }
+                                >
+                                  {assignmentStatusLabels[a.status] ||
+                                    formatLabel(a.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    projectStatusColors[a.project.status] || ""
+                                  }
+                                >
+                                  {projectStatusLabels[a.project.status] ||
+                                    a.project.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <CanDo resource="crew" action="update">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuGroup>
+                                        {a.status === "PENDING" && member.email && (
+                                          <DropdownMenuItem
+                                            onClick={() => sendOfferMutation.mutate(a.id)}
+                                          >
+                                            <Send className="mr-2 h-4 w-4" />
+                                            Send Offer
+                                          </DropdownMenuItem>
+                                        )}
+                                        {availableStatuses.map((s) => (
+                                          <DropdownMenuItem
+                                            key={s}
+                                            onClick={() =>
+                                              updateAssignmentStatusMutation.mutate({
+                                                assignmentId: a.id,
+                                                status: s,
+                                              })
+                                            }
+                                          >
+                                            {s === "CONFIRMED" && <CheckCircle className="mr-2 h-4 w-4" />}
+                                            {s === "CANCELLED" && <AlertTriangle className="mr-2 h-4 w-4" />}
+                                            {!["CONFIRMED", "CANCELLED"].includes(s) && <Briefcase className="mr-2 h-4 w-4" />}
+                                            {assignmentStatusLabels[s] || formatLabel(s)}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <CanDo resource="crew" action="delete">
+                                          <DropdownMenuItem
+                                            className="text-destructive"
+                                            onClick={() => {
+                                              if (confirm("Remove this assignment?"))
+                                                deleteAssignmentMutation.mutate(a.id);
+                                            }}
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Remove
+                                          </DropdownMenuItem>
+                                        </CanDo>
+                                      </DropdownMenuGroup>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </CanDo>
+                              </TableCell>
+                            </TableRow>
+                            );
+                          }
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Availability Tab */}
+          <TabsContent value="availability" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">
+                  Availability Blocks
+                </CardTitle>
+                <CanDo resource="crew" action="update">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddAvailOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Block
+                  </Button>
+                </CanDo>
+              </CardHeader>
+              <CardContent>
+                {!availabilityRecords || availabilityRecords.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No availability blocks set. Add blocks to indicate when this
+                    crew member is unavailable, tentative, or preferred.
+                  </p>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Dates</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Time
+                          </TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Reason
+                          </TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {availabilityRecords.map(
+                          (av: {
+                            id: string;
+                            type: string;
+                            startDate: string | Date;
+                            endDate: string | Date;
+                            isAllDay: boolean;
+                            startTime: string | null;
+                            endTime: string | null;
+                            reason: string | null;
+                          }) => (
+                            <TableRow key={av.id}>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    availabilityTypeColors[av.type] || ""
+                                  }
+                                >
+                                  <CalendarOff className="mr-1 h-3 w-3" />
+                                  {availabilityTypeLabels[av.type] ||
+                                    formatLabel(av.type)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {formatDate(av.startDate)}
+                                {av.endDate !== av.startDate
+                                  ? ` \u2013 ${formatDate(av.endDate)}`
+                                  : ""}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
+                                {av.isAllDay
+                                  ? "All Day"
+                                  : `${av.startTime || ""} \u2013 ${av.endTime || ""}`}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
+                                {av.reason || "\u2014"}
+                              </TableCell>
+                              <TableCell>
+                                <CanDo resource="crew" action="update">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          "Remove this availability block?"
+                                        )
+                                      )
+                                        removeAvailMutation.mutate(av.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </CanDo>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Certifications Tab */}
+          <TabsContent value="certifications" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">
+                  Certifications & Qualifications
+                </CardTitle>
+                <CanDo resource="crew" action="update">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddCertOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Certification
+                  </Button>
+                </CanDo>
+              </CardHeader>
+              <CardContent>
+                {certifications.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No certifications recorded.
+                  </p>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Issued By
+                          </TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Certificate #
+                          </TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            Issued
+                          </TableHead>
+                          <TableHead>Expiry</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {certifications.map(
+                          (cert: {
+                            id: string;
+                            name: string;
+                            issuedBy: string | null;
+                            certificateNumber: string | null;
+                            issuedDate: Date | string | null;
+                            expiryDate: Date | string | null;
+                            status: string;
+                          }) => (
+                            <TableRow key={cert.id}>
+                              <TableCell className="font-medium">
+                                {cert.name}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground hidden md:table-cell">
+                                {cert.issuedBy || "\u2014"}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground hidden md:table-cell font-mono text-sm">
+                                {cert.certificateNumber || "\u2014"}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground hidden md:table-cell">
+                                {cert.issuedDate
+                                  ? new Date(
+                                      cert.issuedDate
+                                    ).toLocaleDateString()
+                                  : "\u2014"}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {cert.expiryDate
+                                  ? new Date(
+                                      cert.expiryDate
+                                    ).toLocaleDateString()
+                                  : "\u2014"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    certStatusColors[cert.status] || ""
+                                  }
+                                >
+                                  {crewCertStatusLabels[cert.status] ||
+                                    formatLabel(cert.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <CanDo resource="crew" action="update">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `Remove certification "${cert.name}"?`
+                                        )
+                                      )
+                                        removeCertMutation.mutate(cert.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </CanDo>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Calendar Tab */}
+          {/* Time Entries Tab */}
+          <TabsContent value="time-entries" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Time Entries
+                </CardTitle>
+                <div className="flex gap-2">
+                  {timeEntries && timeEntries.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={
+                        <a
+                          href={`/api/crew/timesheet?crewMemberId=${id}`}
+                          download
+                        />
+                      }
+                    >
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      Export CSV
+                    </Button>
+                  )}
+                  {/* Bulk submit all drafts */}
+                  {timeEntries &&
+                    timeEntries.filter(
+                      (e: { status: string }) => e.status === "DRAFT"
+                    ).length > 0 && (
+                      <CanDo resource="crew" action="update">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const draftIds = timeEntries
+                              .filter(
+                                (e: { status: string }) =>
+                                  e.status === "DRAFT"
+                              )
+                              .map((e: { id: string }) => e.id);
+                            submitTimeMutation.mutate(draftIds);
+                          }}
+                          disabled={submitTimeMutation.isPending}
+                        >
+                          <Send className="mr-2 h-3.5 w-3.5" />
+                          Submit All Drafts
+                        </Button>
+                      </CanDo>
+                    )}
+                  {/* Bulk approve all submitted */}
+                  {timeEntries &&
+                    timeEntries.filter(
+                      (e: { status: string }) => e.status === "SUBMITTED"
+                    ).length > 0 && (
+                      <CanDo resource="crew" action="update">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const submittedIds = timeEntries
+                              .filter(
+                                (e: { status: string }) =>
+                                  e.status === "SUBMITTED"
+                              )
+                              .map((e: { id: string }) => e.id);
+                            approveTimeMutation.mutate(submittedIds);
+                          }}
+                          disabled={approveTimeMutation.isPending}
+                        >
+                          <CheckCircle className="mr-2 h-3.5 w-3.5" />
+                          Approve All
+                        </Button>
+                      </CanDo>
+                    )}
+                  <CanDo resource="crew" action="create">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingTimeEntry(null);
+                        setAddTimeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-3.5 w-3.5" />
+                      Log Time
+                    </Button>
+                  </CanDo>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!timeEntries || timeEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No time entries recorded yet.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead>Break</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* eslint-disable @typescript-eslint/no-explicit-any */}
+                      {timeEntries.map((entry: any) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="text-sm">
+                            {formatDate(entry.date)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.assignment ? (
+                              <>
+                                {entry.assignment.project?.projectNumber} —{" "}
+                                {entry.assignment.project?.name}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground italic">
+                                {entry.description || "General"}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.assignment?.crewRole?.name || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.startTime}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.endTime}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {entry.breakMinutes > 0
+                              ? `${entry.breakMinutes}m`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {entry.totalHours != null
+                              ? `${Number(entry.totalHours).toFixed(1)}h`
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                timeEntryStatusColors[entry.status] || ""
+                              }
+                            >
+                              {timeEntryStatusLabels[entry.status] ||
+                                formatLabel(entry.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {entry.status !== "EXPORTED" && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button variant="ghost" size="icon" />
+                                  }
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuGroup>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setEditingTimeEntry(entry.id);
+                                        setAddTimeOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    {["DRAFT", "DISPUTED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          submitTimeMutation.mutate([entry.id])
+                                        }
+                                      >
+                                        <Send className="mr-2 h-4 w-4" />
+                                        Submit
+                                      </DropdownMenuItem>
+                                    )}
+                                    {["SUBMITTED", "DISPUTED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          approveTimeMutation.mutate([
+                                            entry.id,
+                                          ])
+                                        }
+                                      >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Approve
+                                      </DropdownMenuItem>
+                                    )}
+                                    {["SUBMITTED", "APPROVED"].includes(entry.status) && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          disputeTimeMutation.mutate(
+                                            entry.id
+                                          )
+                                        }
+                                      >
+                                        <AlertTriangle className="mr-2 h-4 w-4" />
+                                        Dispute
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() =>
+                                        deleteTimeMutation.mutate(entry.id)
+                                      }
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuGroup>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarSync className="h-4 w-4" />
+                  iCal Feed
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enable an iCal feed URL that can be subscribed to from Google
+                  Calendar, Apple Calendar, Outlook, or any calendar app. The
+                  feed includes all confirmed assignments.
+                </p>
+
+                {icalSettings?.icalEnabled && icalSettings?.icalToken ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        Feed URL
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/crew/calendar/${icalSettings.icalToken}`}
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/api/crew/calendar/${icalSettings.icalToken}`
+                            );
+                            toast.success("Feed URL copied to clipboard");
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <CanDo resource="crew" action="update">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Regenerate token? The old URL will stop working."
+                              )
+                            )
+                              regenerateTokenMutation.mutate();
+                          }}
+                          disabled={regenerateTokenMutation.isPending}
+                        >
+                          <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                          Regenerate URL
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => disableIcalMutation.mutate()}
+                          disabled={disableIcalMutation.isPending}
+                        >
+                          Disable Feed
+                        </Button>
+                      </div>
+                    </CanDo>
+                  </div>
+                ) : (
+                  <CanDo resource="crew" action="update">
+                    <Button
+                      variant="outline"
+                      onClick={() => enableIcalMutation.mutate()}
+                      disabled={enableIcalMutation.isPending}
+                    >
+                      {enableIcalMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      <CalendarSync className="mr-2 h-4 w-4" />
+                      Enable iCal Feed
+                    </Button>
+                  </CanDo>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Add Certification Dialog */}
+      <AddCertificationDialog
+        crewMemberId={id}
+        open={addCertOpen}
+        onOpenChange={setAddCertOpen}
+      />
+
+      {/* Add Availability Dialog */}
+      <AddAvailabilityDialog
+        crewMemberId={id}
+        open={addAvailOpen}
+        onOpenChange={setAddAvailOpen}
+      />
+
+      {/* Add/Edit Time Entry Dialog */}
+      <AddTimeEntryDialog
+        crewMemberId={id}
+        assignments={assignments}
+        open={addTimeOpen}
+        onOpenChange={(open) => {
+          setAddTimeOpen(open);
+          if (!open) setEditingTimeEntry(null);
+        }}
+        editingEntry={
+          editingTimeEntry
+            ? timeEntries?.find(
+                (e: { id: string }) => e.id === editingTimeEntry
+              )
+            : null
+        }
+      />
+    </RequirePermission>
+  );
+}
+
+// ─── Add Certification Dialog ──────────────────────────────────────────────────
+
+function AddCertificationDialog({
+  crewMemberId,
+  open,
+  onOpenChange,
+}: {
+  crewMemberId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const form = useForm<CrewCertificationFormValues>({
+    resolver: zodResolver(crewCertificationSchema),
+    defaultValues: {
+      name: "",
+      issuedBy: "",
+      certificateNumber: "",
+      status: "NOT_VERIFIED",
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: CrewCertificationFormValues) =>
+      addCertification(crewMemberId, data),
+    onSuccess: () => {
+      toast.success("Certification added");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-member", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Certification</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label>Name *</Label>
+            <Input
+              placeholder="e.g. White Card, Working at Heights"
+              {...form.register("name")}
+            />
+            {form.formState.errors.name && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.name.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Issued By</Label>
+            <Input
+              placeholder="Issuing authority"
+              {...form.register("issuedBy")}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Certificate Number</Label>
+            <Input
+              placeholder="Certificate #"
+              {...form.register("certificateNumber")}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Issued Date</Label>
+              <Input type="date" {...form.register("issuedDate")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Expiry Date</Label>
+              <Input type="date" {...form.register("expiryDate")} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Status</Label>
+            <Select
+              value={form.watch("status")}
+              onValueChange={(v) =>
+                form.setValue(
+                  "status",
+                  v as CrewCertificationFormValues["status"]
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CURRENT">Current</SelectItem>
+                <SelectItem value="EXPIRING_SOON">Expiring Soon</SelectItem>
+                <SelectItem value="EXPIRED">Expired</SelectItem>
+                <SelectItem value="NOT_VERIFIED">Not Verified</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Add Certification
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add Availability Dialog ──────────────────────────────────────────────────
+
+function AddAvailabilityDialog({
+  crewMemberId,
+  open,
+  onOpenChange,
+}: {
+  crewMemberId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const form = useForm<CrewAvailabilityFormValues>({
+    resolver: zodResolver(crewAvailabilitySchema),
+    defaultValues: {
+      crewMemberId,
+      type: "UNAVAILABLE",
+      isAllDay: true,
+      reason: "",
+      startTime: "",
+      endTime: "",
+    },
+  });
+
+  const isAllDay = form.watch("isAllDay");
+
+  const mutation = useMutation({
+    mutationFn: (data: CrewAvailabilityFormValues) => addAvailability(data),
+    onSuccess: () => {
+      toast.success("Availability block added");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-availability", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset({ crewMemberId, type: "UNAVAILABLE", isAllDay: true, reason: "", startTime: "", endTime: "" });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Availability Block</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label>Type</Label>
+            <Select
+              value={form.watch("type")}
+              onValueChange={(v) =>
+                form.setValue("type", v as CrewAvailabilityFormValues["type"])
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="UNAVAILABLE">Unavailable</SelectItem>
+                <SelectItem value="TENTATIVE">Tentative</SelectItem>
+                <SelectItem value="PREFERRED">Preferred</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Start Date *</Label>
+              <Input type="date" {...form.register("startDate")} />
+              {form.formState.errors.startDate && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.startDate.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>End Date *</Label>
+              <Input type="date" {...form.register("endDate")} />
+              {form.formState.errors.endDate && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.endDate.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="isAllDay"
+              checked={isAllDay}
+              onCheckedChange={(v) => form.setValue("isAllDay", v === true)}
+            />
+            <Label htmlFor="isAllDay" className="cursor-pointer">
+              All Day
+            </Label>
+          </div>
+
+          {!isAllDay && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start Time</Label>
+                <Input type="time" {...form.register("startTime")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time</Label>
+                <Input type="time" {...form.register("endTime")} />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Reason</Label>
+            <Input
+              placeholder="e.g. Holiday, Another gig, Personal"
+              {...form.register("reason")}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Add Block
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Add/Edit Time Entry Dialog ─────────────────────────────────────────────
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function AddTimeEntryDialog({
+  crewMemberId,
+  assignments,
+  open,
+  onOpenChange,
+  editingEntry,
+}: {
+  crewMemberId: string;
+  assignments: any[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingEntry?: any;
+}) {
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const orgId = activeOrg?.id;
+
+  const isEditing = !!editingEntry;
+  const [isGeneral, setIsGeneral] = useState(false);
+
+  const form = useForm<CrewTimeEntryFormValues>({
+    resolver: zodResolver(crewTimeEntrySchema),
+    defaultValues: {
+      assignmentId: "",
+      crewMemberId,
+      description: "",
+      date: "",
+      startTime: "",
+      endTime: "",
+      breakMinutes: "",
+      notes: "",
+    },
+  });
+
+  // Reset form when editing entry changes
+  const resetKey = `${open}-${editingEntry?.id}`;
+  const [prevKey, setPrevKey] = useState(resetKey);
+  if (prevKey !== resetKey) {
+    setPrevKey(resetKey);
+    if (open && editingEntry) {
+      const isGen = !editingEntry.assignmentId;
+      setIsGeneral(isGen);
+      form.reset({
+        assignmentId: editingEntry.assignmentId || "",
+        crewMemberId,
+        description: editingEntry.description || "",
+        date: editingEntry.date
+          ? new Date(editingEntry.date).toISOString().split("T")[0]
+          : "",
+        startTime: editingEntry.startTime || "",
+        endTime: editingEntry.endTime || "",
+        breakMinutes: editingEntry.breakMinutes || "",
+        notes: editingEntry.notes || "",
+      });
+    } else if (open) {
+      setIsGeneral(false);
+      form.reset({
+        assignmentId: assignments.length === 1 ? assignments[0].id : "",
+        crewMemberId,
+        description: "",
+        date: new Date().toISOString().split("T")[0],
+        startTime: "",
+        endTime: "",
+        breakMinutes: "",
+        notes: "",
+      });
+    }
+  }
+
+  const createMutation = useMutation({
+    mutationFn: (data: CrewTimeEntryFormValues) => createTimeEntry(data),
+    onSuccess: () => {
+      toast.success("Time entry added");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: CrewTimeEntryFormValues) =>
+      updateTimeEntry(editingEntry?.id, data),
+    onSuccess: () => {
+      toast.success("Time entry updated");
+      queryClient.invalidateQueries({
+        queryKey: ["crew-time-entries", orgId, crewMemberId],
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const mutation = isEditing ? updateMutation : createMutation;
+
+  // Active (non-cancelled/declined) assignments for the picker
+  const activeAssignments = assignments.filter(
+    (a: any) => !["CANCELLED", "DECLINED"].includes(a.status)
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? "Edit Time Entry" : "Log Time"}
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={form.handleSubmit((data) => {
+            // Clear assignmentId if general shift
+            if (isGeneral) data.assignmentId = "";
+            mutation.mutate(data);
+          })}
+          className="space-y-4"
+        >
+          {/* Type toggle */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={!isGeneral ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setIsGeneral(false);
+                form.setValue("description", "");
+              }}
+            >
+              <Briefcase className="mr-2 h-3.5 w-3.5" />
+              Project
+            </Button>
+            <Button
+              type="button"
+              variant={isGeneral ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setIsGeneral(true);
+                form.setValue("assignmentId", "");
+              }}
+            >
+              <Clock className="mr-2 h-3.5 w-3.5" />
+              General
+            </Button>
+          </div>
+
+          {!isGeneral ? (
+            <div className="space-y-1.5">
+              <Label>Assignment</Label>
+              <Select
+                value={form.watch("assignmentId") || ""}
+                onValueChange={(v) =>
+                  form.setValue("assignmentId", v || "")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {(() => {
+                      const selected = activeAssignments.find(
+                        (a: any) => a.id === form.watch("assignmentId")
+                      );
+                      if (!selected) return "Select assignment";
+                      return `${selected.project?.projectNumber} — ${selected.project?.name}${selected.crewRole?.name ? ` (${selected.crewRole.name})` : ""}`;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {activeAssignments.map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.project?.projectNumber} — {a.project?.name}
+                      {a.crewRole?.name ? ` (${a.crewRole.name})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input
+                placeholder="e.g. Warehouse maintenance, Office admin..."
+                {...form.register("description")}
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Date</Label>
+            <Input type="date" {...form.register("date")} />
+            {form.formState.errors.date && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.date.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Start Time</Label>
+              <Input type="time" {...form.register("startTime")} />
+              {form.formState.errors.startTime && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.startTime.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>End Time</Label>
+              <Input type="time" {...form.register("endTime")} />
+              {form.formState.errors.endTime && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.endTime.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Break (minutes)</Label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0"
+              {...form.register("breakMinutes")}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Notes</Label>
+            <Textarea
+              placeholder="Optional notes..."
+              {...form.register("notes")}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isEditing ? "Update" : "Log Time"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

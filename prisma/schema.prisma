@@ -45,6 +45,9 @@ model User {
   activityLogs            ActivityLog[]
   passkeys                Passkey[]
   supplierOrders          SupplierOrder[]
+  crewMembers             CrewMember[]
+  confirmedAssignments    CrewAssignment[] @relation("ConfirmedBy")
+  approvedTimeEntries     CrewTimeEntry[]  @relation("TimeEntryApprovedBy")
 
   @@map("user")
 }
@@ -135,6 +138,11 @@ model Organization {
   testTagAssets      TestTagAsset[]
   testTagRecords     TestTagRecord[]
   activityLogs       ActivityLog[]
+  crewMembers        CrewMember[]
+  crewRoles          CrewRole[]
+  crewSkills         CrewSkill[]
+  crewAssignments    CrewAssignment[]
+  crewTimeEntries    CrewTimeEntry[]
   @@map("organization")
 }
 
@@ -910,10 +918,11 @@ model Project {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  lineItems      ProjectLineItem[]
-  scanLogs       AssetScanLog[]
-  media          ProjectMedia[]
-  supplierOrders SupplierOrder[]
+  lineItems        ProjectLineItem[]
+  scanLogs         AssetScanLog[]
+  media            ProjectMedia[]
+  supplierOrders   SupplierOrder[]
+  crewAssignments  CrewAssignment[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId])
@@ -1370,4 +1379,329 @@ model ActivityLog {
   @@index([organizationId, assetId])
   @@index([organizationId, entityType, entityId])
   @@map("activity_log")
+}
+
+// ─── Crew Management ─────────────────────────────────────────────────────────
+
+model CrewMember {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Identity
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  image           String?
+
+  // Link to platform user (optional)
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Employment type
+  type            CrewMemberType  @default(FREELANCER)
+  status          CrewMemberStatus @default(ACTIVE)
+  department      String?
+
+  // Rates
+  defaultDayRate    Decimal?  @db.Decimal(10, 2)
+  defaultHourlyRate Decimal?  @db.Decimal(10, 2)
+  overtimeMultiplier Decimal? @db.Decimal(3, 2)
+  currency          String?
+
+  // Contact & personal
+  address           String?
+  addressLatitude   Float?
+  addressLongitude  Float?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  dateOfBirth     DateTime?
+  abnOrGst        String?
+
+  // Notes & tags
+  notes           String?
+  tags            String[] @default([])
+
+  // Calendar integration
+  icalEnabled     Boolean  @default(false)
+  icalToken       String?  @unique
+
+  // Relations
+  skills          CrewSkill[]
+  certifications  CrewCertification[]
+  assignments     CrewAssignment[]
+  availability    CrewAvailability[]
+  timeEntries     CrewTimeEntry[]
+  crewRoleId      String?
+  crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isActive        Boolean  @default(true)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([userId])
+  @@map("crew_member")
+}
+
+enum CrewMemberType {
+  EMPLOYEE
+  FREELANCER
+  CONTRACTOR
+  VOLUNTEER
+}
+
+enum CrewMemberStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  ARCHIVED
+}
+
+model CrewRole {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?
+  department      String?
+  color           String?
+  defaultRate     Decimal? @db.Decimal(10, 2)
+  rateType        CrewRateType?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+
+  crewMembers     CrewMember[]
+  assignments     CrewAssignment[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("crew_role")
+}
+
+enum CrewRateType {
+  HOURLY
+  DAILY
+  FLAT
+}
+
+model CrewSkill {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  category        String?
+
+  crewMembers     CrewMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("crew_skill")
+}
+
+model CrewCertification {
+  id              String   @id @default(cuid())
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  name            String
+  issuedBy        String?
+  certificateNumber String?
+  issuedDate      DateTime?
+  expiryDate      DateTime?
+  status          CrewCertStatus @default(NOT_VERIFIED)
+
+  @@index([crewMemberId])
+  @@map("crew_certification")
+}
+
+enum CrewCertStatus {
+  CURRENT
+  EXPIRING_SOON
+  EXPIRED
+  NOT_VERIFIED
+}
+
+model CrewAssignment {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  crewRoleId      String?
+  crewRole        CrewRole? @relation(fields: [crewRoleId], references: [id], onDelete: SetNull)
+
+  status          AssignmentStatus @default(PENDING)
+  phase           ProjectPhase?
+  isProjectManager Boolean @default(false)
+
+  // Schedule
+  startDate       DateTime?
+  startTime       String?
+  endDate         DateTime?
+  endTime         String?
+
+  // Rate
+  rateOverride    Decimal?  @db.Decimal(10, 2)
+  rateType        CrewRateType?
+  estimatedHours  Decimal?  @db.Decimal(6, 2)
+  estimatedCost   Decimal?  @db.Decimal(10, 2)
+
+  // Notes
+  notes           String?
+  internalNotes   String?
+
+  // Response tracking
+  responseToken   String?  @unique
+  offeredAt       DateTime?
+  respondedAt     DateTime?
+  responseNote    String?
+
+  // Confirmation
+  confirmedAt     DateTime?
+  confirmedById   String?
+  confirmedBy     User?    @relation("ConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+
+  shifts          CrewShift[]
+  timeEntries     CrewTimeEntry[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, crewMemberId, phase])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([crewMemberId])
+  @@index([crewMemberId, startDate])
+  @@map("crew_assignment")
+}
+
+enum AssignmentStatus {
+  PENDING
+  OFFERED
+  ACCEPTED
+  DECLINED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ProjectPhase {
+  BUMP_IN
+  EVENT
+  BUMP_OUT
+  DELIVERY
+  PICKUP
+  SETUP
+  REHEARSAL
+  FULL_DURATION
+}
+
+model CrewShift {
+  id              String   @id @default(cuid())
+  assignmentId    String
+  assignment      CrewAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  callTime        String?
+  endTime         String?
+  breakMinutes    Int?
+  location        String?
+  notes           String?
+  status          ShiftStatus @default(SCHEDULED)
+
+  @@index([assignmentId])
+  @@index([assignmentId, date])
+  @@map("crew_shift")
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ─── Crew Availability ──────────────────────────────────────────────────────
+
+model CrewAvailability {
+  id              String   @id @default(cuid())
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  startDate       DateTime
+  endDate         DateTime
+  type            AvailabilityType @default(UNAVAILABLE)
+  reason          String?
+  isAllDay        Boolean  @default(true)
+  startTime       String?
+  endTime         String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([crewMemberId])
+  @@index([crewMemberId, startDate, endDate])
+  @@map("crew_availability")
+}
+
+enum AvailabilityType {
+  UNAVAILABLE
+  TENTATIVE
+  PREFERRED
+}
+
+// ── Time Tracking ──────────────────────────────────────────────────
+
+model CrewTimeEntry {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  assignmentId    String?
+  assignment      CrewAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  crewMemberId    String
+  crewMember      CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+
+  description     String?          // For standalone shifts not linked to a project
+
+  date            DateTime
+  startTime       String
+  endTime         String
+  breakMinutes    Int      @default(0)
+  totalHours      Decimal? @db.Decimal(6, 2)
+
+  status          TimeEntryStatus @default(DRAFT)
+  approvedById    String?
+  approvedBy      User?    @relation("TimeEntryApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([crewMemberId, date])
+  @@map("crew_time_entry")
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  DISPUTED
+  EXPORTED
 }

@@ -1,0 +1,320 @@
+# Crew Management
+
+## Overview
+Crew management tracks people (employees, freelancers, contractors, volunteers) for project staffing. Includes core entity CRUD (Phase 1), project crew assignments with scheduling and call sheets (Phase 2), availability management with conflict detection and crew planner (Phase 3), iCal calendar integration (Phase 4), communication and offer flow (Phase 5), and time tracking with timesheets (Phase 6).
+
+## Data Models
+
+### CrewMember
+- `id, organizationId, firstName, lastName, email?, phone?, image?`
+- `userId?` — optional link to platform User
+- `type` — EMPLOYEE, FREELANCER, CONTRACTOR, VOLUNTEER
+- `status` — ACTIVE, INACTIVE, ON_LEAVE, ARCHIVED
+- `department?` — freeform (e.g. "Audio", "Lighting")
+- `crewRoleId?` — FK to CrewRole
+- `defaultDayRate?, defaultHourlyRate?, overtimeMultiplier?, currency?`
+- `address?, addressLatitude?, addressLongitude?`
+- `emergencyContactName?, emergencyContactPhone?`
+- `dateOfBirth?, abnOrGst?`
+- `notes?, tags[]`
+- `skills[]` — many-to-many with CrewSkill
+- `certifications[]` — one-to-many CrewCertification
+- Unique: `[organizationId, email]`
+
+### CrewRole
+- `id, organizationId, name, description?, department?, color?`
+- `defaultRate?, rateType?` (HOURLY | DAILY | FLAT)
+- `sortOrder, isActive`
+- Unique: `[organizationId, name]`
+
+### CrewSkill
+- `id, organizationId, name, category?`
+- Many-to-many with CrewMember
+- Unique: `[organizationId, name]`
+
+### CrewCertification
+- `id, crewMemberId, name, issuedBy?, certificateNumber?`
+- `issuedDate?, expiryDate?`
+- `status` — CURRENT, EXPIRING_SOON, EXPIRED, NOT_VERIFIED
+
+### CrewAssignment
+- `id, organizationId, projectId, crewMemberId`
+- `crewRoleId?` — role for this assignment
+- `status` — PENDING, OFFERED, ACCEPTED, DECLINED, CONFIRMED, CANCELLED, COMPLETED
+- `phase?` — BUMP_IN, EVENT, BUMP_OUT, DELIVERY, PICKUP, SETUP, REHEARSAL, FULL_DURATION
+- `isProjectManager` — boolean, PMs shown first
+- `startDate?, startTime?, endDate?, endTime?`
+- `rateOverride?, rateType?, estimatedHours?, estimatedCost?`
+- `notes?, internalNotes?`
+- `confirmedAt?, confirmedById?`
+- Unique: `[projectId, crewMemberId, phase]`
+
+### CrewShift
+- `id, assignmentId, date, callTime?, endTime?`
+- `breakMinutes?, location?, notes?`
+- `status` — SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+
+### CrewAvailability
+- `id, crewMemberId, startDate, endDate`
+- `type` — UNAVAILABLE, TENTATIVE, PREFERRED
+- `reason?` — freeform text
+- `isAllDay` — boolean (default true)
+- `startTime?, endTime?` — for partial-day blocks
+- Indexes: `[crewMemberId]`, `[crewMemberId, startDate, endDate]`
+
+## Server Actions
+
+### `src/server/crew.ts` (Phase 1)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getCrewMembers(params)` | crew.read | Paginated list with search, filters, sorting |
+| `getCrewMemberById(id)` | crew.read | Full detail with role, skills, certifications |
+| `createCrewMember(data)` | crew.create | Create with skill connections |
+| `updateCrewMember(id, data)` | crew.update | Update with skill set replacement |
+| `deleteCrewMember(id)` | crew.delete | Delete crew member |
+| `getCrewRoles()` | crew.read | All active roles |
+| `createCrewRole(data)` | crew.create | Create role |
+| `updateCrewRole(id, data)` | crew.update | Update role |
+| `deleteCrewRole(id)` | crew.delete | Delete (fails if assigned) |
+| `getCrewSkills()` | crew.read | All skills with member counts |
+| `createCrewSkill(data)` | crew.create | Create skill |
+| `deleteCrewSkill(id)` | crew.delete | Delete skill |
+| `addCertification(crewMemberId, data)` | crew.update | Add cert to member |
+| `removeCertification(certId)` | crew.update | Remove cert |
+| `getCrewRoleOptions()` | crew.read | Dropdown options |
+| `getCrewSkillOptions()` | crew.read | Multi-select options |
+| `getCrewDepartments()` | crew.read | Distinct departments |
+
+### `src/server/crew-assignments.ts` (Phase 2)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getProjectCrew(projectId)` | crew.read | All assignments for a project |
+| `createAssignment(projectId, data)` | crew.create | Assign crew to project |
+| `updateAssignment(id, data)` | crew.update | Update assignment |
+| `deleteAssignment(id)` | crew.delete | Remove assignment |
+| `updateAssignmentStatus(id, status)` | crew.update | Change status |
+| `generateShifts(assignmentId)` | crew.update | Auto-generate daily shifts |
+| `updateShift(shiftId, data)` | crew.update | Edit individual shift |
+| `deleteShift(shiftId)` | crew.update | Remove shift |
+| `getProjectLabourCost(projectId)` | crew.read | Aggregate estimated cost |
+| `getCrewMembersForAssignment(projectId)` | crew.read | Available crew for picker |
+
+### `src/server/crew-availability.ts` (Phase 3)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getCrewAvailability(crewMemberId, start?, end?)` | crew.read | Availability blocks for a member |
+| `addAvailability(data)` | crew.update | Add availability block |
+| `removeAvailability(id)` | crew.update | Remove availability block |
+| `checkCrewConflicts(crewMemberId, start, end, excludeId?)` | crew.read | Conflict detection (availability + assignments) |
+| `getCrewPlannerData(start, end)` | crew.read | All crew with assignments/availability in range |
+| `getCrewAvailabilityStatus(ids[], start, end)` | crew.read | Status map for visual indicators |
+
+## Rate Cascade
+Assignment rate is resolved in this order:
+1. `rateOverride` on the assignment (if set and > 0)
+2. `crewMember.defaultDayRate` (daily) or `crewMember.defaultHourlyRate` (hourly)
+3. `crewRole.defaultRate` (with role's rate type)
+4. Fallback: $0 daily
+
+## Cost Calculation
+- **DAILY**: rate × number of days (start to end inclusive)
+- **HOURLY**: rate × estimatedHours
+- **FLAT**: rate (fixed amount)
+
+## Pages
+| Path | Component | Description |
+|------|-----------|-------------|
+| `/crew` | CrewDashboard / CrewTable | Manager+ sees dashboard with stats, timesheets, assignments, offers; others see crew list |
+| `/crew/new` | CrewMemberForm | Create crew member |
+| `/crew/[id]` | Detail page | Contact, rates, skills, assignments (with status management), availability, certifications, time entries, calendar |
+| `/crew/[id]/edit` | CrewMemberForm | Edit crew member |
+| `/crew/planner` | CrewPlannerPage | 14-day Gantt-style timeline of all crew |
+| `/crew/timesheets` | TimesheetsPage | All time entries with DataTable, filtering, search, edit/delete, export |
+| `/crew/settings` | CrewSettingsPage | Manage roles and skills |
+
+## Project Detail Integration
+- **Crew tab** on project detail page (`/projects/[id]`) via `CrewPanel` component
+- Assignment list with phase grouping, PM highlighting
+- Add/edit assignment dialogs with crew picker, role, phase, dates, rate override
+- Status dropdown (Pending → Offered → Accepted → Confirmed → Completed)
+- **Labour cost** shown in project financial summary
+- **Call Sheet** button in crew tab and Documents dropdown
+
+## Call Sheet PDF
+- `src/lib/pdf/call-sheet-pdf.tsx` — landscape A4 document
+- API route: `GET /api/documents/call-sheet/[projectId]?date=YYYY-MM-DD`
+- Lists all non-cancelled crew sorted by call time then role
+- Includes: project info, location, site contact, crew table (name, role, phase, call/wrap times, phone, notes)
+- Uses shift-specific times when available for the requested date
+
+## Availability Management (Phase 3)
+- Crew member detail page has an "Availability" tab to add/view/remove blocks
+- Types: UNAVAILABLE (hard block, red), TENTATIVE (soft, amber), PREFERRED (wants work, green)
+- Conflict detection integrated in assignment dialog — shows warnings when assigning crew with conflicts
+- Hard conflicts (UNAVAILABLE) shown in red, soft conflicts (TENTATIVE, double-booked) in amber
+- Allows override — admin can still assign despite warnings
+
+## Crew Planner
+- 14-day Gantt-style timeline at `/crew/planner`
+- Shows all active crew with their assignments and availability blocks
+- Color-coded cells: primary (assignment), red (unavailable), amber (tentative), green (preferred)
+- Sticky crew name column, scrollable date columns
+- Weekend/today highlighting
+- Tooltip on hover showing project details or availability reason
+- Navigation: back/forward by week, "Today" button
+- Sidebar: "Planner" link under Crew
+
+## Calendar Integration (Phase 4)
+
+### iCal Feed per Crew Member
+- Each crew member can have an iCal feed enabled from their detail page "Calendar" tab
+- Feed URL: `GET /api/crew/calendar/[token]` (or `[token].ics`)
+- Token is a 32-byte cryptographically random URL-safe base64 string
+- No authentication required — the token IS the auth
+- Feed contains all CONFIRMED assignments as VEVENT entries
+- If shifts exist, one event per shift; otherwise one event per assignment
+- Events include: project name, role, phase, location, site contact, notes
+- Token can be regenerated (invalidates old URL) or feed can be disabled
+
+### Schema Fields (CrewMember)
+- `icalEnabled` — Boolean, default false
+- `icalToken` — String, unique, nullable
+
+### Per-Assignment .ics Download
+- API route: `GET /api/crew/calendar/assignment/[id]`
+- Requires authentication (session-based)
+- Downloads a single .ics file for one assignment
+- Available from the assignment row actions dropdown in the project crew panel
+
+### Server Actions (`src/server/crew-calendar.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `enableIcalFeed(crewMemberId)` | crew.update | Enable feed + generate token |
+| `disableIcalFeed(crewMemberId)` | crew.update | Disable feed (keeps token) |
+| `regenerateIcalToken(crewMemberId)` | crew.update | New token, invalidates old URL |
+| `getIcalSettings(crewMemberId)` | crew.read | Get icalEnabled + icalToken |
+| `getAssignmentIcsData(assignmentId)` | crew.read | Full assignment data for .ics |
+
+### iCal Library (`src/lib/ical.ts`)
+- `generateVCalendar(calName, events)` — RFC 5545 compliant VCALENDAR
+- `generateVEvent(event)` — single VEVENT with proper line folding
+- `buildDateTime(date, time?)` — combine date + optional "HH:mm" time string
+- Supports all-day events and timed events
+
+## Communication & Offers (Phase 5)
+
+### Offer Flow
+- Admin creates assignment (PENDING) then sends offer via "Send Offer" action
+- Status changes: PENDING -> OFFERED (email sent with Accept/Decline links)
+- Crew responds via token-based links: OFFERED -> ACCEPTED or DECLINED
+- Admin confirms: ACCEPTED -> CONFIRMED (confirmation email sent)
+- `responseToken` on CrewAssignment — unique, one-time use, cleared after response
+
+### Email Templates (`src/lib/crew-emails.ts`)
+- `crewOfferEmail` — project details + Accept/Decline buttons
+- `crewConfirmationEmail` — confirmed assignment details
+- `crewCancellationEmail` — cancellation notice
+- `crewUpdateEmail` — updated assignment details
+- `crewBulkMessageEmail` — freeform message with project context
+
+### Server Actions (`src/server/crew-communication.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `sendCrewOffer(assignmentId)` | crew.update | Send offer email, set status to OFFERED |
+| `sendCrewOfferAll(projectId)` | crew.update | Offer all PENDING assignments |
+| `sendConfirmationEmail(assignmentId)` | crew.update | Send confirmation email |
+| `sendCancellationEmail(assignmentId)` | crew.update | Send cancellation email |
+| `sendBulkMessage(projectId, message, filter?)` | crew.update | Email all active crew on project |
+
+### API Routes
+- `GET /api/crew/respond/[token]?action=accept|decline` — Public, token-based response page
+- Returns styled HTML confirmation page after updating assignment status
+
+### UI Integration
+- **Per-assignment**: "Send Offer" in row actions dropdown (only for PENDING)
+- **Bulk**: "Offer All" button (sends to all PENDING with email), "Message" button opens dialog
+- **Middleware**: `/api/crew/respond/` added to public routes (no auth required)
+
+## Permissions
+Resource `crew` with actions: `read, create, update, delete`
+- owner/admin: all
+- manager: create, read, update
+- member/staff/warehouse/viewer: read
+
+## Crew Dashboard (`src/server/crew-dashboard.ts`)
+- Manager/admin/owner only — users with `crew.update` permission see the dashboard; others see the crew table
+- **Stats**: active crew, assignments, pending offers, submitted timesheets, hours (7d), expiring certs
+- **Pending Timesheets**: approve/dispute individual or bulk from dashboard
+- **Active Assignments**: links to project detail
+- **Upcoming Shifts**: next 10 scheduled shifts, consecutive shifts for same assignment grouped as date ranges
+- **Pending Offers**: send offer directly from dashboard
+- **Log Time**: multi-select crew member dialog, then time entry form with Project/General toggle
+- **Export Timesheets**: dialog with date range picker, downloads CSV
+- **Crew List**: embedded crew table at the bottom
+
+## Integration Points
+- **Sidebar**: "Crew" with HardHat icon, sub-items: Planner, Timesheets, Roles & Skills. Gated by `crew` resource
+- **Top bar**: `crew`, `timesheets`, `planner` segment labels
+- **Page commands**: searchable crew page with children (Planner, Timesheets, Roles & Skills)
+- **Global search**: searches first/last name, email, phone, department, role name, tags
+- **Slash commands**:
+  - `/crew` list page: `/new`, `/planner`, `/timesheets`, `/roles`, `/log-time`, `/export`
+  - `/crew/[id]` detail page: `/edit`, `/assignments`, `/availability`, `/certifications`, `/time`, `/calendar`, `/add-availability`, `/add-cert`, `/log-time`
+  - `/crew/timesheets` page: `/log-time`, `/export`
+- **Notifications**: expiring certifications (30 days), pending crew offers, submitted timesheets awaiting approval
+- **Dashboard**: active crew count and pending crew offers shown in main dashboard stats
+- **Activity log**: CREATE/UPDATE/DELETE logged for crew members, roles, assignments, and availability
+
+## Validation Schemas (`src/lib/validations/crew.ts`)
+- `crewMemberSchema` — full member form
+- `crewRoleSchema` — role form
+- `crewSkillSchema` — skill creation
+- `crewCertificationSchema` — certification form
+- `crewAssignmentSchema` — project assignment form
+- `crewShiftSchema` — individual shift form
+- `crewAvailabilitySchema` — availability block form
+
+## Status Labels (`src/lib/status-labels.ts`)
+- `crewMemberStatusLabels`, `crewMemberTypeLabels`, `crewCertStatusLabels`
+- `crewRateTypeLabels`, `assignmentStatusLabels`, `phaseLabels`, `shiftStatusLabels`
+- `availabilityTypeLabels`, `timeEntryStatusLabels`
+
+## Time Tracking (Phase 6)
+
+### Data Model — `CrewTimeEntry`
+- `id, organizationId, assignmentId? (optional — null for general shifts), crewMemberId`
+- `description?` — freeform label for standalone shifts (e.g. "Warehouse maintenance")
+- `date, startTime, endTime, breakMinutes, totalHours?`
+- `status` — DRAFT, SUBMITTED, APPROVED, DISPUTED, EXPORTED
+- `approvedById?, approvedAt?, notes?`
+- Indexes: `[organizationId]`, `[assignmentId]`, `[crewMemberId, date]`
+
+### Status Flow
+```
+DRAFT → SUBMITTED → APPROVED → EXPORTED
+                   → DISPUTED → (edit) → DRAFT
+```
+
+### Server Actions (`src/server/crew-time.ts`)
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `getTimeEntriesForMember(crewMemberId)` | crew.read | All time entries for a crew member |
+| `getTimeEntriesForProject(projectId)` | crew.read | All time entries for a project |
+| `createTimeEntry(data)` | crew.create | Log time entry, auto-calculates totalHours |
+| `updateTimeEntry(id, data)` | crew.update | Edit (only DRAFT/DISPUTED entries) |
+| `deleteTimeEntry(id)` | crew.delete | Delete (only DRAFT entries) |
+| `submitTimeEntries(ids)` | crew.update | Batch DRAFT → SUBMITTED |
+| `approveTimeEntries(ids)` | crew.update | Batch SUBMITTED → APPROVED |
+| `disputeTimeEntry(id, reason?)` | crew.update | SUBMITTED → DISPUTED |
+| `exportTimesheetCSV(filters?)` | crew.read | CSV export with date/project/member filters |
+
+### API Routes
+- `GET /api/crew/timesheet?dateFrom=...&dateTo=...&crewMemberId=...&projectId=...` — CSV download
+
+### UI
+- **Crew detail page**: "Time" tab with table of all entries, add/edit dialog, bulk submit/approve buttons, CSV export
+- **Log Time dialog**: Toggle between "Project" (linked to assignment) and "General" (standalone shift with description)
+- **Actions per entry**: Edit (DRAFT/DISPUTED), Submit (DRAFT), Approve (SUBMITTED), Dispute (SUBMITTED), Delete (DRAFT)
+
+## Future Phases (not yet implemented)
+- Phase 7: Crew portal

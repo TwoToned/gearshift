@@ -14,7 +14,8 @@ export type SearchResultType =
   | "supplier"
   | "location"
   | "category"
-  | "maintenance";
+  | "maintenance"
+  | "crew";
 
 export type SearchResult = {
   id: string;
@@ -44,6 +45,7 @@ type LocationRow = { id: string; name: string; address: string | null; match_qua
 type CategoryRow = { id: string; name: string; description: string | null; modelCount: number; match_quality: number };
 type SupplierRow = { id: string; name: string; contactName: string | null; accountNumber: string | null; match_quality: number };
 type MaintenanceRow = { id: string; title: string; status: string; match_quality: number };
+type CrewRow = { id: string; firstName: string; lastName: string; email: string | null; department: string | null; roleName: string | null; match_quality: number };
 
 // Child row types
 type ChildAssetRow = { id: string; assetTag: string; serialNumber: string | null; customName: string | null; modelId: string; status: string };
@@ -70,7 +72,7 @@ export async function globalSearch(query: string) {
 
   if (nq.length < 1) return { results: [] };
 
-  const [models, kits, assets, bulkAssets, projects, clients, suppliers, locations, categories, maintenance] =
+  const [models, kits, assets, bulkAssets, projects, clients, suppliers, locations, categories, maintenance, crew] =
     await Promise.all([
       prisma.$queryRaw<ModelRow[]>`
         SELECT m.id, m.name, m.manufacturer, m."modelNumber",
@@ -250,6 +252,32 @@ export async function globalSearch(query: string) {
             OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${ilikePattern})
           )
         ORDER BY match_quality DESC, title ASC LIMIT 3
+      `,
+
+      prisma.$queryRaw<CrewRow[]>`
+        SELECT cm.id, cm."firstName", cm."lastName", cm.email, cm.department,
+               cr.name AS "roleName",
+               GREATEST(
+                 similarity(lower(cm."firstName"), ${ql}),
+                 similarity(lower(cm."lastName"), ${ql}),
+                 similarity(lower(cm."firstName" || ' ' || cm."lastName"), ${ql}),
+                 similarity(lower(COALESCE(cm.email, '')), ${ql})
+               ) AS match_quality
+        FROM "public"."crew_member" cm
+        LEFT JOIN "public"."crew_role" cr ON cm."crewRoleId" = cr.id
+        WHERE cm."organizationId" = ${organizationId} AND cm."status" != 'ARCHIVED'
+          AND (
+            cm."firstName" ILIKE ${ilikePattern} OR cm."lastName" ILIKE ${ilikePattern}
+            OR (cm."firstName" || ' ' || cm."lastName") ILIKE ${ilikePattern}
+            OR COALESCE(cm.email, '') ILIKE ${ilikePattern}
+            OR COALESCE(cm.phone, '') ILIKE ${ilikePattern}
+            OR COALESCE(cm.department, '') ILIKE ${ilikePattern}
+            OR COALESCE(cr.name, '') ILIKE ${ilikePattern}
+            OR lower(regexp_replace(cm."firstName" || cm."lastName", '[^a-zA-Z0-9]', '', 'g')) LIKE ${nqPattern}
+            OR similarity(cm."firstName" || ' ' || cm."lastName", ${q}) > ${trigramThreshold}
+            OR EXISTS(SELECT 1 FROM unnest(cm.tags) t WHERE t ILIKE ${ilikePattern})
+          )
+        ORDER BY match_quality DESC, cm."lastName" ASC LIMIT 10
       `,
     ]);
 
@@ -561,6 +589,16 @@ export async function globalSearch(query: string) {
       id: mr.id, type: "maintenance",
       title: mr.title, subtitle: mr.status,
       href: `/maintenance/${mr.id}`, relevance: Number(mr.match_quality) || 0,
+    });
+  }
+
+  // Crew members
+  for (const c of crew) {
+    results.push({
+      id: c.id, type: "crew",
+      title: `${c.firstName} ${c.lastName}`,
+      subtitle: [c.roleName, c.department].filter(Boolean).join(" · ") || c.email || null,
+      href: `/crew/${c.id}`, relevance: Number(c.match_quality) || 0,
     });
   }
 
