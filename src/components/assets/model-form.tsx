@@ -226,7 +226,9 @@ export function ModelForm({ initialData }: ModelFormProps) {
                     onValueChange={(v) => v && form.setValue("defaultEquipmentClass", v as ModelFormValues["defaultEquipmentClass"])}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue />
+                      <SelectValue>
+                        {equipmentClassOptions.find((o) => o.value === (form.watch("defaultEquipmentClass") || "CLASS_I"))?.label}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {equipmentClassOptions.map((opt) => (
@@ -242,7 +244,9 @@ export function ModelForm({ initialData }: ModelFormProps) {
                     onValueChange={(v) => v && form.setValue("defaultApplianceType", v as ModelFormValues["defaultApplianceType"])}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue />
+                      <SelectValue>
+                        {applianceTypeOptions.find((o) => o.value === (form.watch("defaultApplianceType") || "APPLIANCE"))?.label}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {applianceTypeOptions.map((opt) => (

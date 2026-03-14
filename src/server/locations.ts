@@ -70,9 +70,21 @@ export async function getLocations(params?: {
   });
 }
 
+/** Inherit address/coordinates from parent when a child location has none of its own. */
+function resolveLocationInheritance<T extends { address?: string | null; latitude?: number | null; longitude?: number | null; parent?: { address?: string | null; latitude?: number | null; longitude?: number | null } | null }>(location: T): T {
+  if (location.parent) {
+    if (!location.address) location.address = location.parent.address;
+    if (location.latitude == null && location.longitude == null && location.parent.latitude != null) {
+      location.latitude = location.parent.latitude;
+      location.longitude = location.parent.longitude;
+    }
+  }
+  return location;
+}
+
 export async function getLocation(id: string) {
   const { organizationId } = await getOrgContext();
-  return serialize(await prisma.location.findUnique({
+  const location = await prisma.location.findUnique({
     where: { id, organizationId },
     include: {
       parent: true,
@@ -108,7 +120,9 @@ export async function getLocation(id: string) {
       },
       _count: { select: { assets: true, bulkAssets: true, kits: true, children: true, projects: true } },
     },
-  }));
+  });
+  if (!location) return null;
+  return serialize(location);
 }
 
 export async function createLocation(data: LocationFormValues) {

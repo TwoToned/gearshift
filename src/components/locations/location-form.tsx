@@ -99,7 +99,9 @@ export function LocationForm({ initialData }: LocationFormProps) {
                 onValueChange={(v) => form.setValue("type", (v ?? "WAREHOUSE") as LocationFormValues["type"])}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {{ WAREHOUSE: "Warehouse", VENUE: "Venue", VEHICLE: "Vehicle", OFFSITE: "Offsite" }[form.watch("type") ?? "WAREHOUSE"]}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="WAREHOUSE">Warehouse</SelectItem>
@@ -117,7 +119,9 @@ export function LocationForm({ initialData }: LocationFormProps) {
                 onValueChange={(v) => form.setValue("parentId", v === "__none__" ? null : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="None" />
+                  <SelectValue>
+                    {allLocations.find((l) => l.id === form.watch("parentId"))?.name || "None"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
@@ -136,29 +140,39 @@ export function LocationForm({ initialData }: LocationFormProps) {
             <Controller
               name="address"
               control={form.control}
-              render={({ field }) => (
-                <AddressInput
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  onPlaceSelect={(place) => {
-                    if (place) {
-                      form.setValue("latitude", place.latitude);
-                      form.setValue("longitude", place.longitude);
-                    } else {
-                      form.setValue("latitude", null);
-                      form.setValue("longitude", null);
+              render={({ field }) => {
+                const parentId = form.watch("parentId");
+                const parentLoc = parentId ? allLocations.find((l) => l.id === parentId) : null;
+                const parentAddress = parentLoc?.address || undefined;
+                return (
+                  <AddressInput
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onPlaceSelect={(place) => {
+                      if (place) {
+                        form.setValue("latitude", place.latitude);
+                        form.setValue("longitude", place.longitude);
+                      } else {
+                        form.setValue("latitude", null);
+                        form.setValue("longitude", null);
+                      }
+                    }}
+                    initialCoordinates={
+                      form.watch("latitude") != null && form.watch("longitude") != null
+                        ? { latitude: form.watch("latitude") as number, longitude: form.watch("longitude") as number }
+                        : null
                     }
-                  }}
-                  initialCoordinates={
-                    form.watch("latitude") != null && form.watch("longitude") != null
-                      ? { latitude: form.watch("latitude") as number, longitude: form.watch("longitude") as number }
-                      : null
-                  }
-                  placeholder="123 Main St, City"
-                  countryCode={orgCountry}
-                />
-              )}
+                    placeholder={parentAddress ? `Inherited: ${parentAddress}` : "123 Main St, City"}
+                    countryCode={orgCountry}
+                  />
+                );
+              }}
             />
+            {form.watch("parentId") && !form.watch("address") && (
+              <p className="text-xs text-muted-foreground">
+                Using parent location&apos;s address. Type to set a custom address.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

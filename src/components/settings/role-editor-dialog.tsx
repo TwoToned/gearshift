@@ -154,7 +154,9 @@ export function RoleEditorDialog({
               <Label htmlFor="role-color">Badge Color</Label>
               <Select value={color} onValueChange={(v) => { if (v) setColor(v); }}>
                 <SelectTrigger id="role-color">
-                  <SelectValue />
+                  <SelectValue>
+                    {ROLE_COLORS.find((c) => c.value === color)?.label || color}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {ROLE_COLORS.map((c) => (

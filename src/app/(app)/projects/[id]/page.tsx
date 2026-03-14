@@ -20,6 +20,7 @@ import {
   Copy,
   BookTemplate,
   MoreHorizontal,
+  Navigation,
 } from "lucide-react";
 import { LineItemsPanel } from "@/components/projects/line-items-panel";
 import { useRouter } from "next/navigation";
@@ -435,6 +436,17 @@ export default function ProjectDetailPage({
                         <p className="text-muted-foreground">
                           {project.location.address}
                         </p>
+                      )}
+                      {project.location.latitude != null && project.location.longitude != null && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${project.location.latitude},${project.location.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-teal-500 hover:text-teal-400 mt-1"
+                        >
+                          <Navigation className="h-3 w-3" />
+                          Get Directions
+                        </a>
                       )}
                     </>
                   ) : (

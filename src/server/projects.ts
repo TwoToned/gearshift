@@ -185,7 +185,7 @@ export async function getProject(id: string) {
     where: { id, organizationId },
     include: {
       client: true,
-      location: true,
+      location: { include: { parent: true } },
       lineItems: {
         include: {
           model: true,
@@ -207,6 +207,19 @@ export async function getProject(id: string) {
     },
   });
   if (!project) return null;
+
+  // Inherit address/coordinates from parent location if child has none
+  if (project.location?.parentId) {
+    const loc = project.location;
+    const parent = loc.parent;
+    if (parent) {
+      if (!loc.address) loc.address = parent.address;
+      if (loc.latitude == null && loc.longitude == null && parent.latitude != null) {
+        loc.latitude = parent.latitude;
+        loc.longitude = parent.longitude;
+      }
+    }
+  }
 
   const overbookedMap = await computeOverbookedStatus(
     organizationId,
