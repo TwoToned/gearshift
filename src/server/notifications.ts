@@ -76,7 +76,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
         id: `return-${p.id}`,
         type: "overdue_return",
         title: `Overdue return: ${p.projectNumber}`,
-        description: `${p.name} — ${p._count.lineItems} items still checked out`,
+        description: `${p.name} — ${p._count.lineItems} items still deployed`,
         href: `/projects/${p.id}`,
         severity: "error",
         timestamp: p.rentalEndDate?.toISOString() || p.updatedAt.toISOString(),

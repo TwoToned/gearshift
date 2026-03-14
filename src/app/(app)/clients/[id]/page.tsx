@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getClient, archiveClient, updateClientNotes } from "@/server/clients";
+import { projectStatusLabels, formatLabel } from "@/lib/status-labels";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
@@ -47,6 +48,10 @@ const projectStatusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
   QUOTED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   CONFIRMED: "bg-green-500/10 text-green-500 border-green-500/20",
+  PREPPING: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  ON_SITE: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  RETURNED: "bg-teal-500/10 text-teal-500 border-teal-500/20",
   IN_PROGRESS: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   COMPLETED: "bg-green-500/10 text-green-500 border-green-500/20",
   CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
@@ -263,7 +268,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                           <TableCell>{project.name}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={projectStatusColors[project.status] || ""}>
-                              {project.status.replace("_", " ")}
+                              {projectStatusLabels[project.status] || formatLabel(project.status)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">{project._count.lineItems}</TableCell>

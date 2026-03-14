@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/dialog";
 import { MediaThumbnail } from "@/components/media/media-thumbnail";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
+import { assetStatusLabels, bulkAssetStatusLabels, conditionLabels, formatLabel } from "@/lib/status-labels";
 
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RESERVED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -118,7 +119,7 @@ function useAssetColumns(
       filterType: "enum",
       filterOptions: [
         { value: "AVAILABLE", label: "Available", color: "bg-green-500" },
-        { value: "CHECKED_OUT", label: "Checked Out", color: "bg-blue-500" },
+        { value: "CHECKED_OUT", label: "Deployed", color: "bg-purple-500" },
         { value: "IN_MAINTENANCE", label: "In Maintenance", color: "bg-amber-500" },
         { value: "RESERVED", label: "Reserved", color: "bg-purple-500" },
         { value: "RETIRED", label: "Retired", color: "bg-gray-500" },
@@ -126,7 +127,7 @@ function useAssetColumns(
       ],
       cell: (row) => (
         <Badge variant="outline" className={statusColors[row.status] || ""}>
-          {row.status.replace(/_/g, " ")}
+          {assetStatusLabels[row.status] || formatLabel(row.status)}
         </Badge>
       ),
     },
@@ -147,7 +148,7 @@ function useAssetColumns(
       ],
       cell: (row) => (
         <Badge variant="outline" className={conditionColors[row.condition] || ""}>
-          {row.condition}
+          {conditionLabels[row.condition] || formatLabel(row.condition)}
         </Badge>
       ),
     },
@@ -260,7 +261,7 @@ function useBulkAssetColumns(
       ],
       cell: (row) => (
         <Badge variant="outline" className={statusColors[row.status] || ""}>
-          {row.status.replace(/_/g, " ")}
+          {bulkAssetStatusLabels[row.status] || formatLabel(row.status)}
         </Badge>
       ),
     },
@@ -588,7 +589,7 @@ function BulkEditDialog({
             >
               <option value="">— No change —</option>
               <option value="AVAILABLE">Available</option>
-              <option value="CHECKED_OUT">Checked Out</option>
+              <option value="CHECKED_OUT">Deployed</option>
               <option value="IN_MAINTENANCE">In Maintenance</option>
               <option value="RESERVED">Reserved</option>
               <option value="RETIRED">Retired</option>

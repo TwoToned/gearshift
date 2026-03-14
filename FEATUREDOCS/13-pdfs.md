@@ -5,6 +5,7 @@
 - API route: `GET /api/documents/[projectId]?type=quote` streams PDF
 - Templates in `src/lib/pdf/`: `quote-pdf.tsx`, `invoice-pdf.tsx`, `packing-list-pdf.tsx`, `return-sheet-pdf.tsx`, `delivery-docket-pdf.tsx`
 - Shared styles in `src/lib/pdf/styles.ts`
+- Documents accessible from both the **project detail page** and the **warehouse page** via dropdown menus
 
 ## Constraints
 - **Helvetica only** — no Unicode symbols (use ASCII: `-` not `—`, `|` not `•`)

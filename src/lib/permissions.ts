@@ -105,8 +105,8 @@ export const PERMISSION_REGISTRY: Record<
     label: "Warehouse",
     actions: [
       { key: "read", label: "View" },
-      { key: "check_out", label: "Check Out" },
-      { key: "check_in", label: "Check In" },
+      { key: "check_out", label: "Deploy" },
+      { key: "check_in", label: "Return" },
       { key: "scan", label: "Scan" },
     ],
   },

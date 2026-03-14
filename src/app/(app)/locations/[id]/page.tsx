@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getLocation, deleteLocation, updateLocationNotes } from "@/server/locations";
+import { assetStatusLabels, bulkAssetStatusLabels, kitStatusLabels, projectStatusLabels, formatLabel } from "@/lib/status-labels";
 import { useActiveOrganization } from "@/lib/auth-client";
 import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
@@ -55,6 +56,10 @@ const projectStatusColors: Record<string, string> = {
   ENQUIRY: "bg-gray-500/10 text-gray-500 border-gray-500/20",
   QUOTED: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   CONFIRMED: "bg-green-500/10 text-green-500 border-green-500/20",
+  PREPPING: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  ON_SITE: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  RETURNED: "bg-teal-500/10 text-teal-500 border-teal-500/20",
   IN_PROGRESS: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   COMPLETED: "bg-green-500/10 text-green-500 border-green-500/20",
   CANCELLED: "bg-red-500/10 text-red-500 border-red-500/20",
@@ -274,7 +279,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                             <Badge variant="outline" className="text-xs">Serialized</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">{asset.status}</Badge>
+                            <Badge variant="outline" className="text-xs">{assetStatusLabels[asset.status] || formatLabel(asset.status)}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -290,7 +295,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                             <Badge variant="outline" className="text-xs">Bulk</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">{bulk.status}</Badge>
+                            <Badge variant="outline" className="text-xs">{bulkAssetStatusLabels[bulk.status] || formatLabel(bulk.status)}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -306,7 +311,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                             <Badge variant="outline" className="text-xs">Kit</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">{kit.status}</Badge>
+                            <Badge variant="outline" className="text-xs">{kitStatusLabels[kit.status] || formatLabel(kit.status)}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -355,7 +360,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                           <TableCell className="text-muted-foreground">{project.client?.name || "\u2014"}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={projectStatusColors[project.status] || ""}>
-                              {project.status.replace("_", " ")}
+                              {projectStatusLabels[project.status] || formatLabel(project.status)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground">

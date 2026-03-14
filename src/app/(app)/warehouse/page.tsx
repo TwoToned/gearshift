@@ -56,7 +56,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   CONFIRMED: "Confirmed",
   PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
+  CHECKED_OUT: "Deployed",
   ON_SITE: "On Site",
   RETURNED: "Returned",
 };
@@ -114,7 +114,7 @@ export default function WarehousePage() {
     mutationFn: ({ id, status }: { id: string; status: "CHECKED_OUT" | "RETURNED" | "COMPLETED" }) =>
       updateProjectStatus(id, status),
     onSuccess: (_, { status }) => {
-      const label = status === "CHECKED_OUT" ? "Checked Out" : status === "RETURNED" ? "Returned" : "Completed";
+      const label = status === "CHECKED_OUT" ? "Deployed" : status === "RETURNED" ? "Returned" : "Completed";
       toast.success(`Project marked as ${label}`);
       queryClient.invalidateQueries({ queryKey: ["warehouse-projects"] });
       setPendingAction(null);
@@ -139,7 +139,7 @@ export default function WarehousePage() {
       setPendingAction({
         project,
         targetStatus,
-        warningMessage: `Are you sure you want to mark this project as ${targetStatus === "CHECKED_OUT" ? "Checked Out" : targetStatus === "RETURNED" ? "Returned" : "Completed"}?`,
+        warningMessage: `Are you sure you want to mark this project as ${targetStatus === "CHECKED_OUT" ? "Deployed" : targetStatus === "RETURNED" ? "Returned" : "Completed"}?`,
       });
       return;
     }
@@ -152,7 +152,7 @@ export default function WarehousePage() {
         setPendingAction({
           project,
           targetStatus,
-          warningMessage: `${notCheckedOut} item${notCheckedOut !== 1 ? "s are" : " is"} not yet checked out. Are you sure you want to mark this project as Checked Out?`,
+          warningMessage: `${notCheckedOut} item${notCheckedOut !== 1 ? "s are" : " is"} not yet deployed. Are you sure you want to mark this project as Deployed?`,
         });
         return;
       }
@@ -176,7 +176,7 @@ export default function WarehousePage() {
     setPendingAction({
       project,
       targetStatus,
-      warningMessage: `Mark this project as ${targetStatus === "CHECKED_OUT" ? "Checked Out" : targetStatus === "RETURNED" ? "Returned" : "Completed"}?`,
+      warningMessage: `Mark this project as ${targetStatus === "CHECKED_OUT" ? "Deployed" : targetStatus === "RETURNED" ? "Returned" : "Completed"}?`,
     });
   }
 
@@ -187,7 +187,7 @@ export default function WarehousePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Warehouse</h1>
         <p className="text-muted-foreground">
-          Check out and return equipment for active projects.
+          Deploy and return equipment for active projects.
         </p>
       </div>
 
@@ -277,7 +277,7 @@ export default function WarehousePage() {
                             onClick={() => handleStatusAction(project, "CHECKED_OUT")}
                           >
                             <PackageOpen className="mr-2 h-4 w-4" />
-                            Mark Checked Out
+                            Mark Deployed
                           </DropdownMenuItem>
                         )}
                         {(project.status === "CHECKED_OUT" || project.status === "ON_SITE") && (
@@ -312,7 +312,7 @@ export default function WarehousePage() {
           <DialogHeader>
             <DialogTitle>
               {pendingAction?.targetStatus === "CHECKED_OUT"
-                ? "Mark as Checked Out?"
+                ? "Mark as Deployed?"
                 : pendingAction?.targetStatus === "RETURNED"
                 ? "Mark as Returned?"
                 : "Mark as Completed?"}

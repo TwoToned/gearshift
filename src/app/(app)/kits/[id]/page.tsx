@@ -55,9 +55,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { kitStatusLabels, lineItemStatusLabels, conditionLabels, formatLabel } from "@/lib/status-labels";
+
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
   INCOMPLETE: "bg-red-500/10 text-red-500 border-red-500/20",
@@ -224,7 +226,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
             <h1 className="text-2xl font-bold tracking-tight font-mono">{kit.assetTag}</h1>
             <CanDo resource="kit" action="update" fallback={
               <Badge variant="outline" className={statusColors[kit.status] || ""}>
-                {kit.status.replace("_", " ")}
+                {kitStatusLabels[kit.status] || formatLabel(kit.status)}
               </Badge>
             }>
               <select
@@ -234,14 +236,14 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                 className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="AVAILABLE">Available</option>
-                <option value="CHECKED_OUT">Checked Out</option>
+                <option value="CHECKED_OUT">Deployed</option>
                 <option value="IN_MAINTENANCE">In Maintenance</option>
                 <option value="RETIRED">Retired</option>
                 <option value="INCOMPLETE">Incomplete</option>
               </select>
             </CanDo>
             <Badge variant="outline" className={conditionColors[kit.condition] || ""}>
-              {kit.condition}
+              {conditionLabels[kit.condition] || formatLabel(kit.condition)}
             </Badge>
             {kit.caseType && (
               <Badge variant="secondary">{kit.caseType}</Badge>
@@ -472,7 +474,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                         <TableRow>
                           <TableHead>Project</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Checked Out</TableHead>
+                          <TableHead>Deployed</TableHead>
                           <TableHead>Returned</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -486,7 +488,7 @@ export default function KitDetailPage({ params }: { params: Promise<{ id: string
                               <p className="text-xs text-muted-foreground">{li.project.projectNumber}</p>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{li.status.replace("_", " ")}</Badge>
+                              <Badge variant="outline">{lineItemStatusLabels[li.status] || formatLabel(li.status)}</Badge>
                             </TableCell>
                             <TableCell className="text-sm">{formatDate(li.checkedOutAt)}</TableCell>
                             <TableCell className="text-sm">{formatDate(li.returnedAt)}</TableCell>

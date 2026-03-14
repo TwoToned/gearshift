@@ -70,7 +70,7 @@ export function DuplicateProjectDialog({
           </DialogTitle>
           <DialogDescription>
             {isTemplate
-              ? "Create a reusable template from this project. Dates and checkout status will not be copied."
+              ? "Create a reusable template from this project. Dates and deployment status will not be copied."
               : "Create a copy of this project with all line items. Dates will be cleared and status set to Enquiry."}
           </DialogDescription>
         </DialogHeader>

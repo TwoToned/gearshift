@@ -21,6 +21,7 @@ import {
   BookTemplate,
   MoreHorizontal,
   Navigation,
+  Warehouse,
 } from "lucide-react";
 import { LineItemsPanel } from "@/components/projects/line-items-panel";
 import { useRouter } from "next/navigation";
@@ -85,7 +86,7 @@ const statusLabels: Record<string, string> = {
   QUOTED: "Quoted",
   CONFIRMED: "Confirmed",
   PREPPING: "Prepping",
-  CHECKED_OUT: "Checked Out",
+  CHECKED_OUT: "Deployed",
   ON_SITE: "On Site",
   RETURNED: "Returned",
   COMPLETED: "Completed",
@@ -235,6 +236,12 @@ export default function ProjectDetailPage({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {!project.isTemplate && (
+            <Button variant="outline" size="sm" render={<Link href={`/warehouse/${id}`} />}>
+              <Warehouse className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Warehouse</span>
+            </Button>
+          )}
           {!project.isTemplate && (
             <DropdownMenu>
               <DropdownMenuTrigger

@@ -36,9 +36,11 @@ import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 
+import { assetStatusLabels, bulkAssetStatusLabels, formatLabel } from "@/lib/status-labels";
+
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RESERVED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -286,7 +288,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                         <TableCell className="font-mono text-sm text-muted-foreground">{asset.serialNumber || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColors[asset.status] || ""}>
-                            {asset.status.replace("_", " ")}
+                            {assetStatusLabels[asset.status] || formatLabel(asset.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{asset.location?.name || "—"}</TableCell>
@@ -333,7 +335,7 @@ export default function ModelDetailPage({ params }: { params: Promise<{ id: stri
                         <TableCell className="text-right text-muted-foreground">{ba.totalQuantity}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColors[ba.status] || ""}>
-                            {ba.status.replace("_", " ")}
+                            {bulkAssetStatusLabels[ba.status] || formatLabel(ba.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{ba.location?.name || "—"}</TableCell>

@@ -427,7 +427,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     label: "History",
     command: "history",
     aliases: ["log", "activity"],
-    description: "View asset checkout history",
+    description: "View asset deployment history",
     icon: "ScrollText",
     pages: ["/assets/registry/[id]"],
     action: { type: "trigger", event: "switch-tab:history" },

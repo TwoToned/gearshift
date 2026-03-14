@@ -38,9 +38,11 @@ import { CanDo } from "@/components/auth/permission-gate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 
+import { assetStatusLabels, lineItemStatusLabels, maintenanceTypeLabels, maintenanceStatusLabels, mediaTypeLabels, conditionLabels, formatLabel } from "@/lib/status-labels";
+
 const statusColors: Record<string, string> = {
   AVAILABLE: "bg-green-500/10 text-green-500 border-green-500/20",
-  CHECKED_OUT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  CHECKED_OUT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   IN_MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   RESERVED: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   RETIRED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
@@ -169,10 +171,10 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight font-mono">{asset.assetTag}</h1>
             <Badge variant="outline" className={statusColors[asset.status] || ""}>
-              {asset.status.replace("_", " ")}
+              {assetStatusLabels[asset.status] || formatLabel(asset.status)}
             </Badge>
             <Badge variant="outline" className={conditionColors[asset.condition] || ""}>
-              {asset.condition}
+              {conditionLabels[asset.condition] || asset.condition}
             </Badge>
           </div>
           <p className="text-muted-foreground truncate">
@@ -342,7 +344,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <TableRow>
                     <TableHead>Project</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="hidden sm:table-cell">Checked Out</TableHead>
+                    <TableHead className="hidden sm:table-cell">Deployed</TableHead>
                     <TableHead className="hidden sm:table-cell">Returned</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -356,7 +358,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                         <p className="text-xs text-muted-foreground">{li.project.projectNumber}</p>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{li.status.replace("_", " ")}</Badge>
+                        <Badge variant="outline">{lineItemStatusLabels[li.status] || formatLabel(li.status)}</Badge>
                       </TableCell>
                       <TableCell className="text-sm hidden sm:table-cell">{formatDate(li.checkedOutAt)}</TableCell>
                       <TableCell className="text-sm hidden sm:table-cell">{formatDate(li.returnedAt)}</TableCell>
@@ -394,10 +396,10 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       <TableRow key={mr.id}>
                         <TableCell className="font-medium">{mr.title}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{mr.type.replace("_", " ")}</Badge>
+                          <Badge variant="secondary">{maintenanceTypeLabels[mr.type] || formatLabel(mr.type)}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{mr.status}</Badge>
+                          <Badge variant="outline">{maintenanceStatusLabels[mr.status] || formatLabel(mr.status)}</Badge>
                         </TableCell>
                         <TableCell className="text-sm hidden sm:table-cell">
                           {formatDate(mr.completedDate || mr.scheduledDate)}
@@ -505,7 +507,7 @@ function AssetDetailContent({ params }: { params: Promise<{ id: string }> }) {
                             {doc.displayName || doc.file.fileName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {doc.type.replace("_", " ")} — {(doc.file.fileSize / 1024).toFixed(0)} KB
+                            {mediaTypeLabels[doc.type] || formatLabel(doc.type)} — {(doc.file.fileSize / 1024).toFixed(0)} KB
                           </p>
                         </div>
                       </a>
